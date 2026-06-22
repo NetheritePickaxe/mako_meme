@@ -1,26 +1,53 @@
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'tables.dart';
 
 part 'database.g.dart';
 
-@DriftDatabase(tables: [StickerPacks, Stickers])
+@DriftDatabase(tables: [Namespaces, StickerPacks, Stickers])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
-  /// 初始化时创建数据库并执行迁移
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (Migrator m) async {
           await m.createAll();
         },
+        onUpgrade: (Migrator m, int from, int to) async {
+          if (from < 2) {
+            await m.createTable(namespaces);
+            await m.addColumn(stickerPacks, stickerPacks.namespaceId);
+            await m.addColumn(stickerPacks, stickerPacks.tags);
+            await m.addColumn(stickerPacks, stickerPacks.metadata);
+          }
+        },
       );
 
-  // --- StickerPack queries ---
+  // ==================== Namespace ====================
 
+  Stream<List<NamespaceData>> watchAllNamespaces() =>
+      select(namespaces).watch();
+
+  Future<NamespaceData?> getNamespace(String id) =>
+      (select(namespaces)..where((t) => t.id.equals(id))).getSingleOrNull();
+
+  Future<int> insertNamespace(NamespacesCompanion ns) =>
+      into(namespaces).insert(ns);
+
+  Future<int> deleteNamespace(String id) =>
+      (delete(namespaces)..where((t) => t.id.equals(id))).go();
+
+  // ==================== StickerPack ====================
+
+  /// 获取某命名空间下所有包
+  Stream<List<StickerPackData>> watchPacksByNamespace(String nsId) =>
+      (select(stickerPacks)..where((t) => t.namespaceId.equals(nsId))).watch();
+
+  /// 获取所有包（按命名空间分组用）
   Stream<List<StickerPackData>> watchAllPacks() => select(stickerPacks).watch();
 
   Future<StickerPackData?> getPack(String id) =>
@@ -35,7 +62,15 @@ class AppDatabase extends _$AppDatabase {
   Future<int> deletePack(String id) =>
       (delete(stickerPacks)..where((t) => t.id.equals(id))).go();
 
-  // --- Sticker queries ---
+  /// 按包标签搜索
+  Stream<List<StickerPackData>> searchPacks(String query) {
+    final q = '%$query%';
+    return (select(stickerPacks)
+          ..where((t) => t.name.like(q) | t.tags.like(q)))
+        .watch();
+  }
+
+  // ==================== Sticker ====================
 
   Stream<List<StickerData>> watchStickersByPack(String packId) =>
       (select(stickers)..where((t) => t.packId.equals(packId))).watch();
@@ -58,14 +93,16 @@ class AppDatabase extends _$AppDatabase {
   Future<List<StickerData>> getStickersByPack(String packId) =>
       (select(stickers)..where((t) => t.packId.equals(packId))).get();
 
-  /// 获取所有表情（带 pack join，用于全局搜索）
-  Stream<List<TypedResult>> watchAllStickers() {
-    final query = select(stickers).join([
-      leftOuterJoin(stickerPacks, stickerPacks.id.equalsExp(stickers.packId)),
-    ]);
-    return query.watch();
+  static QueryExecutor _openConnection() {
+    if (kIsWeb) {
+      return driftDatabase(
+        name: 'mako_meme.db',
+        web: DriftWebOptions(
+          sqlite3Wasm: Uri.parse('sqlite3.wasm'),
+          driftWorker: Uri.parse('drift_worker.js'),
+        ),
+      );
+    }
+    return driftDatabase(name: 'mako_meme.db');
   }
-
-  static QueryExecutor _openConnection() =>
-      driftDatabase(name: 'mako_meme.db');
 }

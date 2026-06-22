@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
@@ -7,6 +7,7 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import '../../data/database/database.dart';
 import '../providers/sticker_providers.dart';
+import '../../shared/widgets/sticker_image.dart';
 import '../widgets/sticker_preview.dart';
 
 class PackDetailScreen extends ConsumerStatefulWidget {
@@ -276,8 +277,20 @@ class _PackDetailScreenState extends ConsumerState<PackDetailScreen> {
     if (result == null || result.files.isEmpty) return;
 
     final repo = ref.read(stickerRepositoryProvider);
-    final paths =
-        result.files.where((f) => f.path != null).map((f) => f.path!).toList();
+
+    // Web: file_picker 返回 bytes；Native: 返回 path
+    final paths = <String>[];
+    final bytesList = <Uint8List?>[];
+    for (final f in result.files) {
+      if (f.path != null) {
+        paths.add(f.path!);
+        bytesList.add(null);
+      } else if (f.bytes != null) {
+        // Web 端使用文件名作为源路径标识
+        paths.add(f.name);
+        bytesList.add(f.bytes);
+      }
+    }
 
     if (paths.isEmpty) return;
 
@@ -289,7 +302,7 @@ class _PackDetailScreenState extends ConsumerState<PackDetailScreen> {
       );
     }
 
-    await repo.importStickers(packId: widget.packId, sourcePaths: paths);
+    await repo.importStickers(packId: widget.packId, sourcePaths: paths, bytesList: bytesList);
 
     if (context.mounted) {
       Navigator.of(context).pop();
@@ -424,7 +437,6 @@ class _StickerTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final repo = ref.read(stickerRepositoryProvider);
-    final theme = Theme.of(context);
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -434,22 +446,10 @@ class _StickerTile extends ConsumerWidget {
           InkWell(
             onTap: onTap,
             onLongPress: onLongPress,
-            child: FutureBuilder<String>(
-              future: repo.stickerFullPath(sticker.storedPath),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return const SizedBox(height: 120);
-                }
-                return Image.file(
-                  File(snapshot.data!),
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    height: 120,
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    child: const Icon(Icons.broken_image),
-                  ),
-                );
-              },
+            child: StickerImage(
+              sticker: sticker,
+              repo: repo,
+              fit: BoxFit.cover,
             ),
           ),
           if (selected)

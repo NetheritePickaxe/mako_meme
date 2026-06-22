@@ -1,8 +1,8 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/database/database.dart';
 import '../providers/sticker_providers.dart';
+import '../../shared/widgets/sticker_image.dart';
 import '../widgets/sticker_preview.dart';
 
 /// 全局搜索代理
@@ -129,27 +129,14 @@ class StickerSearchDelegate extends SearchDelegate<String> {
                               ),
                             );
                           },
-                          child: FutureBuilder<String>(
-                            future: repo.stickerFullPath(s.storedPath),
-                            builder: (context, fileSnap) {
-                              if (!fileSnap.hasData) {
-                                return const SizedBox.shrink();
-                              }
-                              return ClipRRect(
+                          child: ClipRRect(
                                 borderRadius: BorderRadius.circular(8),
-                                child: Image.file(
-                                  File(fileSnap.data!),
+                                child: StickerImage(
+                                  sticker: s,
+                                  repo: repo,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Container(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .surfaceContainerHighest,
-                                    child: const Icon(Icons.broken_image),
-                                  ),
                                 ),
-                              );
-                            },
-                          ),
+                              ),
                         );
                       },
                     ),

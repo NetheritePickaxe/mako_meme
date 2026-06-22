@@ -9,12 +9,16 @@ import 'data/repositories/sticker_repository.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 初始化预置数据
-  final db = AppDatabase();
-  final fileService = FileService();
-  final repo = StickerRepository(db, fileService);
-  final presetService = PresetService(repo);
-  await presetService.initializeIfNeeded();
+  // 初始化预置数据 (Web 环境可能不支持 Canvas/File IO, 优雅降级)
+  try {
+    final db = AppDatabase();
+    final fileService = FileService();
+    final repo = StickerRepository(db, fileService);
+    final presetService = PresetService(repo);
+    await presetService.initializeIfNeeded();
+  } catch (e) {
+    debugPrint('Preset initialization skipped: $e');
+  }
 
   runApp(
     const ProviderScope(

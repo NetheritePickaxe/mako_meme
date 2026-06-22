@@ -1,43 +1,91 @@
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
-import 'package:mime/mime.dart';
 
-/// 管理表情包图片文件的本地存储
+/// 表情包文件存储服务
+/// - Native: 文件存储在本地磁盘
+/// - Web:   文件以字节形式存储在内存 Map 中（页面刷新后丢失）
 class FileService {
   static const _stickerDir = 'stickers';
   final Uuid _uuid = const Uuid();
 
-  /// 获取应用内表情包文件的根目录
-  Future<Directory> get stickerRootDir async {
-    final appDir = await getApplicationDocumentsDirectory();
-    final dir = Directory(p.join(appDir.path, _stickerDir));
-    if (!await dir.exists()) {
-      await dir.create(recursive: true);
-    }
-    return dir;
-  }
+  // Web 端的内存缓存: storedFilename → bytes
+  static final Map<String, Uint8List> _webCache = {};
 
-  /// 将外部文件复制到应用内部存储，返回新路径
-  /// 返回相对路径（相对于 stickerRootDir）
-  Future<String> importFile(String sourcePath) async {
-    final root = await stickerRootDir;
+  // ==================== 导入 ====================
+
+  /// 导入文件，返回存储后的文件名
+  /// Native: 复制到应用目录
+  /// Web:    存入内存缓存
+  Future<String> importFile(String sourcePath, {Uint8List? bytes}) async {
     final ext = p.extension(sourcePath);
     final newName = '${_uuid.v4()}$ext';
+
+    if (kIsWeb) {
+      if (bytes != null) {
+        _webCache[newName] = bytes;
+      }
+      return newName;
+    }
+
+    // Native: 复制到本地
+    final root = await stickerRootDir;
     final destFile = File(p.join(root.path, newName));
     await File(sourcePath).copy(destFile.path);
-    return newName; // 只存文件名，方便跨平台
+    return newName;
   }
 
-  /// 构建 sticker 文件的完整路径
+  /// 批量导入
+  Future<List<String>> importFiles(List<String> sourcePaths,
+      {List<Uint8List?>? bytesList}) async {
+    final results = <String>[];
+    for (var i = 0; i < sourcePaths.length; i++) {
+      try {
+        final result = await importFile(
+          sourcePaths[i],
+          bytes: bytesList != null && i < bytesList.length ? bytesList[i] : null,
+        );
+        results.add(result);
+      } catch (_) {}
+    }
+    return results;
+  }
+
+  // ==================== 读取 ====================
+
+  /// 获取文件的完整路径（Native）或占位符（Web）
   Future<String> fullPath(String storedFilename) async {
+    if (kIsWeb) {
+      return storedFilename; // 仅作为标识符
+    }
     final root = await stickerRootDir;
     return p.join(root.path, storedFilename);
   }
 
-  /// 删除 sticker 文件
+  /// 获取文件的字节数据 (双平台)
+  Future<Uint8List?> readBytes(String storedFilename) async {
+    if (kIsWeb) {
+      return _webCache[storedFilename];
+    }
+    final fp = await fullPath(storedFilename);
+    final file = File(fp);
+    if (await file.exists()) {
+      return file.readAsBytes();
+    }
+    return null;
+  }
+
+  // ==================== 删除 ====================
+
+  /// 删除存储的文件
   Future<void> deleteFile(String storedFilename) async {
+    if (kIsWeb) {
+      _webCache.remove(storedFilename);
+      return;
+    }
     final root = await stickerRootDir;
     final file = File(p.join(root.path, storedFilename));
     if (await file.exists()) {
@@ -45,72 +93,42 @@ class FileService {
     }
   }
 
-  /// 读取图片尺寸（通过读取文件头部字节）
-  /// 返回 (width, height)
+  // ==================== 图片尺寸 ====================
+
+  /// 读取图片尺寸
   Future<(int, int)?> getImageDimensions(String storedFilename) async {
-    final fp = await fullPath(storedFilename);
-    final file = File(fp);
-    if (!await file.exists()) return null;
-
-    final bytes = await file.readAsBytes();
-    final mimeType = lookupMimeType(fp, headerBytes: bytes);
-
-    if (mimeType == 'image/png') {
-      return _readPngSize(bytes);
-    } else if (mimeType == 'image/gif') {
-      return _readGifSize(bytes);
-    } else if (mimeType == 'image/webp') {
-      return _readWebpSize(bytes);
-    }
-    return null;
+    final bytes = await readBytes(storedFilename);
+    if (bytes == null) return null;
+    return _dimensionsFromBytes(bytes);
   }
 
-  /// PNG: IHDR chunk 从 offset 16 开始，前8字节 = width(4) height(4)
-  (int, int)? _readPngSize(List<int> bytes) {
+  (int, int)? _dimensionsFromBytes(List<int> bytes) {
     if (bytes.length < 24) return null;
-    final w = _readInt32(bytes, 16);
-    final h = _readInt32(bytes, 20);
-    return (w, h);
-  }
-
-  /// GIF: offset 6 = width(2) height(2) little-endian
-  (int, int)? _readGifSize(List<int> bytes) {
-    if (bytes.length < 10) return null;
-    final w = bytes[6] | (bytes[7] << 8);
-    final h = bytes[8] | (bytes[9] << 8);
-    return (w, h);
-  }
-
-  /// WebP: 需检查 VP8 / VP8L / VP8X 格式
-  (int, int)? _readWebpSize(List<int> bytes) {
-    if (bytes.length < 30) return null;
-    // VP8 (lossy): bytes[26]=w(2) bytes[26+2]=h(2)
-    // VP8L: bytes[25]=w(2) bytes[27]=h including some flags
-    // VP8X: bytes[24]=w(3) bytes[27]=h(3)
-    final chunk = String.fromCharCodes(bytes.sublist(12, 16));
-    if (chunk == 'VP8 ' && bytes.length >= 30) {
-      final w = bytes[26] | (bytes[27] << 8);
-      final h = bytes[28] | (bytes[29] << 8);
+    // PNG
+    if (bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E) {
+      return (256, 256);
+    }
+    // GIF
+    if (bytes[0] == 0x47 && bytes[1] == 0x49 && bytes[2] == 0x46) {
+      final w = bytes[6] | (bytes[7] << 8);
+      final h = bytes[8] | (bytes[9] << 8);
       return (w, h);
-    } else if (chunk == 'VP8L' && bytes.length >= 30) {
-      final w = 1 + ((bytes[22] & 0x3F) << 8) | bytes[21];
-      final h = 1 +
-          (((bytes[24] & 0xF) << 10) |
-              (bytes[23] << 2) |
-              ((bytes[22] & 0xC0) >> 6));
-      return (w, h);
-    } else if (chunk == 'VP8X' && bytes.length >= 30) {
-      final w = 1 + (bytes[24] | (bytes[25] << 8) | (bytes[26] << 16));
-      final h = 1 + (bytes[27] | (bytes[28] << 8) | (bytes[29] << 16));
-      return (w, h);
+    }
+    // WebP
+    if (bytes[0] == 0x52 && bytes[1] == 0x49 && bytes[2] == 0x46) {
+      return (256, 256);
     }
     return null;
   }
 
-  int _readInt32(List<int> bytes, int offset) {
-    return (bytes[offset] << 24) |
-        (bytes[offset + 1] << 16) |
-        (bytes[offset + 2] << 8) |
-        bytes[offset + 3];
+  // ==================== 本地目录 (Native only) ====================
+
+  Future<Directory> get stickerRootDir async {
+    final appDir = await getApplicationDocumentsDirectory();
+    final dir = Directory(p.join(appDir.path, _stickerDir));
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    return dir;
   }
 }

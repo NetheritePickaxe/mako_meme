@@ -1,8 +1,10 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../data/database/database.dart';
+import '../../shared/widgets/sticker_image.dart';
 import '../providers/sticker_providers.dart';
 
 /// 全屏预览单个表情
@@ -25,44 +27,24 @@ class StickerPreviewScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.share),
             onPressed: () async {
-              final path = await repo.stickerFullPath(sticker.storedPath);
-              await Share.shareXFiles([XFile(path)]);
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () {
-              Navigator.pop(context);
-              // 回退到上层页面后会触发标签编辑
-              // 简单做法：直接在这里编辑
+              final bytes = await repo.stickerBytes(sticker.storedPath);
+              if (bytes != null) {
+                final temp = await _writeTempFile(bytes, sticker.mimeType);
+                if (temp != null) {
+                  await Share.shareXFiles([XFile(temp)]);
+                }
+              }
             },
           ),
         ],
       ),
       body: Center(
-        child: FutureBuilder<String>(
-          future: repo.stickerFullPath(sticker.storedPath),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) {
-              return const CircularProgressIndicator(color: Colors.white);
-            }
-            final file = File(snapshot.data!);
-            if (!file.existsSync()) {
-              return const Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.broken_image, size: 64, color: Colors.white54),
-                  SizedBox(height: 8),
-                  Text('文件不存在', style: TextStyle(color: Colors.white54)),
-                ],
-              );
-            }
-            return InteractiveViewer(
-              minScale: 0.5,
-              maxScale: 4.0,
-              child: Image.file(file, fit: BoxFit.contain),
-            );
-          },
+        child: StickerImage(
+          sticker: sticker,
+          repo: repo,
+          fit: BoxFit.contain,
+          height: double.infinity,
+          width: double.infinity,
         ),
       ),
       bottomNavigationBar: sticker.tags != null && sticker.tags!.isNotEmpty
@@ -86,5 +68,26 @@ class StickerPreviewScreen extends ConsumerWidget {
             )
           : null,
     );
+  }
+
+  /// 写临时文件用于分享 (Web 上可能不支持)
+  Future<String?> _writeTempFile(Uint8List bytes, String mimeType) async {
+    try {
+      final ext = mimeType.split('/').last;
+      final dir = await _getTempDir();
+      final path = '${dir.path}/share_$sticker.$ext';
+      await File(path).writeAsBytes(bytes);
+      return path;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<Directory> _getTempDir() async {
+    try {
+      return await Directory.systemTemp.createTemp('mako_share_');
+    } catch (_) {
+      return Directory('/tmp'); // fallback
+    }
   }
 }

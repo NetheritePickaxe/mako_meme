@@ -1,11 +1,11 @@
 {
-    "name": "sticker_manager",
-    "short_name": "sticker_manager",
+    "name": "Mako Meme",
+    "short_name": "Mako Meme",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#7C3AED",
+    "theme_color": "#7C3AED",
+    "description": "Mako Meme - 跨平台表情包管理器",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -23,6 +23,18 @@ class PresetService {
   }
 
   Future<void> _createPresetPacks() async {
+    // 创建默认命名空间
+    final nsBasic = await _repo.createNamespace(
+      name: '默认',
+      icon: '😊',
+      color: '7C3AED',
+    );
+    final nsGestures = await _repo.createNamespace(
+      name: '手势',
+      icon: '✌️',
+      color: '3498DB',
+    );
+
     // 创建 temp 目录用于生成图片
     final tempDir = await getTemporaryDirectory();
 
@@ -30,6 +42,8 @@ class PresetService {
     final pack1 = await _repo.createPack(
       name: '基础表情',
       description: '经典黄脸表情包',
+      namespaceId: nsBasic.id,
+      tags: ['emoji', '经典', '黄脸'],
     );
 
     final emojis = _getBasicEmojis();
@@ -47,6 +61,8 @@ class PresetService {
     final pack2 = await _repo.createPack(
       name: '手势与动作',
       description: '常用手势表情',
+      namespaceId: nsGestures.id,
+      tags: ['手势', '动作', '常用'],
     );
 
     final gestures = _getGestureEmojis();

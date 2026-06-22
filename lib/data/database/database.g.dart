@@ -3,6 +3,405 @@
 part of 'database.dart';
 
 // ignore_for_file: type=lint
+class $NamespacesTable extends Namespaces
+    with TableInfo<$NamespacesTable, NamespaceData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $NamespacesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _iconMeta = const VerificationMeta('icon');
+  @override
+  late final GeneratedColumn<String> icon = GeneratedColumn<String>(
+    'icon',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _colorMeta = const VerificationMeta('color');
+  @override
+  late final GeneratedColumn<String> color = GeneratedColumn<String>(
+    'color',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    icon,
+    color,
+    sortOrder,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'namespaces';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<NamespaceData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('icon')) {
+      context.handle(
+        _iconMeta,
+        icon.isAcceptableOrUnknown(data['icon']!, _iconMeta),
+      );
+    }
+    if (data.containsKey('color')) {
+      context.handle(
+        _colorMeta,
+        color.isAcceptableOrUnknown(data['color']!, _colorMeta),
+      );
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  NamespaceData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return NamespaceData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      icon: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}icon'],
+      ),
+      color: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}color'],
+      ),
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $NamespacesTable createAlias(String alias) {
+    return $NamespacesTable(attachedDatabase, alias);
+  }
+}
+
+class NamespaceData extends DataClass implements Insertable<NamespaceData> {
+  final String id;
+  final String name;
+  final String? icon;
+  final String? color;
+  final int sortOrder;
+  final DateTime createdAt;
+  const NamespaceData({
+    required this.id,
+    required this.name,
+    this.icon,
+    this.color,
+    required this.sortOrder,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    if (!nullToAbsent || icon != null) {
+      map['icon'] = Variable<String>(icon);
+    }
+    if (!nullToAbsent || color != null) {
+      map['color'] = Variable<String>(color);
+    }
+    map['sort_order'] = Variable<int>(sortOrder);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  NamespacesCompanion toCompanion(bool nullToAbsent) {
+    return NamespacesCompanion(
+      id: Value(id),
+      name: Value(name),
+      icon: icon == null && nullToAbsent ? const Value.absent() : Value(icon),
+      color: color == null && nullToAbsent
+          ? const Value.absent()
+          : Value(color),
+      sortOrder: Value(sortOrder),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory NamespaceData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return NamespaceData(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      icon: serializer.fromJson<String?>(json['icon']),
+      color: serializer.fromJson<String?>(json['color']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'icon': serializer.toJson<String?>(icon),
+      'color': serializer.toJson<String?>(color),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  NamespaceData copyWith({
+    String? id,
+    String? name,
+    Value<String?> icon = const Value.absent(),
+    Value<String?> color = const Value.absent(),
+    int? sortOrder,
+    DateTime? createdAt,
+  }) => NamespaceData(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    icon: icon.present ? icon.value : this.icon,
+    color: color.present ? color.value : this.color,
+    sortOrder: sortOrder ?? this.sortOrder,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  NamespaceData copyWithCompanion(NamespacesCompanion data) {
+    return NamespaceData(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      icon: data.icon.present ? data.icon.value : this.icon,
+      color: data.color.present ? data.color.value : this.color,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('NamespaceData(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('icon: $icon, ')
+          ..write('color: $color, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, icon, color, sortOrder, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is NamespaceData &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.icon == this.icon &&
+          other.color == this.color &&
+          other.sortOrder == this.sortOrder &&
+          other.createdAt == this.createdAt);
+}
+
+class NamespacesCompanion extends UpdateCompanion<NamespaceData> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<String?> icon;
+  final Value<String?> color;
+  final Value<int> sortOrder;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const NamespacesCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.icon = const Value.absent(),
+    this.color = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  NamespacesCompanion.insert({
+    required String id,
+    required String name,
+    this.icon = const Value.absent(),
+    this.color = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name);
+  static Insertable<NamespaceData> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<String>? icon,
+    Expression<String>? color,
+    Expression<int>? sortOrder,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (icon != null) 'icon': icon,
+      if (color != null) 'color': color,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  NamespacesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<String?>? icon,
+    Value<String?>? color,
+    Value<int>? sortOrder,
+    Value<DateTime>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return NamespacesCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      icon: icon ?? this.icon,
+      color: color ?? this.color,
+      sortOrder: sortOrder ?? this.sortOrder,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (icon.present) {
+      map['icon'] = Variable<String>(icon.value);
+    }
+    if (color.present) {
+      map['color'] = Variable<String>(color.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('NamespacesCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('icon: $icon, ')
+          ..write('color: $color, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $StickerPacksTable extends StickerPacks
     with TableInfo<$StickerPacksTable, StickerPackData> {
   @override
@@ -17,6 +416,20 @@ class $StickerPacksTable extends StickerPacks
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
+  );
+  static const VerificationMeta _namespaceIdMeta = const VerificationMeta(
+    'namespaceId',
+  );
+  @override
+  late final GeneratedColumn<String> namespaceId = GeneratedColumn<String>(
+    'namespace_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES namespaces (id) ON DELETE SET NULL',
+    ),
   );
   static const VerificationMeta _nameMeta = const VerificationMeta('name');
   @override
@@ -49,6 +462,26 @@ class $StickerPacksTable extends StickerPacks
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _tagsMeta = const VerificationMeta('tags');
+  @override
+  late final GeneratedColumn<String> tags = GeneratedColumn<String>(
+    'tags',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _metadataMeta = const VerificationMeta(
+    'metadata',
+  );
+  @override
+  late final GeneratedColumn<String> metadata = GeneratedColumn<String>(
+    'metadata',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -76,9 +509,12 @@ class $StickerPacksTable extends StickerPacks
   @override
   List<GeneratedColumn> get $columns => [
     id,
+    namespaceId,
     name,
     iconPath,
     description,
+    tags,
+    metadata,
     createdAt,
     updatedAt,
   ];
@@ -98,6 +534,15 @@ class $StickerPacksTable extends StickerPacks
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
       context.missing(_idMeta);
+    }
+    if (data.containsKey('namespace_id')) {
+      context.handle(
+        _namespaceIdMeta,
+        namespaceId.isAcceptableOrUnknown(
+          data['namespace_id']!,
+          _namespaceIdMeta,
+        ),
+      );
     }
     if (data.containsKey('name')) {
       context.handle(
@@ -120,6 +565,18 @@ class $StickerPacksTable extends StickerPacks
           data['description']!,
           _descriptionMeta,
         ),
+      );
+    }
+    if (data.containsKey('tags')) {
+      context.handle(
+        _tagsMeta,
+        tags.isAcceptableOrUnknown(data['tags']!, _tagsMeta),
+      );
+    }
+    if (data.containsKey('metadata')) {
+      context.handle(
+        _metadataMeta,
+        metadata.isAcceptableOrUnknown(data['metadata']!, _metadataMeta),
       );
     }
     if (data.containsKey('created_at')) {
@@ -147,6 +604,10 @@ class $StickerPacksTable extends StickerPacks
         DriftSqlType.string,
         data['${effectivePrefix}id'],
       )!,
+      namespaceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}namespace_id'],
+      ),
       name: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}name'],
@@ -158,6 +619,14 @@ class $StickerPacksTable extends StickerPacks
       description: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}description'],
+      ),
+      tags: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}tags'],
+      ),
+      metadata: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}metadata'],
       ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
@@ -178,16 +647,22 @@ class $StickerPacksTable extends StickerPacks
 
 class StickerPackData extends DataClass implements Insertable<StickerPackData> {
   final String id;
+  final String? namespaceId;
   final String name;
   final String? iconPath;
   final String? description;
+  final String? tags;
+  final String? metadata;
   final DateTime createdAt;
   final DateTime updatedAt;
   const StickerPackData({
     required this.id,
+    this.namespaceId,
     required this.name,
     this.iconPath,
     this.description,
+    this.tags,
+    this.metadata,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -195,12 +670,21 @@ class StickerPackData extends DataClass implements Insertable<StickerPackData> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
+    if (!nullToAbsent || namespaceId != null) {
+      map['namespace_id'] = Variable<String>(namespaceId);
+    }
     map['name'] = Variable<String>(name);
     if (!nullToAbsent || iconPath != null) {
       map['icon_path'] = Variable<String>(iconPath);
     }
     if (!nullToAbsent || description != null) {
       map['description'] = Variable<String>(description);
+    }
+    if (!nullToAbsent || tags != null) {
+      map['tags'] = Variable<String>(tags);
+    }
+    if (!nullToAbsent || metadata != null) {
+      map['metadata'] = Variable<String>(metadata);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -210,6 +694,9 @@ class StickerPackData extends DataClass implements Insertable<StickerPackData> {
   StickerPacksCompanion toCompanion(bool nullToAbsent) {
     return StickerPacksCompanion(
       id: Value(id),
+      namespaceId: namespaceId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(namespaceId),
       name: Value(name),
       iconPath: iconPath == null && nullToAbsent
           ? const Value.absent()
@@ -217,6 +704,10 @@ class StickerPackData extends DataClass implements Insertable<StickerPackData> {
       description: description == null && nullToAbsent
           ? const Value.absent()
           : Value(description),
+      tags: tags == null && nullToAbsent ? const Value.absent() : Value(tags),
+      metadata: metadata == null && nullToAbsent
+          ? const Value.absent()
+          : Value(metadata),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -229,9 +720,12 @@ class StickerPackData extends DataClass implements Insertable<StickerPackData> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return StickerPackData(
       id: serializer.fromJson<String>(json['id']),
+      namespaceId: serializer.fromJson<String?>(json['namespaceId']),
       name: serializer.fromJson<String>(json['name']),
       iconPath: serializer.fromJson<String?>(json['iconPath']),
       description: serializer.fromJson<String?>(json['description']),
+      tags: serializer.fromJson<String?>(json['tags']),
+      metadata: serializer.fromJson<String?>(json['metadata']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -241,9 +735,12 @@ class StickerPackData extends DataClass implements Insertable<StickerPackData> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
+      'namespaceId': serializer.toJson<String?>(namespaceId),
       'name': serializer.toJson<String>(name),
       'iconPath': serializer.toJson<String?>(iconPath),
       'description': serializer.toJson<String?>(description),
+      'tags': serializer.toJson<String?>(tags),
+      'metadata': serializer.toJson<String?>(metadata),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -251,27 +748,38 @@ class StickerPackData extends DataClass implements Insertable<StickerPackData> {
 
   StickerPackData copyWith({
     String? id,
+    Value<String?> namespaceId = const Value.absent(),
     String? name,
     Value<String?> iconPath = const Value.absent(),
     Value<String?> description = const Value.absent(),
+    Value<String?> tags = const Value.absent(),
+    Value<String?> metadata = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => StickerPackData(
     id: id ?? this.id,
+    namespaceId: namespaceId.present ? namespaceId.value : this.namespaceId,
     name: name ?? this.name,
     iconPath: iconPath.present ? iconPath.value : this.iconPath,
     description: description.present ? description.value : this.description,
+    tags: tags.present ? tags.value : this.tags,
+    metadata: metadata.present ? metadata.value : this.metadata,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
   StickerPackData copyWithCompanion(StickerPacksCompanion data) {
     return StickerPackData(
       id: data.id.present ? data.id.value : this.id,
+      namespaceId: data.namespaceId.present
+          ? data.namespaceId.value
+          : this.namespaceId,
       name: data.name.present ? data.name.value : this.name,
       iconPath: data.iconPath.present ? data.iconPath.value : this.iconPath,
       description: data.description.present
           ? data.description.value
           : this.description,
+      tags: data.tags.present ? data.tags.value : this.tags,
+      metadata: data.metadata.present ? data.metadata.value : this.metadata,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -281,9 +789,12 @@ class StickerPackData extends DataClass implements Insertable<StickerPackData> {
   String toString() {
     return (StringBuffer('StickerPackData(')
           ..write('id: $id, ')
+          ..write('namespaceId: $namespaceId, ')
           ..write('name: $name, ')
           ..write('iconPath: $iconPath, ')
           ..write('description: $description, ')
+          ..write('tags: $tags, ')
+          ..write('metadata: $metadata, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -291,42 +802,63 @@ class StickerPackData extends DataClass implements Insertable<StickerPackData> {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, name, iconPath, description, createdAt, updatedAt);
+  int get hashCode => Object.hash(
+    id,
+    namespaceId,
+    name,
+    iconPath,
+    description,
+    tags,
+    metadata,
+    createdAt,
+    updatedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is StickerPackData &&
           other.id == this.id &&
+          other.namespaceId == this.namespaceId &&
           other.name == this.name &&
           other.iconPath == this.iconPath &&
           other.description == this.description &&
+          other.tags == this.tags &&
+          other.metadata == this.metadata &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
 
 class StickerPacksCompanion extends UpdateCompanion<StickerPackData> {
   final Value<String> id;
+  final Value<String?> namespaceId;
   final Value<String> name;
   final Value<String?> iconPath;
   final Value<String?> description;
+  final Value<String?> tags;
+  final Value<String?> metadata;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const StickerPacksCompanion({
     this.id = const Value.absent(),
+    this.namespaceId = const Value.absent(),
     this.name = const Value.absent(),
     this.iconPath = const Value.absent(),
     this.description = const Value.absent(),
+    this.tags = const Value.absent(),
+    this.metadata = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   StickerPacksCompanion.insert({
     required String id,
+    this.namespaceId = const Value.absent(),
     required String name,
     this.iconPath = const Value.absent(),
     this.description = const Value.absent(),
+    this.tags = const Value.absent(),
+    this.metadata = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -334,18 +866,24 @@ class StickerPacksCompanion extends UpdateCompanion<StickerPackData> {
        name = Value(name);
   static Insertable<StickerPackData> custom({
     Expression<String>? id,
+    Expression<String>? namespaceId,
     Expression<String>? name,
     Expression<String>? iconPath,
     Expression<String>? description,
+    Expression<String>? tags,
+    Expression<String>? metadata,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
+      if (namespaceId != null) 'namespace_id': namespaceId,
       if (name != null) 'name': name,
       if (iconPath != null) 'icon_path': iconPath,
       if (description != null) 'description': description,
+      if (tags != null) 'tags': tags,
+      if (metadata != null) 'metadata': metadata,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -354,18 +892,24 @@ class StickerPacksCompanion extends UpdateCompanion<StickerPackData> {
 
   StickerPacksCompanion copyWith({
     Value<String>? id,
+    Value<String?>? namespaceId,
     Value<String>? name,
     Value<String?>? iconPath,
     Value<String?>? description,
+    Value<String?>? tags,
+    Value<String?>? metadata,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
   }) {
     return StickerPacksCompanion(
       id: id ?? this.id,
+      namespaceId: namespaceId ?? this.namespaceId,
       name: name ?? this.name,
       iconPath: iconPath ?? this.iconPath,
       description: description ?? this.description,
+      tags: tags ?? this.tags,
+      metadata: metadata ?? this.metadata,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -378,6 +922,9 @@ class StickerPacksCompanion extends UpdateCompanion<StickerPackData> {
     if (id.present) {
       map['id'] = Variable<String>(id.value);
     }
+    if (namespaceId.present) {
+      map['namespace_id'] = Variable<String>(namespaceId.value);
+    }
     if (name.present) {
       map['name'] = Variable<String>(name.value);
     }
@@ -386,6 +933,12 @@ class StickerPacksCompanion extends UpdateCompanion<StickerPackData> {
     }
     if (description.present) {
       map['description'] = Variable<String>(description.value);
+    }
+    if (tags.present) {
+      map['tags'] = Variable<String>(tags.value);
+    }
+    if (metadata.present) {
+      map['metadata'] = Variable<String>(metadata.value);
     }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
@@ -403,9 +956,12 @@ class StickerPacksCompanion extends UpdateCompanion<StickerPackData> {
   String toString() {
     return (StringBuffer('StickerPacksCompanion(')
           ..write('id: $id, ')
+          ..write('namespaceId: $namespaceId, ')
           ..write('name: $name, ')
           ..write('iconPath: $iconPath, ')
           ..write('description: $description, ')
+          ..write('tags: $tags, ')
+          ..write('metadata: $metadata, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -973,15 +1529,27 @@ class StickersCompanion extends UpdateCompanion<StickerData> {
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
+  late final $NamespacesTable namespaces = $NamespacesTable(this);
   late final $StickerPacksTable stickerPacks = $StickerPacksTable(this);
   late final $StickersTable stickers = $StickersTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
-  List<DatabaseSchemaEntity> get allSchemaEntities => [stickerPacks, stickers];
+  List<DatabaseSchemaEntity> get allSchemaEntities => [
+    namespaces,
+    stickerPacks,
+    stickers,
+  ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'namespaces',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('sticker_packs', kind: UpdateKind.update)],
+    ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
         'sticker_packs',
@@ -992,12 +1560,340 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   ]);
 }
 
+typedef $$NamespacesTableCreateCompanionBuilder =
+    NamespacesCompanion Function({
+      required String id,
+      required String name,
+      Value<String?> icon,
+      Value<String?> color,
+      Value<int> sortOrder,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+typedef $$NamespacesTableUpdateCompanionBuilder =
+    NamespacesCompanion Function({
+      Value<String> id,
+      Value<String> name,
+      Value<String?> icon,
+      Value<String?> color,
+      Value<int> sortOrder,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+
+final class $$NamespacesTableReferences
+    extends BaseReferences<_$AppDatabase, $NamespacesTable, NamespaceData> {
+  $$NamespacesTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<$StickerPacksTable, List<StickerPackData>>
+  _stickerPacksRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.stickerPacks,
+    aliasName: $_aliasNameGenerator(
+      db.namespaces.id,
+      db.stickerPacks.namespaceId,
+    ),
+  );
+
+  $$StickerPacksTableProcessedTableManager get stickerPacksRefs {
+    final manager = $$StickerPacksTableTableManager(
+      $_db,
+      $_db.stickerPacks,
+    ).filter((f) => f.namespaceId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_stickerPacksRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$NamespacesTableFilterComposer
+    extends Composer<_$AppDatabase, $NamespacesTable> {
+  $$NamespacesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get icon => $composableBuilder(
+    column: $table.icon,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get color => $composableBuilder(
+    column: $table.color,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  Expression<bool> stickerPacksRefs(
+    Expression<bool> Function($$StickerPacksTableFilterComposer f) f,
+  ) {
+    final $$StickerPacksTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.stickerPacks,
+      getReferencedColumn: (t) => t.namespaceId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$StickerPacksTableFilterComposer(
+            $db: $db,
+            $table: $db.stickerPacks,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$NamespacesTableOrderingComposer
+    extends Composer<_$AppDatabase, $NamespacesTable> {
+  $$NamespacesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get icon => $composableBuilder(
+    column: $table.icon,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get color => $composableBuilder(
+    column: $table.color,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$NamespacesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $NamespacesTable> {
+  $$NamespacesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get icon =>
+      $composableBuilder(column: $table.icon, builder: (column) => column);
+
+  GeneratedColumn<String> get color =>
+      $composableBuilder(column: $table.color, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  Expression<T> stickerPacksRefs<T extends Object>(
+    Expression<T> Function($$StickerPacksTableAnnotationComposer a) f,
+  ) {
+    final $$StickerPacksTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.stickerPacks,
+      getReferencedColumn: (t) => t.namespaceId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$StickerPacksTableAnnotationComposer(
+            $db: $db,
+            $table: $db.stickerPacks,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$NamespacesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $NamespacesTable,
+          NamespaceData,
+          $$NamespacesTableFilterComposer,
+          $$NamespacesTableOrderingComposer,
+          $$NamespacesTableAnnotationComposer,
+          $$NamespacesTableCreateCompanionBuilder,
+          $$NamespacesTableUpdateCompanionBuilder,
+          (NamespaceData, $$NamespacesTableReferences),
+          NamespaceData,
+          PrefetchHooks Function({bool stickerPacksRefs})
+        > {
+  $$NamespacesTableTableManager(_$AppDatabase db, $NamespacesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$NamespacesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$NamespacesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$NamespacesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String?> icon = const Value.absent(),
+                Value<String?> color = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => NamespacesCompanion(
+                id: id,
+                name: name,
+                icon: icon,
+                color: color,
+                sortOrder: sortOrder,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                Value<String?> icon = const Value.absent(),
+                Value<String?> color = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => NamespacesCompanion.insert(
+                id: id,
+                name: name,
+                icon: icon,
+                color: color,
+                sortOrder: sortOrder,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$NamespacesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({stickerPacksRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [if (stickerPacksRefs) db.stickerPacks],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (stickerPacksRefs)
+                    await $_getPrefetchedData<
+                      NamespaceData,
+                      $NamespacesTable,
+                      StickerPackData
+                    >(
+                      currentTable: table,
+                      referencedTable: $$NamespacesTableReferences
+                          ._stickerPacksRefsTable(db),
+                      managerFromTypedResult: (p0) =>
+                          $$NamespacesTableReferences(
+                            db,
+                            table,
+                            p0,
+                          ).stickerPacksRefs,
+                      referencedItemsForCurrentItem: (item, referencedItems) =>
+                          referencedItems.where(
+                            (e) => e.namespaceId == item.id,
+                          ),
+                      typedResults: items,
+                    ),
+                ];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$NamespacesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $NamespacesTable,
+      NamespaceData,
+      $$NamespacesTableFilterComposer,
+      $$NamespacesTableOrderingComposer,
+      $$NamespacesTableAnnotationComposer,
+      $$NamespacesTableCreateCompanionBuilder,
+      $$NamespacesTableUpdateCompanionBuilder,
+      (NamespaceData, $$NamespacesTableReferences),
+      NamespaceData,
+      PrefetchHooks Function({bool stickerPacksRefs})
+    >;
 typedef $$StickerPacksTableCreateCompanionBuilder =
     StickerPacksCompanion Function({
       required String id,
+      Value<String?> namespaceId,
       required String name,
       Value<String?> iconPath,
       Value<String?> description,
+      Value<String?> tags,
+      Value<String?> metadata,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<int> rowid,
@@ -1005,9 +1901,12 @@ typedef $$StickerPacksTableCreateCompanionBuilder =
 typedef $$StickerPacksTableUpdateCompanionBuilder =
     StickerPacksCompanion Function({
       Value<String> id,
+      Value<String?> namespaceId,
       Value<String> name,
       Value<String?> iconPath,
       Value<String?> description,
+      Value<String?> tags,
+      Value<String?> metadata,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<int> rowid,
@@ -1016,6 +1915,25 @@ typedef $$StickerPacksTableUpdateCompanionBuilder =
 final class $$StickerPacksTableReferences
     extends BaseReferences<_$AppDatabase, $StickerPacksTable, StickerPackData> {
   $$StickerPacksTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $NamespacesTable _namespaceIdTable(_$AppDatabase db) =>
+      db.namespaces.createAlias(
+        $_aliasNameGenerator(db.stickerPacks.namespaceId, db.namespaces.id),
+      );
+
+  $$NamespacesTableProcessedTableManager? get namespaceId {
+    final $_column = $_itemColumn<String>('namespace_id');
+    if ($_column == null) return null;
+    final manager = $$NamespacesTableTableManager(
+      $_db,
+      $_db.namespaces,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_namespaceIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
 
   static MultiTypedResultKey<$StickersTable, List<StickerData>>
   _stickersRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
@@ -1065,6 +1983,16 @@ class $$StickerPacksTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get tags => $composableBuilder(
+    column: $table.tags,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get metadata => $composableBuilder(
+    column: $table.metadata,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnFilters(column),
@@ -1074,6 +2002,29 @@ class $$StickerPacksTableFilterComposer
     column: $table.updatedAt,
     builder: (column) => ColumnFilters(column),
   );
+
+  $$NamespacesTableFilterComposer get namespaceId {
+    final $$NamespacesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.namespaceId,
+      referencedTable: $db.namespaces,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$NamespacesTableFilterComposer(
+            $db: $db,
+            $table: $db.namespaces,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 
   Expression<bool> stickersRefs(
     Expression<bool> Function($$StickersTableFilterComposer f) f,
@@ -1130,6 +2081,16 @@ class $$StickerPacksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get tags => $composableBuilder(
+    column: $table.tags,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get metadata => $composableBuilder(
+    column: $table.metadata,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -1139,6 +2100,29 @@ class $$StickerPacksTableOrderingComposer
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  $$NamespacesTableOrderingComposer get namespaceId {
+    final $$NamespacesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.namespaceId,
+      referencedTable: $db.namespaces,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$NamespacesTableOrderingComposer(
+            $db: $db,
+            $table: $db.namespaces,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$StickerPacksTableAnnotationComposer
@@ -1164,11 +2148,40 @@ class $$StickerPacksTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get tags =>
+      $composableBuilder(column: $table.tags, builder: (column) => column);
+
+  GeneratedColumn<String> get metadata =>
+      $composableBuilder(column: $table.metadata, builder: (column) => column);
+
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  $$NamespacesTableAnnotationComposer get namespaceId {
+    final $$NamespacesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.namespaceId,
+      referencedTable: $db.namespaces,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$NamespacesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.namespaces,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 
   Expression<T> stickersRefs<T extends Object>(
     Expression<T> Function($$StickersTableAnnotationComposer a) f,
@@ -1209,7 +2222,7 @@ class $$StickerPacksTableTableManager
           $$StickerPacksTableUpdateCompanionBuilder,
           (StickerPackData, $$StickerPacksTableReferences),
           StickerPackData,
-          PrefetchHooks Function({bool stickersRefs})
+          PrefetchHooks Function({bool namespaceId, bool stickersRefs})
         > {
   $$StickerPacksTableTableManager(_$AppDatabase db, $StickerPacksTable table)
     : super(
@@ -1225,17 +2238,23 @@ class $$StickerPacksTableTableManager
           updateCompanionCallback:
               ({
                 Value<String> id = const Value.absent(),
+                Value<String?> namespaceId = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<String?> iconPath = const Value.absent(),
                 Value<String?> description = const Value.absent(),
+                Value<String?> tags = const Value.absent(),
+                Value<String?> metadata = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => StickerPacksCompanion(
                 id: id,
+                namespaceId: namespaceId,
                 name: name,
                 iconPath: iconPath,
                 description: description,
+                tags: tags,
+                metadata: metadata,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -1243,17 +2262,23 @@ class $$StickerPacksTableTableManager
           createCompanionCallback:
               ({
                 required String id,
+                Value<String?> namespaceId = const Value.absent(),
                 required String name,
                 Value<String?> iconPath = const Value.absent(),
                 Value<String?> description = const Value.absent(),
+                Value<String?> tags = const Value.absent(),
+                Value<String?> metadata = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => StickerPacksCompanion.insert(
                 id: id,
+                namespaceId: namespaceId,
                 name: name,
                 iconPath: iconPath,
                 description: description,
+                tags: tags,
+                metadata: metadata,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -1266,11 +2291,42 @@ class $$StickerPacksTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({stickersRefs = false}) {
+          prefetchHooksCallback: ({namespaceId = false, stickersRefs = false}) {
             return PrefetchHooks(
               db: db,
               explicitlyWatchedTables: [if (stickersRefs) db.stickers],
-              addJoins: null,
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (namespaceId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.namespaceId,
+                                referencedTable: $$StickerPacksTableReferences
+                                    ._namespaceIdTable(db),
+                                referencedColumn: $$StickerPacksTableReferences
+                                    ._namespaceIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
               getPrefetchedDataCallback: (items) async {
                 return [
                   if (stickersRefs)
@@ -1312,7 +2368,7 @@ typedef $$StickerPacksTableProcessedTableManager =
       $$StickerPacksTableUpdateCompanionBuilder,
       (StickerPackData, $$StickerPacksTableReferences),
       StickerPackData,
-      PrefetchHooks Function({bool stickersRefs})
+      PrefetchHooks Function({bool namespaceId, bool stickersRefs})
     >;
 typedef $$StickersTableCreateCompanionBuilder =
     StickersCompanion Function({
@@ -1715,6 +2771,8 @@ typedef $$StickersTableProcessedTableManager =
 class $AppDatabaseManager {
   final _$AppDatabase _db;
   $AppDatabaseManager(this._db);
+  $$NamespacesTableTableManager get namespaces =>
+      $$NamespacesTableTableManager(_db, _db.namespaces);
   $$StickerPacksTableTableManager get stickerPacks =>
       $$StickerPacksTableTableManager(_db, _db.stickerPacks);
   $$StickersTableTableManager get stickers =>
