@@ -80,7 +80,6 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
       - run: flutter pub get
-      - run: dart run build_runner build --delete-conflicting-outputs
       - run: flutter build windows --release
       - uses: actions/upload-artifact@v4
         with:
