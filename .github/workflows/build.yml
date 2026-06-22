@@ -92,6 +92,7 @@ jobs:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     needs: web
     runs-on: ubuntu-latest
+    continue-on-error: true  # 未开启 Pages 时不阻塞 CI
     permissions:
       pages: write
       id-token: write

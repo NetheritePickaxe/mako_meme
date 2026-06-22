@@ -7,11 +7,7 @@ import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 import '../models/meme.dart';
 import '../models/folder.dart';
-
-// Web 端使用 dart:html 的 localStorage（虽然已弃用，但 dart2js 下正常工作）
-// ignore_for_file: deprecated_member_use, avoid_web_libraries_in_flutter
-// ignore: undefined_hidden_name
-import 'dart:html' show window;
+import 'storage_platform.dart';
 
 /// JSON 文件存储 — 跨平台，Web 上使用 localStorage
 class StorageService {
@@ -43,8 +39,7 @@ class StorageService {
 
   void _loadFromWeb() {
     try {
-      // ignore: undefined_prefixed_name
-      final raw = _getWebStorage('mako_memes');
+      final raw = webStorageGetItem('mako_memes');
       if (raw != null && raw.isNotEmpty) {
         final data = jsonDecode(raw) as Map<String, dynamic>;
         _memes = (data['memes'] as List? ?? [])
@@ -67,21 +62,7 @@ class StorageService {
         'memes': _memes.map((m) => m.toMap()).toList(),
         'folders': _folders.map((f) => f.toMap()).toList(),
       });
-      _setWebStorage('mako_memes', data);
-    } catch (_) {}
-  }
-
-  static String? _getWebStorage(String key) {
-    try {
-      return window.localStorage[key];
-    } catch (_) {
-      return null;
-    }
-  }
-
-  static void _setWebStorage(String key, String value) {
-    try {
-      window.localStorage[key] = value;
+      webStorageSetItem('mako_memes', data);
     } catch (_) {}
   }
 
