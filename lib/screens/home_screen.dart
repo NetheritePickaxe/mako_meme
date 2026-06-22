@@ -29,6 +29,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          tooltip: '打开菜单',
+          onPressed: () => Scaffold.of(context).openDrawer(),
+        ),
         title: Text(_getTitle(prov)),
         actions: [
           IconButton(

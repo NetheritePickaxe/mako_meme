@@ -54,15 +54,28 @@ class StorageService {
             .cast<Map<String, dynamic>>()
             .map((f) => MemeFolder.fromMap(f))
             .toList();
+        // 恢复图片字节缓存（base64）
+        final bytes = data['stickerBytes'] as Map<String, dynamic>? ?? {};
+        for (final entry in bytes.entries) {
+          _webBytes[entry.key] = base64Decode(entry.value as String);
+        }
       }
     } catch (_) {}
   }
 
   void _saveToWeb() {
     try {
+      // 序列化图片字节（限制单张 1MB 避免 localStorage 溢出）
+      final bytesMap = <String, String>{};
+      for (final entry in _webBytes.entries) {
+        if (entry.value.length <= 1024 * 1024) {
+          bytesMap[entry.key] = base64Encode(entry.value);
+        }
+      }
       final data = jsonEncode({
         'memes': _memes.map((m) => m.toMap()).toList(),
         'folders': _folders.map((f) => f.toMap()).toList(),
+        'stickerBytes': bytesMap,
       });
       _setWebStorage('mako_memes', data);
     } catch (_) {}

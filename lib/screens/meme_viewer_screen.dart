@@ -59,6 +59,7 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
         title: Text(_meme.name, style: const TextStyle(fontSize: 14)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
+          tooltip: '返回',
           onPressed: () => Navigator.pop(context),
         ),
         actions: [

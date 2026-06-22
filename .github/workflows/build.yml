@@ -43,7 +43,6 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
       - run: flutter pub get
-      - run: dart run build_runner build --delete-conflicting-outputs
       - run: flutter build apk --release
       - uses: actions/upload-artifact@v4
         with:
@@ -61,7 +60,6 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
       - run: flutter pub get
-      - run: dart run build_runner build --delete-conflicting-outputs
       - run: flutter build web --release
       - uses: actions/upload-pages-artifact@v3
         with:

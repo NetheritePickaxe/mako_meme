@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -39,6 +40,7 @@ class _MemeCardState extends State<MemeCard> {
   }
 
   bool get _isDesktop {
+    if (kIsWeb) return true;
     final p = Theme.of(context).platform;
     return p == TargetPlatform.windows || p == TargetPlatform.linux || p == TargetPlatform.macOS;
   }
