@@ -17,7 +17,7 @@ on:
     branches: [main, master]
 
 env:
-  FLUTTER_VERSION: "3.29.2"
+  FLUTTER_VERSION: "3.44.2"
 
 jobs:
   # ───────── 静态分析 ─────────
