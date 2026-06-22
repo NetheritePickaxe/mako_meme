@@ -14,6 +14,34 @@
 - 🌙 **暗色模式** — 跟随系统主题自动切换
 - 🎭 **预置表情** — 首次启动自动生成 20 个示例表情
 
+## CI/CD
+
+项目使用 GitHub Actions 自动构建和发布。
+
+| 触发事件 | 行为 |
+|---|---|
+| `push` main/master | 构建 Android APK + Web + Windows，部署 Web 到 Pages |
+| `push` tag `v*` | 构建 + 自动创建 GitHub Release，附带所有产物 |
+| `pull_request` | 仅运行静态分析 |
+
+### 配置
+
+使用前需在 GitHub 仓库设置以下 **Secrets / Settings**:
+
+1. **`FEISHU_WEBHOOK_URL`** (可选) — 飞书机器人 Webhook 地址，用于接收构建结果通知
+   - 在飞书群中添加自定义机器人 → 复制 webhook URL → 添加到仓库 Settings > Secrets > Actions
+2. **GitHub Pages** (可选) — 启用自动部署：
+   - Settings → Pages → Source 选择 **GitHub Actions**
+
+### 发布流程
+
+```bash
+# 打标签即自动发布
+git tag v1.0.0
+git push origin v1.0.0
+# → Actions 自动构建所有平台并创建 Release
+```
+
 ## 技术栈
 
 | 层 | 方案 |

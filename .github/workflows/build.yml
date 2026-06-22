@@ -1,0 +1,232 @@
+# Mako Meme CI/CD
+#
+# 推送构建:
+#   main 分支推送 → 构建 Android APK + Web + Windows
+# 打 Tag 自动 Release:
+#   git tag v1.0.0 && git push origin v1.0.0
+#   → 构建所有平台 + 创建 GitHub Release + 上传产物
+# 构建结果通过飞书 Webhook 通知
+
+name: CI/CD
+
+on:
+  push:
+    branches: [main, master]
+    tags: ["v*"]
+  pull_request:
+    branches: [main, master]
+
+env:
+  FLUTTER_VERSION: "3.29.2"
+
+jobs:
+  # ───────── 静态分析 ─────────
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - run: flutter pub get
+      - run: flutter analyze
+
+  # ───────── Android 构建 ─────────
+  android:
+    name: Build Android
+    needs: analyze
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - run: flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: build/app/outputs/flutter-apk/*.apk
+
+  # ───────── Web 构建 ─────────
+  web:
+    name: Build Web
+    needs: analyze
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - run: flutter build web --release
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: build/web
+
+  # ───────── Windows 构建 ─────────
+  windows:
+    name: Build Windows
+    needs: analyze
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - run: flutter build windows --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-msix
+          path: build/windows/**/Release/
+
+  # ───────── 部署 Web 到 GitHub Pages ─────────
+  deploy-pages:
+    name: Deploy Web to Pages
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    needs: web
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  # ───────── 创建 Release (打 Tag 时) ─────────
+  release:
+    name: Create Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [android, web, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+      - name: Package artifacts
+        shell: bash
+        run: |
+          mkdir release-artifacts
+          cp -r android-apk/* release-artifacts/ 2>/dev/null || true
+          cp -r windows-msix/* release-artifacts/ 2>/dev/null || true
+          cd web-build && zip -r ../release-artifacts/web-build.zip . && cd ..
+      - uses: ncipollo/release-action@v1
+        with:
+          name: "Mako Meme ${{ github.ref_name }}"
+          tag: ${{ github.ref }}
+          body: |
+            ## Mako Meme ${{ github.ref_name }}
+
+            跨平台表情包管理器发布版本。
+
+            ### 下载
+
+            - **Android**: `app-release.apk`
+            - **Windows**: MSIX 安装包
+            - **Web**: `web-build.zip`（解压后部署到任意静态服务器）
+
+            > 构建于 ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          artifacts: release-artifacts/*
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  # ───────── 飞书通知 (直接 curl) ─────────
+  notify:
+    name: Notify Feishu
+    if: ${{ always() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')) }}
+    needs: [analyze, android, web, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build status summary
+        id: status
+        shell: bash
+        run: |
+          STATUS="success"
+          MSG=""
+          append() {
+            local label="$1" result="$2"
+            MSG="$MSG$label: $result\n"
+            if [ "$result" != "success" ]; then STATUS="failure"; fi
+          }
+
+          append "Analyze" "${{ needs.analyze.result }}"
+          append "Android" "${{ needs.android.result }}"
+          append "Web"     "${{ needs.web.result }}"
+          append "Windows" "${{ needs.windows.result }}"
+
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+          {
+            echo "msg<<EOFMSG"
+            printf "%b" "$MSG"
+            echo ""
+            echo "EOFMSG"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Send Feishu webhook
+        shell: bash
+        env:
+          WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
+          STATUS: ${{ steps.status.outputs.status }}
+          SUMMARY: ${{ steps.status.outputs.msg }}
+          REF: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ -z "$WEBHOOK_URL" ]; then echo "FEISHU_WEBHOOK_URL not set, skipping"; exit 0; fi
+
+          if [ "$STATUS" = "success" ]; then
+            export ICON="✅" TPL="green"
+          else
+            export ICON="❌" TPL="red"
+          fi
+
+          python3 -c "
+import json, os
+summary = os.environ.get('SUMMARY', '')
+payload = {
+  'msg_type': 'interactive',
+  'card': {
+    'header': {
+      'title': {
+        'tag': 'plain_text',
+        'content': f'{os.environ[\"ICON\"]} Mako Meme 构建{os.environ[\"STATUS\"]}'
+      },
+      'template': os.environ['TPL']
+    },
+    'elements': [
+      {
+        'tag': 'div',
+        'text': {
+          'tag': 'lark_md',
+          'content': f'**项目**: Mako Meme\n**分支**: {os.environ[\"REF\"]}\n**提交**: {os.environ[\"SHA\"][:7]}\n\n**构建结果**:\n{summary}'
+        }
+      },
+      {
+        'tag': 'action',
+        'actions': [{
+          'tag': 'button',
+          'text': {'tag': 'plain_text', 'content': '查看构建详情'},
+          'url': f'https://github.com/{os.environ[\"REPO\"]}/actions/runs/{os.environ[\"RUN_ID\"]}',
+          'type': 'default'
+        }]
+      }
+    ]
+  }
+}
+print(json.dumps(payload, ensure_ascii=False))
+" > /tmp/feishu_payload.json
+
+          curl -s -X POST -H 'Content-Type: application/json' \
+            -d @/tmp/feishu_payload.json "$WEBHOOK_URL"
