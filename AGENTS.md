@@ -63,6 +63,13 @@ lib/
 - **No code gen**: No build_runner, no drift, no freezed.
 - **GitHub Actions**: CI defined in `.github/workflows/build.yml`; `flutter analyze` gate, then build per platform. No `build_runner` step.
 
+## Storage
+
+- **Native** (Android/Windows): Images copied to `{appDir}/mako_meme/memes/{uuid}.{ext}`. Metadata saved as `memes.json` (JSON). Persists across sessions.
+- **Web**: Image bytes kept in-memory (`_webBytes` map). **Lost on page refresh**. Metadata (name/tags/folder/mood) saved to `localStorage`. Refresh shows metadata with "丢失 / 点击重导" placeholder — user can tap to re-import via file picker. No base64/blob persistence.
+- **Duplicate filenames**: UUID-based filenames prevent file collision. `meme.name` stores original filename (without ext) which may duplicate across entries but that's allowed.
+- **Import flow**: `FilePicker` → `PlatformFile` (native: path, web: bytes) → `StorageService.importFile()` → copies bytes + saves metadata → `MemeProvider.loadAll()` refreshes UI.
+
 ## Notes
 
 -

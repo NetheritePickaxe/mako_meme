@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:file_picker/file_picker.dart';
 import '../models/meme.dart';
 import '../models/mood.dart';
 import '../providers/meme_provider.dart';
@@ -20,7 +21,7 @@ class MemeCard extends StatefulWidget {
 
 class _MemeCardState extends State<MemeCard> {
   Uint8List? _bytes;
-  bool _loaded = false;
+  bool _loading = true;
 
   @override
   void didChangeDependencies() {
@@ -29,13 +30,19 @@ class _MemeCardState extends State<MemeCard> {
   }
 
   void _loadBytes() {
-    if (_loaded) return;
-    _loaded = true;
+    if (!_loading) return;
     final storage = context.read<StorageService>();
     if (widget.meme.type == 'image' && widget.meme.filePath.isNotEmpty) {
       storage.readMemeBytes(widget.meme.filePath).then((b) {
-        if (mounted) setState(() => _bytes = b);
+        if (mounted) setState(() {
+          _bytes = b;
+          _loading = false;
+        });
+      }, onError: (_) {
+        if (mounted) setState(() => _loading = false);
       });
+    } else {
+      _loading = false;
     }
   }
 
@@ -103,12 +110,27 @@ class _MemeCardState extends State<MemeCard> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              if (widget.meme.type == 'image' && _bytes != null)
+              if (widget.meme.type == 'image' && _loading)
+                const Center(child: CircularProgressIndicator(strokeWidth: 2))
+              else if (widget.meme.type == 'image' && _bytes != null)
                 Image.memory(_bytes!, fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => _placeholder(),
                 )
               else if (widget.meme.type == 'image')
-                _placeholder()
+                // 图片丢失（Web 刷新后）
+                Container(
+                  color: Colors.grey.shade200,
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.cloud_off, size: 24, color: Colors.grey.shade500),
+                        const SizedBox(height: 4),
+                        Text('丢失', style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+                      ],
+                    ),
+                  ),
+                )
               else
                 Container(
                   color: Colors.grey.shade100,
@@ -198,8 +220,6 @@ class _MemeCardState extends State<MemeCard> {
   }
 
   void _showContextMenu(Offset tapPosition) {
-    final renderBox = context.findRenderObject() as RenderBox;
-    final localPos = renderBox.globalToLocal(tapPosition);
     showMenu(
       context: context,
       position: RelativeRect.fromRect(
@@ -207,10 +227,16 @@ class _MemeCardState extends State<MemeCard> {
         Offset.zero & MediaQuery.of(context).size,
       ),
       items: <PopupMenuEntry<String>>[
-        const PopupMenuItem<String>(
-          value: 'preview',
-          child: ListTile(leading: Icon(Icons.zoom_in), title: Text('预览大图'), dense: true),
-        ),
+        if (_bytes == null && !_loading)
+          const PopupMenuItem<String>(
+            value: 'reimport',
+            child: ListTile(leading: Icon(Icons.refresh), title: Text('重新导入'), dense: true),
+          ),
+        if (_bytes != null)
+          const PopupMenuItem<String>(
+            value: 'preview',
+            child: ListTile(leading: Icon(Icons.zoom_in), title: Text('预览大图'), dense: true),
+          ),
         const PopupMenuItem<String>(
           value: 'rename',
           child: ListTile(leading: Icon(Icons.edit), title: Text('重命名'), dense: true),
@@ -241,6 +267,7 @@ class _MemeCardState extends State<MemeCard> {
       if (value == null) return;
       switch (value) {
         case 'preview': _openViewer(); break;
+        case 'reimport': _reimport(); break;
         case 'rename': _showRenameDialog(); break;
         case 'copy': _copyToClipboard(); break;
         case 'share': _shareMeme(); break;
@@ -296,4 +323,20 @@ class _MemeCardState extends State<MemeCard> {
     color: Colors.grey.shade200,
     child: Icon(Icons.broken_image, color: Colors.grey.shade400),
   );
+
+  void _reimport() async {
+    final result = await FilePicker.platform.pickFiles(type: FileType.image);
+    if (result != null && result.files.isNotEmpty && mounted) {
+      final file = result.files.first;
+      if (file.bytes != null) {
+        final storage = context.read<StorageService>();
+        // 用新文件覆盖旧字节
+        await storage.reimportMeme(widget.meme.id, file);
+        if (mounted) setState(() {
+          _bytes = file.bytes;
+          _loading = false;
+        });
+      }
+    }
+  }
 }

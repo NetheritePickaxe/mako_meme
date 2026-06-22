@@ -109,12 +109,12 @@ class _HomeScreenState extends State<HomeScreen> {
               if (_dragOver)
                 Positioned.fill(
                   child: Container(
-                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+                    color: Colors.black45,  // 半透明黑底，总是清晰
                     child: Center(
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                         decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.inverseSurface,
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: Column(
@@ -122,7 +122,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           children: [
                             Icon(Icons.cloud_upload, size: 48, color: Theme.of(context).colorScheme.primary),
                             const SizedBox(height: 8),
-                            Text('释放以导入图片', style: Theme.of(context).textTheme.titleMedium),
+                            Text('释放以导入图片', style: TextStyle(
+                              fontSize: Theme.of(context).textTheme.titleMedium?.fontSize,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            )),
                           ],
                         ),
                       ),
@@ -231,13 +235,32 @@ class _HomeScreenState extends State<HomeScreen> {
     return FutureBuilder<Uint8List?>(
       future: context.read<StorageService>().readMemeBytes(meme.filePath),
       builder: (ctx, snapshot) {
-        if (!snapshot.hasData) {
+        if (snapshot.connectionState != ConnectionState.done) {
           return Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               color: Colors.grey.shade200,
             ),
             child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          );
+        }
+        final bytes = snapshot.data;
+        if (bytes == null) {
+          return Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              color: Colors.grey.shade200,
+            ),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.cloud_off, size: 24, color: Colors.grey.shade500),
+                  const SizedBox(height: 4),
+                  Text('丢失', style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+                ],
+              ),
+            ),
           );
         }
         return GestureDetector(

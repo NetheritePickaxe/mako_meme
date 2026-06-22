@@ -199,6 +199,33 @@ class StorageService {
     return results;
   }
 
+  /// 重新导入图片（保留原元数据，只替换文件字节）
+  Future<void> reimportMeme(String memeId, PlatformFile file) async {
+    final idx = _memes.indexWhere((m) => m.id == memeId);
+    if (idx == -1) return;
+    final old = _memes[idx];
+
+    if (kIsWeb) {
+      if (file.bytes != null) {
+        _webBytes[old.filePath] = file.bytes!;
+      }
+    } else {
+      final dest = File(p.join(_basePath!, old.filePath));
+      await dest.create(recursive: true);
+      if (file.path != null) {
+        await File(file.path!).copy(dest.path);
+      } else if (file.bytes != null) {
+        await dest.writeAsBytes(file.bytes!);
+      }
+    }
+    // 更新文件大小和类型
+    _memes[idx] = old.copyWith(
+      mimeType: _guessMime(_guessExt(file.name)),
+      fileSize: file.size,
+    );
+    _save();
+  }
+
   Future<Meme> importText(String text, {String? name, String? folderId, List<String> tags = const [], String? mood}) async {
     final id = _uuid.v4();
     final now = DateTime.now();
