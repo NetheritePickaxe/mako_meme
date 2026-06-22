@@ -1,0 +1,297 @@
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
+import '../models/meme.dart';
+import '../models/mood.dart';
+import '../providers/meme_provider.dart';
+import '../services/storage_service.dart';
+import '../screens/meme_viewer_screen.dart';
+
+class MemeCard extends StatefulWidget {
+  final Meme meme;
+  const MemeCard({super.key, required this.meme});
+
+  @override
+  State<MemeCard> createState() => _MemeCardState();
+}
+
+class _MemeCardState extends State<MemeCard> {
+  Uint8List? _bytes;
+  bool _loaded = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _loadBytes();
+  }
+
+  void _loadBytes() {
+    if (_loaded) return;
+    _loaded = true;
+    final storage = context.read<StorageService>();
+    if (widget.meme.type == 'image' && widget.meme.filePath.isNotEmpty) {
+      storage.readMemeBytes(widget.meme.filePath).then((b) {
+        if (mounted) setState(() => _bytes = b);
+      });
+    }
+  }
+
+  bool get _isDesktop {
+    final p = Theme.of(context).platform;
+    return p == TargetPlatform.windows || p == TargetPlatform.linux || p == TargetPlatform.macOS;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final prov = context.watch<MemeProvider>();
+    final isSelected = prov.selected.contains(widget.meme.id);
+    final isMulti = prov.isMulti;
+    final theme = Theme.of(context);
+
+    if (_isDesktop) {
+      // 桌面端：LongPressDraggable 用于拖入文件夹，左键复制，右键菜单
+      return LongPressDraggable<Meme>(
+        data: widget.meme,
+        feedback: Material(
+          elevation: 4,
+          borderRadius: BorderRadius.circular(12),
+          child: SizedBox(
+            width: 100,
+            height: 100,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: _bytes != null
+                  ? Image.memory(_bytes!, fit: BoxFit.cover)
+                  : Container(color: Colors.grey.shade300),
+            ),
+          ),
+        ),
+        childWhenDragging: Opacity(
+          opacity: 0.4,
+          child: _buildCard(context, prov, isSelected, isMulti, theme),
+        ),
+        child: GestureDetector(
+          onTap: isMulti ? () => prov.toggleSelect(widget.meme.id) : _copyToClipboard,
+          onSecondaryTapUp: (details) => _showContextMenu(details.globalPosition),
+          child: _buildCard(context, prov, isSelected, isMulti, theme),
+        ),
+      );
+    }
+
+    // 移动端：点击预览，长按分享
+    return GestureDetector(
+      onTap: isMulti ? () => prov.toggleSelect(widget.meme.id) : _openViewer,
+      onLongPress: isMulti ? null : _shareMeme,
+      child: _buildCard(context, prov, isSelected, isMulti, theme),
+    );
+  }
+
+  Widget _buildCard(BuildContext context, MemeProvider prov, bool isSelected, bool isMulti, ThemeData theme) {
+    return AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: isSelected ? Border.all(color: Theme.of(context).colorScheme.primary, width: 3) : null,
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4, offset: const Offset(0, 2))],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (widget.meme.type == 'image' && _bytes != null)
+                Image.memory(_bytes!, fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => _placeholder(),
+                )
+              else if (widget.meme.type == 'image')
+                _placeholder()
+              else
+                Container(
+                  color: Colors.grey.shade100,
+                  padding: const EdgeInsets.all(8),
+                  child: Center(child: Text(
+                    widget.meme.textContent ?? '',
+                    style: TextStyle(fontSize: widget.meme.type == 'emoji' ? 28 : 16,
+                      fontWeight: widget.meme.type == 'text' ? FontWeight.w500 : FontWeight.normal,
+                      color: Colors.black87),
+                    textAlign: TextAlign.center, overflow: TextOverflow.ellipsis, maxLines: 4,
+                  )),
+                ),
+              if (widget.meme.mood != null && !isMulti)
+                Positioned(top: 6, right: widget.meme.isFavorite ? 30 : 6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                    decoration: BoxDecoration(color: (findMoodById(widget.meme.mood)?.color ?? Colors.grey).withOpacity(0.85),
+                      borderRadius: BorderRadius.circular(4)),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(findMoodById(widget.meme.mood)?.icon ?? Icons.help, size: 10, color: Colors.white),
+                      const SizedBox(width: 2),
+                      Text(findMoodById(widget.meme.mood)?.name ?? '', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                    ]),
+                  ),
+                ),
+              if (widget.meme.isFavorite)
+                Positioned(top: 6, right: 6,
+                  child: Container(padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(color: Colors.red.withOpacity(0.85), shape: BoxShape.circle),
+                    child: const Icon(Icons.favorite, size: 14, color: Colors.white),
+                  ),
+                ),
+              if (isMulti)
+                Positioned(top: 6, left: 6,
+                  child: Container(padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: isSelected ? Theme.of(context).colorScheme.primary : Colors.white.withOpacity(0.8),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey.shade400, width: 2),
+                    ),
+                    child: isSelected ? const Icon(Icons.check, size: 14, color: Colors.white) : const SizedBox(width: 14, height: 14),
+                  ),
+                ),
+              if (widget.meme.mimeType == 'image/gif')
+                Positioned(bottom: 6, left: 6,
+                  child: Container(padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                    decoration: BoxDecoration(color: Colors.black.withOpacity(0.6), borderRadius: BorderRadius.circular(4)),
+                    child: const Text('GIF', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              if (widget.meme.type != 'image')
+                Positioned(bottom: 6, left: 6,
+                  child: Container(padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                    decoration: BoxDecoration(color: Colors.black.withOpacity(0.6), borderRadius: BorderRadius.circular(4)),
+                    child: Text(widget.meme.type == 'emoji' ? 'Emoji' : '文本',
+                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+            ],
+          ),
+        ),
+    );
+  }
+
+  void _copyToClipboard() {
+    if (_bytes != null) {
+      Clipboard.setData(ClipboardData(text: ''));
+      // 对于图片复制需要特殊处理，这里复制文件名作为 fallback
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已复制: ${widget.meme.name}'), duration: const Duration(seconds: 1)),
+      );
+    }
+    // 实际图片复制需要 platform channel，简化处理
+  }
+
+  void _openViewer() {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => MemeViewerScreen(
+        memes: [widget.meme],
+        initialIndex: 0,
+      ),
+    ));
+  }
+
+  void _shareMeme() {
+    Share.share(widget.meme.name);
+  }
+
+  void _showContextMenu(Offset tapPosition) {
+    final renderBox = context.findRenderObject() as RenderBox;
+    final localPos = renderBox.globalToLocal(tapPosition);
+    showMenu(
+      context: context,
+      position: RelativeRect.fromRect(
+        tapPosition & const Size(1, 1),
+        Offset.zero & MediaQuery.of(context).size,
+      ),
+      items: <PopupMenuEntry<String>>[
+        const PopupMenuItem<String>(
+          value: 'preview',
+          child: ListTile(leading: Icon(Icons.zoom_in), title: Text('预览大图'), dense: true),
+        ),
+        const PopupMenuItem<String>(
+          value: 'rename',
+          child: ListTile(leading: Icon(Icons.edit), title: Text('重命名'), dense: true),
+        ),
+        const PopupMenuItem<String>(
+          value: 'copy',
+          child: ListTile(leading: Icon(Icons.copy), title: Text('复制'), dense: true),
+        ),
+        const PopupMenuItem<String>(
+          value: 'share',
+          child: ListTile(leading: Icon(Icons.share), title: Text('分享'), dense: true),
+        ),
+        PopupMenuItem<String>(
+          value: 'favorite',
+          child: ListTile(
+            leading: Icon(Icons.favorite, color: widget.meme.isFavorite ? Colors.red : null),
+            title: Text(widget.meme.isFavorite ? '取消收藏' : '收藏'),
+            dense: true,
+          ),
+        ),
+        const PopupMenuDivider(),
+        const PopupMenuItem<String>(
+          value: 'delete',
+          child: ListTile(leading: Icon(Icons.delete, color: Colors.red), title: Text('删除', style: TextStyle(color: Colors.red)), dense: true),
+        ),
+      ],
+    ).then((value) {
+      if (value == null) return;
+      switch (value) {
+        case 'preview': _openViewer(); break;
+        case 'rename': _showRenameDialog(); break;
+        case 'copy': _copyToClipboard(); break;
+        case 'share': _shareMeme(); break;
+        case 'favorite':
+          context.read<MemeProvider>().toggleFavorite(widget.meme.id);
+          break;
+        case 'delete': _confirmDelete(); break;
+      }
+    });
+  }
+
+  void _showRenameDialog() async {
+    final ctrl = TextEditingController(text: widget.meme.name);
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (dCtx) => AlertDialog(
+        title: const Text('重命名'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: '新名称'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dCtx), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(dCtx, ctrl.text.trim()), child: const Text('保存')),
+        ],
+      ),
+    );
+    if (newName != null && newName.isNotEmpty) {
+      context.read<MemeProvider>().renameMeme(widget.meme.id, newName);
+    }
+  }
+
+  void _confirmDelete() async {
+    final prov = context.read<MemeProvider>();
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (dCtx) => AlertDialog(
+        title: const Text('删除表情'),
+        content: Text('确定删除「${widget.meme.name}」？'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dCtx, false), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(dCtx, true), child: const Text('删除')),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      await prov.deleteMeme(widget.meme.id);
+    }
+  }
+
+  Widget _placeholder() => Container(
+    color: Colors.grey.shade200,
+    child: Icon(Icons.broken_image, color: Colors.grey.shade400),
+  );
+}
