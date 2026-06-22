@@ -84,9 +84,13 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
             onSelected: (v) {
-              if (v == 'rename') _rename();
-              else if (v == 'mood') _showMoodPicker();
-              else if (v == 'delete') _confirmDelete();
+              if (v == 'rename') {
+                _rename();
+              } else if (v == 'mood') {
+                _showMoodPicker();
+              } else if (v == 'delete') {
+                _confirmDelete();
+              }
             },
             itemBuilder: (_) => [
               const PopupMenuItem(value: 'rename', child: ListTile(
@@ -199,7 +203,7 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
       ),
     );
     if (newName != null && newName.isNotEmpty) {
-      context.read<MemeProvider>().renameMeme(_meme.id, newName);
+      if (mounted) context.read<MemeProvider>().renameMeme(_meme.id, newName);
     }
   }
 
@@ -236,9 +240,11 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
       ),
     );
     if (confirm == true) {
-      final prov = context.read<MemeProvider>();
-      await prov.deleteMeme(_meme.id);
-      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        final prov = context.read<MemeProvider>();
+        await prov.deleteMeme(_meme.id);
+        if (mounted) Navigator.pop(context);
+      }
     }
   }
 }

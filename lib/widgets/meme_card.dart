@@ -33,10 +33,12 @@ class _MemeCardState extends State<MemeCard> {
     final storage = context.read<StorageService>();
     if (widget.meme.type == 'image' && widget.meme.filePath.isNotEmpty) {
       storage.readMemeBytes(widget.meme.filePath).then((b) {
-        if (mounted) setState(() {
-          _bytes = b;
-          _loading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _bytes = b;
+            _loading = false;
+          });
+        }
       }, onError: (_) {
         if (mounted) setState(() => _loading = false);
       });
@@ -102,7 +104,7 @@ class _MemeCardState extends State<MemeCard> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           border: isSelected ? Border.all(color: Theme.of(context).colorScheme.primary, width: 3) : null,
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4, offset: const Offset(0, 2))],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4, offset: const Offset(0, 2))],
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
@@ -146,7 +148,7 @@ class _MemeCardState extends State<MemeCard> {
                 Positioned(top: 6, right: widget.meme.isFavorite ? 30 : 6,
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                    decoration: BoxDecoration(color: (findMoodById(widget.meme.mood)?.color ?? Colors.grey).withOpacity(0.85),
+                    decoration: BoxDecoration(color: (findMoodById(widget.meme.mood)?.color ?? Colors.grey).withValues(alpha: 0.85),
                       borderRadius: BorderRadius.circular(4)),
                     child: Row(mainAxisSize: MainAxisSize.min, children: [
                       Icon(findMoodById(widget.meme.mood)?.icon ?? Icons.help, size: 10, color: Colors.white),
@@ -158,7 +160,7 @@ class _MemeCardState extends State<MemeCard> {
               if (widget.meme.isFavorite)
                 Positioned(top: 6, right: 6,
                   child: Container(padding: const EdgeInsets.all(3),
-                    decoration: BoxDecoration(color: Colors.red.withOpacity(0.85), shape: BoxShape.circle),
+                    decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.85), shape: BoxShape.circle),
                     child: const Icon(Icons.favorite, size: 14, color: Colors.white),
                   ),
                 ),
@@ -166,7 +168,7 @@ class _MemeCardState extends State<MemeCard> {
                 Positioned(top: 6, left: 6,
                   child: Container(padding: const EdgeInsets.all(2),
                     decoration: BoxDecoration(
-                      color: isSelected ? Theme.of(context).colorScheme.primary : Colors.white.withOpacity(0.8),
+                      color: isSelected ? Theme.of(context).colorScheme.primary : Colors.white.withValues(alpha: 0.8),
                       shape: BoxShape.circle,
                       border: Border.all(color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey.shade400, width: 2),
                     ),
