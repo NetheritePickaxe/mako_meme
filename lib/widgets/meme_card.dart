@@ -272,7 +272,7 @@ class _MemeCardState extends State<MemeCard> {
         case 'copy': _copyToClipboard(); break;
         case 'share': _shareMeme(); break;
         case 'favorite':
-          context.read<MemeProvider>().toggleFavorite(widget.meme.id);
+          if (mounted) context.read<MemeProvider>().toggleFavorite(widget.meme.id);
           break;
         case 'delete': _confirmDelete(); break;
       }
@@ -297,7 +297,7 @@ class _MemeCardState extends State<MemeCard> {
       ),
     );
     if (newName != null && newName.isNotEmpty) {
-      context.read<MemeProvider>().renameMeme(widget.meme.id, newName);
+      if (mounted) context.read<MemeProvider>().renameMeme(widget.meme.id, newName);
     }
   }
 
@@ -332,10 +332,12 @@ class _MemeCardState extends State<MemeCard> {
         final storage = context.read<StorageService>();
         // 用新文件覆盖旧字节
         await storage.reimportMeme(widget.meme.id, file);
-        if (mounted) setState(() {
-          _bytes = file.bytes;
-          _loading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _bytes = file.bytes;
+            _loading = false;
+          });
+        }
       }
     }
   }
