@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -114,7 +113,7 @@ class _MemeCardState extends State<MemeCard> {
                 const Center(child: CircularProgressIndicator(strokeWidth: 2))
               else if (widget.meme.type == 'image' && _bytes != null)
                 Image.memory(_bytes!, fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => _placeholder(),
+                  errorBuilder: (_, _, _) => _placeholder(),
                 )
               else if (widget.meme.type == 'image')
                 // 图片丢失（Web 刷新后）
@@ -177,14 +176,14 @@ class _MemeCardState extends State<MemeCard> {
               if (widget.meme.mimeType == 'image/gif')
                 Positioned(bottom: 6, left: 6,
                   child: Container(padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                    decoration: BoxDecoration(color: Colors.black.withOpacity(0.6), borderRadius: BorderRadius.circular(4)),
+                    decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.6), borderRadius: BorderRadius.circular(4)),
                     child: const Text('GIF', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
                   ),
                 ),
               if (widget.meme.type != 'image')
                 Positioned(bottom: 6, left: 6,
                   child: Container(padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                    decoration: BoxDecoration(color: Colors.black.withOpacity(0.6), borderRadius: BorderRadius.circular(4)),
+                    decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.6), borderRadius: BorderRadius.circular(4)),
                     child: Text(widget.meme.type == 'emoji' ? 'Emoji' : '文本',
                       style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
                   ),

@@ -20,7 +20,7 @@ class MemeProvider with ChangeNotifier {
   SortOrder _order = SortOrder.desc;
   bool _multi = false;
   final Set<String> _sel = {};
-  Set<String> _tagFilter = {};
+  final Set<String> _tagFilter = {};
   String? _moodFilter;
 
   MemeProvider(this._storage);
