@@ -8,7 +8,8 @@ import 'package:uuid/uuid.dart';
 import '../models/meme.dart';
 import '../models/folder.dart';
 
-// Web 端使用 dart:html 的 localStorage
+// Web 端使用 dart:html 的 localStorage（虽然已弃用，但 dart2js 下正常工作）
+// ignore_for_file: deprecated_member_use, avoid_web_libraries_in_flutter
 // ignore: undefined_hidden_name
 import 'dart:html' show window;
 
