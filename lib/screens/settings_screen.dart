@@ -189,60 +189,68 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await file.delete();
   }
 
-  Future<void> _importZip(BuildContext context) async {
+  Future<void> _importZip(BuildContext ctx) async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['zip'],
     );
     if (result == null || result.files.isEmpty) return;
+    if (!ctx.mounted) return;
 
     final zipFile = result.files.first;
     if (zipFile.path == null) return;
 
-    final storage = context.read<StorageService>();
-    final prov = context.read<MemeProvider>();
+    final storage = ctx.read<StorageService>();
+    final prov = ctx.read<MemeProvider>();
 
     final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
+      context: ctx,
+      builder: (c) => AlertDialog(
         title: const Text('导入备份'),
         content: Text('是否从 ${zipFile.name} 导入？\n\n如果 ZIP 包含 memes.json，将覆盖当前所有数据。'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('导入')),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('导入')),
         ],
       ),
     );
+    if (!ctx.mounted) return;
     if (confirmed != true) return;
 
     final count = await storage.importZip(zipFile.path!);
     await prov.loadAll();
 
-    if (context.mounted) {
+    if (ctx.mounted) {
       String msg;
-      if (count == 0) msg = '备份导入成功';
-      else if (count > 0) msg = '导入了 $count 张图片';
-      else msg = '导入失败：无法识别的 ZIP 文件';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      if (count == 0) {
+        msg = '备份导入成功';
+      } else if (count > 0) {
+        msg = '导入了 $count 张图片';
+      } else {
+        msg = '导入失败：无法识别的 ZIP 文件';
+      }
+      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(msg)));
     }
   }
 
-  Future<void> _checkUpdate(BuildContext context) async {
+  Future<void> _checkUpdate(BuildContext ctx) async {
     setState(() => _checking = true);
     final service = UpdateService();
     final info = await service.check();
-    if (!mounted) return;
+    if (!ctx.mounted) return;
     setState(() => _checking = false);
 
     if (info == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (!ctx.mounted) return;
+      ScaffoldMessenger.of(ctx).showSnackBar(
         const SnackBar(content: Text('已是最新版本')),
       );
       return;
     }
 
+    if (!ctx.mounted) return;
     final result = await showDialog<bool>(
-      context: context,
+      context: ctx,
       builder: (ctx) => AlertDialog(
         title: const Text('发现新版本'),
         content: Text('版本 $info.version 可用，是否下载？'),

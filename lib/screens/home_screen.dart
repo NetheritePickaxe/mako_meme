@@ -458,6 +458,7 @@ class _HomeScreenState extends State<HomeScreen> {
       allowedExtensions: ['zip'],
     );
     if (result == null || result.files.isEmpty) return;
+    if (!ctx.mounted) return;
     final zipFile = result.files.first;
     if (zipFile.path == null) return;
 
@@ -475,6 +476,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+    if (!ctx.mounted) return;
     if (confirmed != true) return;
 
     final count = await storage.importZip(zipFile.path!);
@@ -482,9 +484,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (ctx.mounted) {
       String msg;
-      if (count == 0) msg = '备份导入成功';
-      else if (count > 0) msg = '导入了 $count 张图片';
-      else msg = '导入失败：无法识别的 ZIP 文件';
+      if (count == 0) {
+        msg = '备份导入成功';
+      } else if (count > 0) {
+        msg = '导入了 $count 张图片';
+      } else {
+        msg = '导入失败：无法识别的 ZIP 文件';
+      }
       ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(msg)));
     }
   }
