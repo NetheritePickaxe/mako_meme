@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.sticker.sticker_manager"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 34
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

@@ -1,11 +1,11 @@
-# Mako Meme CI/CD
+﻿# Mako Meme CI/CD
 #
-# 推送构建:
-#   main 分支推送 → 构建 Android APK + Web + Windows
-# 打 Tag 自动 Release:
+# 鎺ㄩ€佹瀯寤?
+#   main 鍒嗘敮鎺ㄩ€?鈫?鏋勫缓 Android APK + Web + Windows
+# 鎵?Tag 鑷姩 Release:
 #   git tag v1.0.0 && git push origin v1.0.0
-#   → 构建所有平台 + 创建 GitHub Release + 上传产物
-# 构建结果通过飞书 Webhook 通知
+#   鈫?鏋勫缓鎵€鏈夊钩鍙?+ 鍒涘缓 GitHub Release + 涓婁紶浜х墿
+# 鏋勫缓缁撴灉閫氳繃椋炰功 Webhook 閫氱煡
 
 name: CI/CD
 
@@ -20,7 +20,7 @@ env:
   FLUTTER_VERSION: "3.44.2"
 
 jobs:
-  # ───────── 静态分析 ─────────
+  # 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ 闈欐€佸垎鏋?鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
   analyze:
     name: Analyze
     runs-on: ubuntu-latest
@@ -32,7 +32,7 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
 
-  # ───────── Android 构建 ─────────
+  # 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ Android 鏋勫缓 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
   android:
     name: Build Android
     needs: analyze
@@ -49,7 +49,7 @@ jobs:
           name: android-apk
           path: build/app/outputs/flutter-apk/*.apk
 
-  # ───────── Web 构建 ─────────
+  # 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ Web 鏋勫缓 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
   web:
     name: Build Web
     needs: analyze
@@ -69,7 +69,7 @@ jobs:
           name: web-build
           path: build/web
 
-  # ───────── Windows 构建 ─────────
+  # 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ Windows 鏋勫缓 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
   windows:
     name: Build Windows
     needs: analyze
@@ -86,24 +86,24 @@ jobs:
           name: windows-msix
           path: build/windows/**/Release/
 
-  # ───────── 部署 Web 到 GitHub Pages ─────────
-  deploy-pages:
-    name: Deploy Web to Pages
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-    needs: web
-    runs-on: ubuntu-latest
-    continue-on-error: true  # 未开启 Pages 时不阻塞 CI
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+  # 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ 閮ㄧ讲 Web 鍒?GitHub Pages 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+#   deploy-pages:
+#     name: Deploy Web to Pages
+#     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+#     needs: web
+#     runs-on: ubuntu-latest
+#     continue-on-error: true  # 鏈紑鍚?Pages 鏃朵笉闃诲 CI
+#     permissions:
+#       pages: write
+#       id-token: write
+#     environment:
+#       name: github-pages
+#       url: ${{ steps.deployment.outputs.page_url }}
+#     steps:
+#       - id: deployment
+#         uses: actions/deploy-pages@v4
 
-  # ───────── 创建 Release (打 Tag 时) ─────────
+  # 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ 鍒涘缓 Release (鎵?Tag 鏃? 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
   release:
     name: Create Release
     if: startsWith(github.ref, 'refs/tags/v')
@@ -127,19 +127,16 @@ jobs:
           body: |
             ## Mako Meme ${{ github.ref_name }}
 
-            跨平台表情包管理器发布版本。
-
-            ### 下载
+            璺ㄥ钩鍙拌〃鎯呭寘绠＄悊鍣ㄥ彂甯冪増鏈€?
+            ### 涓嬭浇
 
             - **Android**: `app-release.apk`
-            - **Windows**: MSIX 安装包
-            - **Web**: `web-build.zip`（解压后部署到任意静态服务器）
-
-            > 构建于 ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            - **Windows**: MSIX 瀹夎鍖?            - **Web**: `web-build.zip`锛堣В鍘嬪悗閮ㄧ讲鍒颁换鎰忛潤鎬佹湇鍔″櫒锛?
+            > 鏋勫缓浜?${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           artifacts: release-artifacts/*
           token: ${{ secrets.GITHUB_TOKEN }}
 
-  # ───────── 飞书通知 ─────────
+  # 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ 椋炰功閫氱煡 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
   notify:
     name: Notify Feishu
     if: ${{ always() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')) }}
@@ -186,9 +183,9 @@ jobs:
           fi
 
           if [ "$STATUS" = "success" ]; then
-            export ICON="✅" TPL="green"
+            export ICON="鉁? TPL="green"
           else
-            export ICON="❌" TPL="red"
+            export ICON="鉂? TPL="red"
           fi
 
           # Write Python script to file to avoid YAML indentation issues
@@ -210,14 +207,14 @@ jobs:
                   'tag': 'div',
                   'text': {
                     'tag': 'lark_md',
-                    'content': '**项目**: Mako Meme\n**分支**: ' + os.environ['REF'] + '\n**提交**: ' + os.environ['SHA'][:7] + '\n\n**构建结果**:\n' + summary
+                    'content': '**椤圭洰**: Mako Meme\n**鍒嗘敮**: ' + os.environ['REF'] + '\n**鎻愪氦**: ' + os.environ['SHA'][:7] + '\n\n**鏋勫缓缁撴灉**:\n' + summary
                   }
                 },
                 {
                   'tag': 'action',
                   'actions': [{
                     'tag': 'button',
-                    'text': {'tag': 'plain_text', 'content': '查看构建详情'},
+                    'text': {'tag': 'plain_text', 'content': '鏌ョ湅鏋勫缓璇︽儏'},
                     'url': 'https://github.com/' + os.environ['REPO'] + '/actions/runs/' + os.environ['RUN_ID'],
                     'type': 'default'
                   }]
