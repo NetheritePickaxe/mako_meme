@@ -34,6 +34,14 @@ android {
     }
 }
 
+// Workaround: Flutter Gradle Plugin overrides compileSdk in its afterEvaluate hook.
+// Re-apply our value after the plugin has finished configuring.
+afterEvaluate {
+    android {
+        compileSdk = 36
+    }
+}
+
 kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
