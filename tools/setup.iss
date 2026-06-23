@@ -7,7 +7,7 @@ AppSupportURL=https://github.com/NetheritePickaxe/mako_meme/issues
 AppUpdatesURL=https://github.com/NetheritePickaxe/mako_meme/releases
 DefaultDirName={autopf}\Mako Meme
 DefaultGroupName=Mako Meme
-OutputDir=build\windows\x64\runner\Release
+OutputDir=..\build\windows\x64\runner\Release
 OutputBaseFilename=mako_meme-1.0.0-setup
 Compression=lzma2/ultra64
 SolidCompression=yes
@@ -17,7 +17,7 @@ PrivilegesRequired=lowest
 DisableReadyPage=no
 
 [Files]
-Source: "..\..\..\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
+Source: "..\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 
 [Icons]
 Name: "{userdesktop}\Mako Meme"; Filename: "{app}\mako_meme.exe"; IconFilename: "{app}\app_icon.ico"
