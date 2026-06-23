@@ -1,4 +1,4 @@
-package com.sticker.sticker_manager
+package com.mako.mako_meme
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -38,7 +38,7 @@ Type: filesandordirs; Name: "{group}"
 var
   DeleteDataPage: TInputOptionWizardPage;
 
-procedure InitializeUninstall;
+function InitializeUninstall: Boolean;
 begin
   DeleteDataPage := CreateInputOptionPage(
     -1,
@@ -50,6 +50,7 @@ begin
   );
   DeleteDataPage.Add('删除所有应用数据（表情包、标签、分类）');
   DeleteDataPage.Values[0] := False;
+  Result := True;
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
