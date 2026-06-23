@@ -15,12 +15,17 @@ WizardStyle=modern
 ArchitecturesInstallIn64BitMode=x64
 PrivilegesRequired=lowest
 DisableReadyPage=no
+AllowNoIcons=yes
+DisableProgramGroupPage=no
 
 [Files]
 Source: "..\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 
+[Tasks]
+Name: desktopicon; Description: "Create desktop shortcut"; GroupDescription: "Additional tasks:"; Flags: checkedonce
+
 [Icons]
-Name: "{userdesktop}\Mako Meme"; Filename: "{app}\mako_meme.exe"; IconFilename: "{app}\app_icon.ico"
+Name: "{userdesktop}\Mako Meme"; Filename: "{app}\mako_meme.exe"; IconFilename: "{app}\app_icon.ico"; Tasks: desktopicon
 Name: "{group}\Mako Meme"; Filename: "{app}\mako_meme.exe"
 Name: "{group}\Uninstall Mako Meme"; Filename: "{uninstallexe}"
 

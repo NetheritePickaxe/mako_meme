@@ -98,7 +98,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: windows-installer
-          path: build/windows/x64/runner/Release/*.exe
+          path: build/windows/x64/runner/Release/*-setup.exe
 
   # --- GitHub Pages Deploy (disabled) ---
   # deploy-pages:
