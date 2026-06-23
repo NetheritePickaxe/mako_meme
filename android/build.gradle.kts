@@ -16,12 +16,6 @@ subprojects {
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
 subprojects {
-    project.evaluationDependsOn(":app")
-}
-
-// Force all library/app modules to use compileSdk 36,
-// overriding their own build.gradle hardcoded values.
-subprojects {
     afterEvaluate {
         if (plugins.hasPlugin("com.android.application") || plugins.hasPlugin("com.android.library")) {
             extensions.configure<com.android.build.gradle.BaseExtension> {
@@ -29,6 +23,7 @@ subprojects {
             }
         }
     }
+    project.evaluationDependsOn(":app")
 }
 
 tasks.register<Delete>("clean") {
