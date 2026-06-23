@@ -1,4 +1,4 @@
-﻿[Setup]
+[Setup]
 AppName=Mako Meme
 AppVersion=1.0.0
 AppPublisher=Mako Meme
@@ -20,7 +20,7 @@ DisableReadyPage=no
 Source: "..\..\..\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 
 [Icons]
-Name: "{userdesktop}\Mako Meme"; Filename: "{app}\mako_meme.exe"; IconFile: "{app}\app_icon.ico"
+Name: "{userdesktop}\Mako Meme"; Filename: "{app}\mako_meme.exe"; IconFilename: "{app}\app_icon.ico"
 Name: "{group}\Mako Meme"; Filename: "{app}\mako_meme.exe"
 Name: "{group}\Uninstall Mako Meme"; Filename: "{uninstallexe}"
 
