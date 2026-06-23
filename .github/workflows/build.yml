@@ -187,10 +187,10 @@ jobs:
 
           if [ "$STATUS" = "success" ]; then
             export ICON="[PASS]"
-            TPL="green"
+            export TPL="green"
           else
             export ICON="[FAIL]"
-            TPL="red"
+            export TPL="red"
           fi
 
           cat > /tmp/gen_payload.py << 'PYEOF'
