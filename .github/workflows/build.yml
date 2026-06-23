@@ -217,14 +217,14 @@ jobs:
                           'tag': 'div',
                           'text': {
                               'tag': 'lark_md',
-                              'content': '**Project**: Mako Meme\n**Branch**: ' + os.environ['REF'] + '\n**Commit**: ' + os.environ['SHA'][:7] + '\n\n**Build Results**:\n' + summary
+                              'content': '**项目**: Mako Meme\n**分支**: ' + os.environ['REF'] + '\n**提交**: ' + os.environ['SHA'][:7] + '\n\n**构建结果**:\n' + summary
                           }
                       },
                       {
                           'tag': 'action',
                           'actions': [{
                               'tag': 'button',
-                              'text': {'tag': 'plain_text', 'content': 'View Build Details'},
+                              'text': {'tag': 'plain_text', 'content': '查看构建详情'},
                               'url': 'https://github.com/' + os.environ['REPO'] + '/actions/runs/' + os.environ['RUN_ID'],
                               'type': 'default'
                           }]
