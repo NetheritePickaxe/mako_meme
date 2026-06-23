@@ -18,17 +18,22 @@ DisableReadyPage=no
 AllowNoIcons=yes
 DisableProgramGroupPage=no
 
+[Languages]
+Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
+
 [Files]
 Source: "..\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 
 [Tasks]
 Name: desktopicon; Description: "创建桌面快捷方式(&D)"; GroupDescription: "附加图标："; Flags: checkedonce
-Name: startmenuicon; Description: "创建开始菜单快捷方式(&S)"; GroupDescription: "附加图标："; Flags: checkedonce
 
 [Icons]
 Name: "{userdesktop}\Mako Meme"; Filename: "{app}\mako_meme.exe"; IconFilename: "{app}\app_icon.ico"; Tasks: desktopicon
-Name: "{group}\Mako Meme"; Filename: "{app}\mako_meme.exe"; Tasks: startmenuicon
-Name: "{group}\Uninstall Mako Meme"; Filename: "{uninstallexe}"
+Name: "{group}\Mako Meme"; Filename: "{app}\mako_meme.exe"
+Name: "{group}\卸载 Mako Meme"; Filename: "{uninstallexe}"
+
+[Run]
+Filename: "{app}\mako_meme.exe"; Description: "启动 Mako Meme"; Flags: postinstall nowait skipifsilent
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}"
