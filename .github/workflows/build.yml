@@ -9,6 +9,10 @@
 
 name: CI/CD
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [main, master]
@@ -171,14 +175,15 @@ jobs:
           STATUS="success"
           MSG=""
           append() {
-            local label="$1" result="$2"
-            MSG="${MSG}${label}: ${result}\n"
+            local label="$1" result="$2" cn_result
+            if [ "$result" = "success" ]; then cn_result="成功"; else cn_result="失败"; fi
+            MSG="${MSG}${label}: ${cn_result}\n"
             if [ "$result" != "success" ]; then STATUS="failure"; fi
           }
-          append "Analyze" "${{ needs.analyze.result }}"
-          append "Android" "${{ needs.android.result }}"
-          append "Web"     "${{ needs.web.result }}"
-          append "Windows" "${{ needs.windows.result }}"
+          append "静态分析" "${{ needs.analyze.result }}"
+          append "安卓"     "${{ needs.android.result }}"
+          append "Web"      "${{ needs.web.result }}"
+          append "Windows"  "${{ needs.windows.result }}"
           echo "status=$STATUS" >> "$GITHUB_OUTPUT"
           {
             echo "msg<<EOFMSG"
@@ -220,7 +225,7 @@ jobs:
                   'header': {
                       'title': {
                           'tag': 'plain_text',
-                          'content': os.environ['ICON'] + ' Mako Meme ' + os.environ['STATUS']
+                          'content': os.environ['ICON'] + ' Mako Meme'
                       },
                       'template': os.environ['TPL']
                   },
