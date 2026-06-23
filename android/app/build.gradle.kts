@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.sticker.sticker_manager"
+    namespace = "com.mako.mako_meme"
     compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
@@ -16,7 +16,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.sticker.sticker_manager"
+        applicationId = "com.mako.mako_meme"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 24

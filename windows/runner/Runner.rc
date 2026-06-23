@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.sticker" "\0"
-            VALUE "FileDescription", "sticker_manager" "\0"
+            VALUE "CompanyName", "com.mako" "\0"
+            VALUE "FileDescription", "mako_meme" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "sticker_manager" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.sticker. All rights reserved." "\0"
-            VALUE "OriginalFilename", "sticker_manager.exe" "\0"
-            VALUE "ProductName", "sticker_manager" "\0"
+            VALUE "InternalName", "mako_meme" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 com.mako. All rights reserved." "\0"
+            VALUE "OriginalFilename", "mako_meme.exe" "\0"
+            VALUE "ProductName", "mako_meme" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
