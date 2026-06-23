@@ -1,4 +1,4 @@
-name: mako_meme
+﻿name: mako_meme
 description: "跨平台表情包管理器"
 publish_to: 'none'
 version: 1.0.0+1
@@ -20,7 +20,7 @@ dependencies:
   fuzzy: ^0.5.1
   photo_view: ^0.15.0
   archive: ^4.0.2
-  desktop_drop: ^0.5.0
+  desktop_drop: ^0.7.1
 
 dev_dependencies:
   flutter_test:
