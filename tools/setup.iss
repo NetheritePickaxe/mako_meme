@@ -1,4 +1,4 @@
-[Setup]
+﻿[Setup]
 AppName=Mako Meme
 AppVersion=1.0.0
 AppPublisher=Mako Meme
@@ -22,13 +22,47 @@ DisableProgramGroupPage=no
 Source: "..\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 
 [Tasks]
-Name: desktopicon; Description: "Create desktop shortcut"; GroupDescription: "Additional tasks:"; Flags: checkedonce
+Name: desktopicon; Description: "创建桌面快捷方式(&D)"; GroupDescription: "附加图标："; Flags: checkedonce
+Name: startmenuicon; Description: "创建开始菜单快捷方式(&S)"; GroupDescription: "附加图标："; Flags: checkedonce
 
 [Icons]
 Name: "{userdesktop}\Mako Meme"; Filename: "{app}\mako_meme.exe"; IconFilename: "{app}\app_icon.ico"; Tasks: desktopicon
-Name: "{group}\Mako Meme"; Filename: "{app}\mako_meme.exe"
+Name: "{group}\Mako Meme"; Filename: "{app}\mako_meme.exe"; Tasks: startmenuicon
 Name: "{group}\Uninstall Mako Meme"; Filename: "{uninstallexe}"
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}"
 Type: filesandordirs; Name: "{group}"
+
+[Code]
+var
+  DeleteDataPage: TInputOptionWizardPage;
+
+procedure InitializeUninstall;
+begin
+  DeleteDataPage := CreateInputOptionPage(
+    -1,
+    '删除应用数据',
+    '是否同时删除所有表情包数据？',
+    '此操作不可撤销。',
+    True,
+    False
+  );
+  DeleteDataPage.Add('删除所有应用数据（表情包、标签、分类）');
+  DeleteDataPage.Values[0] := False;
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  DataPath: string;
+begin
+  if CurUninstallStep = usPostUninstall then
+  begin
+    if DeleteDataPage.Values[0] then
+    begin
+      DataPath := ExpandConstant('{userdocs}\mako_meme');
+      if DirExists(DataPath) then
+        DelTree(DataPath, True, True, True);
+    end;
+  end;
+end;
