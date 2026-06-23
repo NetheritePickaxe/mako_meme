@@ -29,10 +29,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.menu),
-          tooltip: '打开菜单',
-          onPressed: () => Scaffold.of(context).openDrawer(),
+        leading: Builder(
+          builder: (ctx) => IconButton(
+            icon: const Icon(Icons.menu),
+            tooltip: '打开菜单',
+            onPressed: () => Scaffold.of(ctx).openDrawer(),
+          ),
         ),
         title: Text(_getTitle(prov)),
         actions: [
@@ -168,14 +170,10 @@ class _HomeScreenState extends State<HomeScreen> {
             mainAxisSpacing: 8,
             childAspectRatio: 1,
           ),
-          itemCount: folders.length + uncategorized.length + 1, // +1 表示"全部"卡片
+          itemCount: folders.length + uncategorized.length,
           itemBuilder: (ctx, i) {
-            if (i == 0) {
-              // 第一个卡片：全部
-              return _buildAllCard(context, prov);
-            }
-            if (i <= folders.length) {
-              final f = folders[i - 1];
+            if (i < folders.length) {
+              final f = folders[i];
               return FolderCard(
                 folder: f,
                 count: prov.countInFolder(f.id),
@@ -183,50 +181,11 @@ class _HomeScreenState extends State<HomeScreen> {
               );
             }
             // 未分类的表情作为普通 MemeCard 展示
-            final meme = uncategorized[i - folders.length - 1];
+            final meme = uncategorized[i - folders.length];
             return _buildMemeCardInGrid(meme);
           },
         );
       },
-    );
-  }
-
-  Widget _buildAllCard(BuildContext context, MemeProvider prov) {
-    final theme = Theme.of(context);
-    final isActive = prov.folderId == null && prov.moodFilter == null;
-    return GestureDetector(
-      onTap: () {
-        prov.selectFolder(null);
-        prov.clearMood();
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          color: isActive
-              ? theme.colorScheme.primaryContainer.withValues(alpha: 0.5)
-              : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-          border: isActive
-              ? Border.all(color: theme.colorScheme.primary, width: 2)
-              : null,
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.all_inbox, size: 36, color: isActive ? theme.colorScheme.primary : null),
-            const SizedBox(height: 8),
-            Text('全部', style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-              color: isActive ? theme.colorScheme.primary : null,
-            )),
-            const SizedBox(height: 4),
-            Text('${prov.allMemesCount} 个表情',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
