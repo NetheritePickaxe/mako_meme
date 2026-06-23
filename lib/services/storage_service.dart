@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
+import 'package:archive/archive_io.dart';
 import '../models/meme.dart';
 import '../models/folder.dart';
 import 'storage_platform.dart';
@@ -319,6 +320,167 @@ class StorageService {
       }
     }
     _save();
+  }
+
+  // ======================== Settings ========================
+
+  Map<String, String> _settings = {};
+
+  String? getSetting(String key) {
+    if (_settings.isEmpty) _loadSettings();
+    return _settings[key];
+  }
+
+  Future<void> setSetting(String key, String value) async {
+    _settings[key] = value;
+    await _saveSettings();
+  }
+
+  void _loadSettings() {
+    final file = File(p.join(_basePath!, 'settings.json'));
+    if (file.existsSync()) {
+      try {
+        final data = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+        _settings = data.map((k, v) => MapEntry(k, v.toString()));
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _saveSettings() async {
+    try {
+      await File(p.join(_basePath!, 'settings.json')).writeAsString(
+        jsonEncode(_settings),
+      );
+    } catch (_) {}
+  }
+
+  // ======================== Export / Import ========================
+
+  Future<String?> exportData() async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final exportDir = Directory(p.join(tempDir.path, 'mako_meme_export'));
+      if (await exportDir.exists()) await exportDir.delete(recursive: true);
+      await exportDir.create(recursive: true);
+
+      final memesDir = Directory(p.join(exportDir.path, 'memes'));
+      await memesDir.create();
+
+      await File(p.join(_basePath!, 'memes.json')).copy(
+        p.join(exportDir.path, 'memes.json'),
+      );
+
+      final srcMemesDir = Directory(p.join(_basePath!, 'memes'));
+      if (await srcMemesDir.exists()) {
+        await for (final f in srcMemesDir.list()) {
+          if (f is File) {
+            await f.copy(p.join(memesDir.path, p.basename(f.path)));
+          }
+        }
+      }
+
+      final zipPath = p.join(tempDir.path, 'mako_meme_backup.zip');
+      final encoder = ZipFileEncoder();
+      encoder.create(zipPath);
+      await encoder.addDirectory(exportDir, includeDirName: false);
+      await encoder.close();
+
+      await exportDir.delete(recursive: true);
+      return zipPath;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<int> importZip(String zipPath) async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final extractDir = Directory(p.join(tempDir.path, 'mako_meme_import'));
+      if (await extractDir.exists()) await extractDir.delete(recursive: true);
+      await extractDir.create();
+
+      final inputStream = InputFileStream(zipPath);
+      final archiveObj = ZipDecoder().decodeStream(inputStream);
+
+      for (final entry in archiveObj) {
+        if (entry.isFile) {
+          final dest = File(p.join(extractDir.path, entry.name));
+          await dest.create(recursive: true);
+          await dest.writeAsBytes(entry.content);
+        }
+      }
+      inputStream.close();
+
+      final hasMeta = await File(p.join(extractDir.path, 'memes.json')).exists();
+
+      if (hasMeta) {
+        final data = jsonDecode(
+          await File(p.join(extractDir.path, 'memes.json')).readAsString(),
+        ) as Map<String, dynamic>;
+
+        final importedMemes = (data['memes'] as List? ?? [])
+            .cast<Map<String, dynamic>>()
+            .map((m) => Meme.fromMap(m))
+            .toList();
+        final importedFolders = (data['folders'] as List? ?? [])
+            .cast<Map<String, dynamic>>()
+            .map((f) => MemeFolder.fromMap(f))
+            .toList();
+
+        final srcImages = Directory(p.join(extractDir.path, 'memes'));
+        if (await srcImages.exists()) {
+          final dstImages = Directory(p.join(_basePath!, 'memes'));
+          if (!await dstImages.exists()) await dstImages.create(recursive: true);
+          await for (final f in srcImages.list()) {
+            if (f is File) {
+              await f.copy(p.join(dstImages.path, p.basename(f.path)));
+            }
+          }
+        }
+
+        _memes = importedMemes;
+        _folders = importedFolders;
+        _save();
+        await extractDir.delete(recursive: true);
+        return 0;
+      }
+
+      final imagesDir = Directory(p.join(extractDir.path, 'memes'));
+      if (await imagesDir.exists()) {
+        int count = 0;
+        await for (final f in imagesDir.list()) {
+          if (f is File) {
+            final ext = p.extension(f.path).toLowerCase();
+            if (['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'].contains(ext)) {
+              final id = _uuid.v4();
+              final fileName = '$id$ext';
+              final filePath = 'memes/$fileName';
+              final dest = File(p.join(_basePath!, filePath));
+              await dest.create(recursive: true);
+              await f.copy(dest.path);
+              _memes.insert(0, Meme(
+                id: id,
+                name: p.basenameWithoutExtension(p.basename(f.path)),
+                filePath: filePath,
+                createdAt: DateTime.now(),
+                mimeType: _guessMime(ext),
+                fileSize: await f.length(),
+                type: 'image',
+              ));
+              count++;
+            }
+          }
+        }
+        _save();
+        await extractDir.delete(recursive: true);
+        return count;
+      }
+
+      await extractDir.delete(recursive: true);
+      return -1;
+    } catch (_) {
+      return -1;
+    }
   }
 
   // ======================== Utility ========================

@@ -13,6 +13,7 @@ import '../widgets/mako_search_bar.dart' as custom;
 import '../widgets/multi_select_bar.dart';
 import '../services/storage_service.dart';
 import '../screens/meme_viewer_screen.dart';
+import '../screens/settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -310,6 +311,17 @@ class _HomeScreenState extends State<HomeScreen> {
                     onTap: () { prov.selectFolder(f.id); prov.clearMood(); Navigator.pop(context); },
                     onLongPress: () => _showFolderMenu(context, prov, f),
                   )),
+                  const Divider(indent: 16, endIndent: 16),
+                  ListTile(
+                    leading: const Icon(Icons.settings, size: 20),
+                    title: const Text('设置'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+                    },
+                    dense: true,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
                 ],
               ),
             ),
@@ -395,6 +407,13 @@ class _HomeScreenState extends State<HomeScreen> {
               subtitle: const Text('纯文本或 Emoji 符号'),
               onTap: () { Navigator.pop(bCtx); _importText(ctx, prov); },
             ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.file_download_outlined),
+              title: const Text('导入备份'),
+              subtitle: const Text('ZIP 备份 / 图片包'),
+              onTap: () { Navigator.pop(bCtx); _importZip(ctx); },
+            ),
           ],
         ),
       ),
@@ -431,6 +450,43 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _importZip(BuildContext ctx) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['zip'],
+    );
+    if (result == null || result.files.isEmpty) return;
+    final zipFile = result.files.first;
+    if (zipFile.path == null) return;
+
+    final storage = ctx.read<StorageService>();
+    final prov = ctx.read<MemeProvider>();
+
+    final confirmed = await showDialog<bool>(
+      context: ctx,
+      builder: (dCtx) => AlertDialog(
+        title: const Text('导入备份'),
+        content: Text('是否从 ${zipFile.name} 导入？\n\n如果 ZIP 包含 memes.json，将覆盖当前所有数据。'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dCtx, false), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(dCtx, true), child: const Text('导入')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final count = await storage.importZip(zipFile.path!);
+    await prov.loadAll();
+
+    if (ctx.mounted) {
+      String msg;
+      if (count == 0) msg = '备份导入成功';
+      else if (count > 0) msg = '导入了 $count 张图片';
+      else msg = '导入失败：无法识别的 ZIP 文件';
+      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(msg)));
+    }
   }
 
   void _showCreateFolderDialog(BuildContext ctx, MemeProvider prov) {
