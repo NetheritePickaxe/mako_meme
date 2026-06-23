@@ -140,10 +140,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: FloatingActionButton(
         onPressed: () => _showImportMenu(context, prov),
-        icon: const Icon(Icons.add),
-        label: const Text('导入'),
+        child: const Icon(Icons.add, size: 32),
       ),
     );
   }
@@ -325,19 +324,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-            // 新建文件夹按钮
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: OutlinedButton.icon(
-                onPressed: () => _showCreateFolderDialog(context, prov),
-                icon: const Icon(Icons.create_new_folder, size: 18),
-                label: const Text('新建文件夹'),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(44),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-            ),
+
           ],
         ),
       ),
@@ -395,6 +382,12 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            ListTile(
+              leading: const Icon(Icons.create_new_folder),
+              title: const Text('新建文件夹'),
+              onTap: () { Navigator.pop(bCtx); _showCreateFolderDialog(ctx, prov); },
+            ),
+            const Divider(),
             ListTile(
               leading: const Icon(Icons.image),
               title: const Text('导入图片'),
