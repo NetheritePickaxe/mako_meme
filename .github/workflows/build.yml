@@ -106,6 +106,27 @@ jobs:
           name: windows-installer
           path: build/windows/x64/runner/Release/*-setup.exe
 
+  # --- Linux Build (commented out, uncomment to enable) ---
+  # linux:
+  #   name: Build Linux
+  #   needs: analyze
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: subosito/flutter-action@v2
+  #       with:
+  #         flutter-version: ${{ env.FLUTTER_VERSION }}
+  #     - name: Install Linux dependencies
+  #       run: |
+  #         sudo apt-get update
+  #         sudo apt-get install -y cmake clang dbus git libgtk-3-dev libmpv1 ninja-build pkg-config webkit2gtk-4.1
+  #     - run: flutter pub get
+  #     - run: flutter build linux --release
+  #     - uses: actions/upload-artifact@v4
+  #       with:
+  #         name: linux-build
+  #         path: build/linux/x64/release/bundle
+
   # --- GitHub Pages Deploy ---
   deploy-pages:
     name: Deploy Web to Pages
@@ -127,7 +148,7 @@ jobs:
   release:
     name: Create Release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [android, web, windows]
+    needs: [android, web, windows, /* linux */]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -165,7 +186,7 @@ jobs:
   notify:
     name: Notify Feishu
     if: ${{ always() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')) }}
-    needs: [analyze, android, web, windows]
+    needs: [analyze, android, web, windows, /* linux */]
     runs-on: ubuntu-latest
     steps:
       - name: Build status summary
