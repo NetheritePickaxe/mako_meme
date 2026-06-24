@@ -24,22 +24,16 @@ class MemeGrid extends StatelessWidget {
         ),
       );
     }
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final w = constraints.maxWidth;
-        final cols = w > 1200 ? 8 : w > 900 ? 6 : w > 600 ? 4 : w > 400 ? 3 : 2;
-        return GridView.builder(
-          padding: EdgeInsets.all(spacing),
-        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: 160,
-          childAspectRatio: 1,
-          crossAxisSpacing: spacing,
-          mainAxisSpacing: spacing,
-        ),
-          itemCount: memes.length,
-          itemBuilder: (ctx, i) => MemeCard(meme: memes[i]),
-        );
-      },
+    return GridView.builder(
+      padding: EdgeInsets.all(spacing),
+      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 160,
+        childAspectRatio: 1,
+        crossAxisSpacing: spacing,
+        mainAxisSpacing: spacing,
+      ),
+      itemCount: memes.length,
+      itemBuilder: (ctx, i) => MemeCard(meme: memes[i]),
     );
   }
 }
