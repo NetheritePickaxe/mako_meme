@@ -148,7 +148,7 @@ jobs:
   release:
     name: Create Release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [android, web, windows, /* linux */]
+    needs: [android, web, windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -186,7 +186,7 @@ jobs:
   notify:
     name: Notify Feishu
     if: ${{ always() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')) }}
-    needs: [analyze, android, web, windows, /* linux */]
+    needs: [analyze, android, web, windows]
     runs-on: ubuntu-latest
     steps:
       - name: Build status summary
