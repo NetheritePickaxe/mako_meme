@@ -106,22 +106,22 @@ jobs:
           name: windows-installer
           path: build/windows/x64/runner/Release/*-setup.exe
 
-  # --- GitHub Pages Deploy (disabled) ---
-  # deploy-pages:
-  #   name: Deploy Web to Pages
-  #   if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-  #   needs: web
-  #   runs-on: ubuntu-latest
-  #   continue-on-error: true
-  #   permissions:
-  #     pages: write
-  #     id-token: write
-  #   environment:
-  #     name: github-pages
-  #     url: ${{ steps.deployment.outputs.page_url }}
-  #   steps:
-  #     - id: deployment
-  #       uses: actions/deploy-pages@v4
+  # --- GitHub Pages Deploy ---
+  deploy-pages:
+    name: Deploy Web to Pages
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    needs: web
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
 
   # --- Create Release (on tag) ---
   release:

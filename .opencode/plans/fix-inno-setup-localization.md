@@ -1,25 +1,24 @@
-# Fix Inno Setup Chinese Localization for CI
+# Fix Inno Setup Chinese Localization - Path Bug
 
 ## Problem
-CI build failed because `ChineseSimplified.isl` file is not available on the `windows-2025-vs2026` runner. The `[Languages]` section in `tools/setup.iss` references this file and causes compilation to abort.
+CI build failed with:
+```
+Couldn't open include file "...tools\tools\Languages\ChineseSimplified.isl"
+```
 
-## Plan
-1. Remove the `[Languages]` section from `tools/setup.iss`
-2. Add `[CustomMessages]` section with Chinese translations of all key Inno Setup wizard strings
-3. This avoids the missing `.isl` file while still localizing the installer UI
+Note the **double `tools\`** in the path. The `.isl` file is at `tools/Languages/ChineseSimplified.isl`, but `setup.iss` is also inside `tools/`, so the relative path becomes `tools/tools/Languages/...`.
+
+## Fix
+Change `setup.iss` line 22 from:
+```ini
+Name: "chinesesimplified"; MessagesFile: "tools\Languages\ChineseSimplified.isl"
+```
+to:
+```ini
+Name: "chinesesimplified"; MessagesFile: "Languages\ChineseSimplified.isl"
+```
+
+The path is relative to `setup.iss`'s directory (`tools/`), so just `Languages\ChineseSimplified.isl`.
 
 ## Files to change
-- `tools/setup.iss` — remove `[Languages]`, add `[CustomMessages]`
-
-## CustomMessages to override
-- SetupTitle, SetupAppTitle
-- SelectDirDesc, SelectDirBrowseLabel, SelectDirPrompt
-- SelectStartMenuDesc, SelectStartMenuPrompt
-- SelectTaskDesc
-- ReadyLabel, ReadyLabel2, ReadyToInstallLabel, ShouldInstallLabel
-- InstallCaption, InstallProgressCaption
-- InstalledCaption, InstallCompletedLabel
-- FinishLabel, FinishNoAutomationLabel
-- CancelInstallCaption, CancelInstallMessage
-- SelectLanguage, LanguageDescription
-- All error messages (optional, skip non-critical ones)
+- `tools/setup.iss` — fix the MessagesFile path
