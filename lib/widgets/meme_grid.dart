@@ -30,12 +30,12 @@ class MemeGrid extends StatelessWidget {
         final cols = w > 1200 ? 8 : w > 900 ? 6 : w > 600 ? 4 : w > 400 ? 3 : 2;
         return GridView.builder(
           padding: EdgeInsets.all(spacing),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: cols,
-            crossAxisSpacing: spacing,
-            mainAxisSpacing: spacing,
-            childAspectRatio: 1,
-          ),
+        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 160,
+          childAspectRatio: 1,
+          crossAxisSpacing: spacing,
+          mainAxisSpacing: spacing,
+        ),
           itemCount: memes.length,
           itemBuilder: (ctx, i) => MemeCard(meme: memes[i]),
         );
