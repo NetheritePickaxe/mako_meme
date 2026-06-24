@@ -42,6 +42,7 @@ class MakoMemeApp extends StatelessWidget {
             return MaterialApp(
               title: 'Mako Meme',
               debugShowCheckedModeBanner: false,
+              useHashBehavior(),
               theme: theme,
               darkTheme: darkTheme,
               themeMode: s.themeMode,
