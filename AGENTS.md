@@ -12,12 +12,22 @@
 
 ## Entry
 
-`lib/main.dart` → `MultiProvider` injects `MemeProvider` + `SettingsProvider` + `StorageService` + `AuthService` → `MakoMemeApp` → `HomeScreen`
+`lib/main.dart` → `MultiProvider` injects `LocaleProvider` + `MemeProvider` + `SettingsProvider` + `StorageService` + `AuthService` → `MakoMemeApp` → `HomeScreen`
+
+## i18n
+
+- **Languages**: `zh_cn` (简体中文), `en_us` (English)
+- **Files**: `assets/l10n/zh_cn.json`, `assets/l10n/en_us.json` (~90 keys each)
+- **Loader**: `lib/l10n/l10n.dart` — `rootBundle.loadString('assets/l10n/$code.json')`, `tr(key, args: {...})`
+- **Provider**: `lib/providers/locale_provider.dart` — `LocaleProvider` with `init()` awaited in `main.dart` before `runApp()`
+- **Locale**: `Locale('zh', 'cn')` / `Locale('en', 'us')`, set via `supportedLocales` in `MaterialApp`
+- **Rule**: Every user-facing string must use `l10n.tr('key')` — NEVER hardcode text in UI. Update BOTH `zh_cn.json` and `en_us.json` together. Keys use snake_case. Plurals handled manually via `{plural}` marker left as-is.
 
 ## Providers
 
 | Provider | Role |
 |---|---|
+| `LocaleProvider` | Language toggle (`zh_cn`/`en_us`), loads JSON via `rootBundle` |
 | `MemeProvider` | Meme/folder CRUD, filtering (folder/mood/tag), fuzzy search (`fuzzy` package), multi-select, WebDAV sync |
 | `SettingsProvider` | ThemeMode, Monet toggling, 15 color presets, custom colors, WebDAV config, user auth config |
 
@@ -63,6 +73,7 @@ lib/
 - **ZIP export/import**: `archive` package — `StorageService.exportData()` / `StorageService.importZip()`.
 - **WebDAV**: `WebDavService` with Basic auth; sync triggered via `MemeProvider.syncAllToWebDav()`.
 - **GitHub Actions**: CI defined in `.github/workflows/build.yml`; gate `analyze` → build per platform (Android split-per-abi + Windows Inno Setup installer). Tag `v*` triggers auto Release. Feishu webhook (`FEISHU_WEBHOOK_URL` secret) for notifications.
+- **Locale codes**: Always lowercase (`zh_cn` / `en_us`). File names: `zh_cn.json` / `en_us.json`. Path in `l10n.dart`: `'assets/l10n/$langCode.json'`. `Locale('zh', 'cn')` / `Locale('en', 'us')` in `supportedLocales`.
 
 ## Storage
 
