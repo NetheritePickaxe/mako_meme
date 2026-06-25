@@ -9,7 +9,7 @@ class L10n {
       : _messages = messages;
 
   static Future<L10n> load(String langCode) async {
-    final raw = await rootBundle.loadString('assets/l10n/$langCode.json');
+    final raw = await rootBundle.loadString('assets/assets/l10n/$langCode.json');
     final json = jsonDecode(raw) as Map<String, dynamic>;
     final messages = json.map((k, v) => MapEntry(k, v.toString()));
     return L10n(languageCode: langCode, messages: messages);
