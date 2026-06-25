@@ -1,4 +1,5 @@
 ﻿[Setup]
+AppId={{A3B7E1F0-4C5D-4E6F-8A9B-0C1D2E3F4A5B}}
 AppName=Mako Meme
 AppVersion=1.0.0
 AppPublisher=Mako Meme
@@ -14,9 +15,10 @@ SolidCompression=yes
 WizardStyle=modern
 ArchitecturesInstallIn64BitMode=x64
 PrivilegesRequired=lowest
+DisableDirPage=no
 DisableReadyPage=no
+DisableProgramGroupPage=yes
 AllowNoIcons=yes
-DisableProgramGroupPage=no
 
 [Languages]
 Name: "chinesesimplified"; MessagesFile: "Languages\ChineseSimplified.isl"
@@ -30,7 +32,7 @@ Name: desktopicon; Description: "创建桌面快捷方式(&D)"; GroupDescription
 [Icons]
 Name: "{userdesktop}\Mako Meme"; Filename: "{app}\mako_meme.exe"; IconFilename: "{app}\app_icon.ico"; Tasks: desktopicon
 Name: "{group}\Mako Meme"; Filename: "{app}\mako_meme.exe"
-Name: "{group}\卸载 Mako Meme"; Filename: "{uninstallexe}"
+Name: "{group}\Uninstall Mako Meme"; Filename: "{uninstallexe}"
 
 [Run]
 Filename: "{app}\mako_meme.exe"; Description: "启动 Mako Meme"; Flags: postinstall nowait skipifsilent
@@ -41,20 +43,11 @@ Type: filesandordirs; Name: "{group}"
 
 [Code]
 var
-  DeleteDataPage: TInputOptionWizardPage;
+  DeleteData: Boolean;
 
 function InitializeUninstall: Boolean;
 begin
-  DeleteDataPage := CreateInputOptionPage(
-    -1,
-    '删除应用数据',
-    '是否同时删除所有表情包数据？',
-    '此操作不可撤销。',
-    True,
-    False
-  );
-  DeleteDataPage.Add('删除所有应用数据（表情包、标签、分类）');
-  DeleteDataPage.Values[0] := False;
+  DeleteData := False;
   Result := True;
 end;
 
@@ -64,7 +57,13 @@ var
 begin
   if CurUninstallStep = usPostUninstall then
   begin
-    if DeleteDataPage.Values[0] then
+    DeleteData := MsgBox(
+      '是否同时删除所有表情包数据？'#13#10 +
+      '这包括表情、标签、分类和设置。'#13#10#13#10 +
+      '此操作不可撤销。',
+      mbConfirmation, MB_YESNO
+    ) = IDYES;
+    if DeleteData then
     begin
       DataPath := ExpandConstant('{userdocs}\mako_meme');
       if DirExists(DataPath) then
