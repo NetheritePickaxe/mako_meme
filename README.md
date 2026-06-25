@@ -1,102 +1,81 @@
-# Mako Meme 🐟
+<p align="center">
+  <img src="assets/icon_foreground.png" width="128" height="128" alt="Mako Meme">
+</p>
 
-跨平台表情包管理器，基于 Flutter 构建，支持 **Android / Windows / Web**。
+<h1 align="center">Mako Meme 🌸</h1>
 
-## 功能
+<p align="center">
+  <b>跨平台表情包管理器</b><br>
+  Android · Windows · Web
+</p>
 
-- 📦 **表情包管理** — 创建、编辑、删除表情包包
-- 🖼️ **批量导入** — 支持 PNG / GIF / WebP / JPEG 格式
-- 🔍 **全局搜索** — 按标签和文件名搜索表情
-- 🏷️ **标签系统** — 单个或批量编辑标签
-- ✅ **批量选择** — 多选后批量删除、分享、打标签
-- 🖥️ **桌面拖拽** — Windows/macOS/Linux 支持拖拽文件导入
-- 📱 **瀑布流展示** — 自适应列数（3-6 列）
-- 🌙 **暗色模式** — 跟随系统主题自动切换
-- 🎭 **预置表情** — 首次启动自动生成 20 个示例表情
+<p align="center">
+  <a href="https://github.com/anomalyco/mako_meme/actions">
+    <img src="https://img.shields.io/github/actions/workflow/status/anomalyco/mako_meme/build.yml?style=flat-square" alt="Build">
+  </a>
+  <a href="https://github.com/anomalyco/mako_meme/releases">
+    <img src="https://img.shields.io/github/v/release/anomalyco/mako_meme?style=flat-square" alt="Release">
+  </a>
+  <a href="https://github.com/anomalyco/mako_meme/blob/main/LICENSE">
+    <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License">
+  </a>
+</p>
 
-## CI/CD
+> 🌸 茉子（Mako）出自 Yuzusoft（柚子社）作品《千恋万花》。  
+> 🎨 应用图标来源于游戏素材解包，版权归 Yuzusoft 所有。  
+> 🤖 本项目为 AI 辅助开发的 vibecoding 作品。
 
-项目使用 GitHub Actions 自动构建和发布。
+---
 
-| 触发事件 | 行为 |
-|---|---|
-| `push` main/master | 构建 Android APK + Web + Windows，部署 Web 到 Pages |
-| `push` tag `v*` | 构建 + 自动创建 GitHub Release，附带所有产物 |
-| `pull_request` | 仅运行静态分析 |
+## 📸 预览
 
-### 配置
-
-使用前需在 GitHub 仓库设置以下 **Secrets / Settings**:
-
-1. **`FEISHU_WEBHOOK_URL`** (可选) — 飞书机器人 Webhook 地址，用于接收构建结果通知
-   - 在飞书群中添加自定义机器人 → 复制 webhook URL → 添加到仓库 Settings > Secrets > Actions
-2. **GitHub Pages** (可选) — 启用自动部署：
-   - Settings → Pages → Source 选择 **GitHub Actions**
-
-### 发布流程
-
-```bash
-# 打标签即自动发布
-git tag v1.0.0
-git push origin v1.0.0
-# → Actions 自动构建所有平台并创建 Release
+```
+[ 截图待补充 — Android / Windows / Web ]
 ```
 
-## 技术栈
+## ✨ 功能
 
-| 层 | 方案 |
-|---|---|
-| 状态管理 | flutter_riverpod |
-| 本地数据库 | drift (SQLite) |
-| 文件选择 | file_picker |
-| 分享 | share_plus |
-| 桌面拖拽 | desktop_drop |
-| 瀑布流 | flutter_staggered_grid_view |
-| 架构 | Clean Architecture (data/domain/presentation) |
+- **导入与管理** — 支持 PNG/GIF/WebP/JPEG，UUID 自动重命名防冲突
+- **标签系统** — 自定义标签，搜索框输入 `#tag` 即可精确筛选
+- **文件夹分组** — 拖拽归类（DragTarget），自由组织表情结构
+- **心情标签** — 预设心情 + 自定义，图标化展示快速筛选
+- **收藏系统** — 一键收藏，单独视图查看
+- **全局搜索** — 名称 + 标签联合模糊搜索
+- **批量操作** — 多选后批量删除、移动文件夹、修改心情
+- **桌面拖拽导入** — Windows 原生文件拖拽（desktop_drop）
+- **全屏查看器** — photo_view 支持双指缩放、分享、复制
+- **Material You** — Monet 动态取色 + 多套预设主题色
+- **暗色模式** — 跟随系统或手动切换
+- **WebDAV 同步** — 跨设备元数据同步
+- **图片缓存** — Hive 本地缓存加速
 
-## 快速开始
+## 🧱 技术栈
+
+| 类别 | 选型 |
+|------|------|
+| 框架 | Flutter 3.29+ / Dart ^3.12.2 |
+| 状态管理 | Provider (ChangeNotifier) |
+| 持久化 | JSON 文件 + Hive 缓存 |
+| 同步 | WebDAV |
+| 图片 | photo_view · mime · crypto |
+| 工具 | file_picker · share_plus · desktop_drop · uuid · fuzzy · archive |
+| 主题 | dynamic_color (Monet) |
+
+## 🚀 快速上手
 
 ```bash
-# 安装依赖
 flutter pub get
-
-# 生成 drift 代码（修改数据库后需要）
-dart run build_runner build --delete-conflicting-outputs
-
-# 运行
-flutter run
-
-# 构建 Web
-flutter build web
-
-# 构建 Windows
-flutter build windows
+flutter run                          # 开发运行
+flutter build apk --release          # Android
+flutter build windows --release      # Windows
+flutter build web                    # Web
+flutter analyze                      # 静态检查
+flutter test                         # 测试
 ```
 
-## 项目结构
+## 💾 存储说明
 
-```
-lib/
-├── main.dart                  # 入口 + 预置数据初始化
-├── app.dart                   # MaterialApp 配置
-├── core/
-│   └── theme.dart             # 主题 (Material 3)
-├── data/
-│   ├── database/
-│   │   ├── tables.dart        # drift 表定义
-│   │   └── database.dart      # 数据库操作
-│   ├── repositories/
-│   │   └── sticker_repository.dart
-│   └── services/
-│       ├── file_service.dart   # 文件存储
-│       └── preset_service.dart # 预置表情生成
-└── presentation/
-    ├── providers/
-    │   └── sticker_providers.dart
-    ├── screens/
-    │   ├── home_screen.dart
-    │   └── pack_detail_screen.dart
-    └── widgets/
-        ├── sticker_preview.dart
-        └── sticker_search_delegate.dart
-```
+**Native** — 图片存 `{appDir}/mako_meme/memes/{uuid}.{ext}`，元数据存 JSON 文件，重启不丢。
+
+**Web** — 元数据持久化到 `localStorage`，图片保留在运行内存中（刷新后丢失，显示占位符提示重新导入）。
+
