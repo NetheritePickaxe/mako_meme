@@ -83,6 +83,8 @@ class SettingsProvider extends ChangeNotifier {
     return const ColorSchemePreset(
       name: '自定义',
       primary: Color(0xFF6366F1),
+      secondary: Color(0xFF6366F1),
+      tertiary: Color(0xFF6366F1),
     );
   }
 

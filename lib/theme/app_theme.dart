@@ -3,10 +3,14 @@ import 'package:flutter/material.dart';
 class ColorSchemePreset {
   final String name;
   final Color primary;
+  final Color secondary;
+  final Color tertiary;
 
   const ColorSchemePreset({
     required this.name,
     required this.primary,
+    required this.secondary,
+    required this.tertiary,
   });
 
   @override
@@ -25,64 +29,40 @@ class AppTheme {
 
   static const presets = <ColorSchemePreset>[
     ColorSchemePreset(
-      name: '栖霞',
-      primary: Color(0xFF7C3AED),
-    ),
-    ColorSchemePreset(
-      name: '远帆',
-      primary: Color(0xFF3B82F6),
-    ),
-    ColorSchemePreset(
-      name: '薄桃',
-      primary: Color(0xFFF472B6),
-    ),
-    ColorSchemePreset(
-      name: '松风',
-      primary: Color(0xFF059669),
-    ),
-    ColorSchemePreset(
-      name: '秋暮',
-      primary: Color(0xFFF97316),
-    ),
-    ColorSchemePreset(
-      name: '沧渊',
-      primary: Color(0xFF0EA5E9),
-    ),
-    ColorSchemePreset(
-      name: '月白',
-      primary: Color(0xFF6B7280),
-    ),
-    ColorSchemePreset(
-      name: '山吹',
-      primary: Color(0xFF16A34A),
-    ),
-    ColorSchemePreset(
-      name: '紫苑',
-      primary: Color(0xFF8B5CF6),
-    ),
-    ColorSchemePreset(
-      name: '花火',
-      primary: Color(0xFFFF6B9D),
+      name: '巫女大人',
+      primary: Color(0xFFfbfbfe),
+      secondary: Color(0xFF80bce7),
+      tertiary: Color(0xFFffb7cd),
     ),
     ColorSchemePreset(
       name: '下流忍者',
-      primary: Color(0xFF8D4658),
-    ),
-    ColorSchemePreset(
-      name: '巫女大人',
-      primary: Color(0xFFA83A47),
+      primary: Color(0xFFb8b3e5),
+      secondary: Color(0xFFb7e5a1),
+      tertiary: Color(0xFFee6256),
     ),
     ColorSchemePreset(
       name: '幼刀丛雨',
-      primary: Color(0xFFA83C4C),
+      primary: Color(0xFFbcd5aa),
+      secondary: Color(0xFF7a55a8),
+      tertiary: Color(0xFFff3e62),
     ),
     ColorSchemePreset(
       name: '世界之大',
-      primary: Color(0xFF6B77A9),
+      primary: Color(0xFFfcf06b),
+      secondary: Color(0xFF5a74bd),
+      tertiary: Color(0xFFcb7bc8),
     ),
     ColorSchemePreset(
       name: '田心屋',
-      primary: Color(0xFFD97706),
+      primary: Color(0xFFffb1b5),
+      secondary: Color(0xFFc7738c),
+      tertiary: Color(0xFFfdffc9),
+    ),
+    ColorSchemePreset(
+      name: '森人板卡',
+      primary: Color(0xFF9cd7e2),
+      secondary: Color(0xFFF19eb6),
+      tertiary: Color(0xFFc78dbd),
     ),
   ];
 
@@ -129,7 +109,12 @@ class AppTheme {
   static ThemeData lightWithPreset(ColorSchemePreset p) => ThemeData(
     useMaterial3: true,
     brightness: Brightness.light,
-    colorScheme: ColorScheme.fromSeed(seedColor: p.primary, brightness: Brightness.light),
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: p.primary,
+      secondary: p.secondary,
+      tertiary: p.tertiary,
+      brightness: Brightness.light,
+    ),
     appBarTheme: const AppBarTheme(centerTitle: false, elevation: 0),
     cardTheme: CardThemeData(
       elevation: 0,
@@ -149,7 +134,12 @@ class AppTheme {
   static ThemeData darkWithPreset(ColorSchemePreset p) => ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
-    colorScheme: ColorScheme.fromSeed(seedColor: p.primary, brightness: Brightness.dark),
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: p.primary,
+      secondary: p.secondary,
+      tertiary: p.tertiary,
+      brightness: Brightness.dark,
+    ),
     appBarTheme: const AppBarTheme(centerTitle: false, elevation: 0),
     cardTheme: CardThemeData(
       elevation: 0,
