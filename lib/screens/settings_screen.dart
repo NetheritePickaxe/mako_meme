@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import '../providers/settings_provider.dart';
 import '../providers/meme_provider.dart';
+import '../providers/locale_provider.dart';
 import '../services/storage_service.dart';
 import '../services/update_service.dart';
 import '../services/webdav_service.dart';
@@ -33,6 +34,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
           _sectionHeader('外观'),
+          _languageTile(context),
+          const Divider(indent: 16, endIndent: 16),
           _themeModeTile(settings),
           const Divider(indent: 16, endIndent: 16),
           if (defaultTargetPlatform == TargetPlatform.android) ...[
@@ -153,6 +156,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
           fontWeight: FontWeight.w600,
           color: Theme.of(context).colorScheme.primary,
         ),
+      ),
+    );
+  }
+
+  Widget _languageTile(BuildContext context) {
+    final localeProv = context.watch<LocaleProvider>();
+    final currentLang = localeProv.locale.languageCode;
+    return ListTile(
+      leading: const Icon(Icons.language),
+      title: const Text('语言'),
+      trailing: DropdownButton<String>(
+        value: currentLang,
+        underline: const SizedBox(),
+        items: const [
+          DropdownMenuItem(value: 'zh', child: Text('简体中文')),
+          DropdownMenuItem(value: 'en', child: Text('English')),
+        ],
+        onChanged: (val) {
+          if (val != null) {
+            localeProv.setLocale(Locale(val));
+          }
+        },
       ),
     );
   }

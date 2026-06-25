@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'services/storage_service.dart';
 import 'providers/meme_provider.dart';
 import 'providers/settings_provider.dart';
+import 'providers/locale_provider.dart';
 import 'services/auth_service.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
@@ -13,9 +15,12 @@ Future<void> main() async {
   final storage = StorageService();
   await storage.init();
   final authService = AuthService();
+  final localeProvider = LocaleProvider();
+  await localeProvider.init();
   runApp(
     MultiProvider(
       providers: [
+        ChangeNotifierProvider.value(value: localeProvider),
         ChangeNotifierProvider(create: (_) => MemeProvider(storage, SettingsProvider(storage))..init()),
         ChangeNotifierProvider(create: (_) => SettingsProvider(storage)),
         Provider.value(value: storage),
@@ -42,13 +47,27 @@ class MakoMemeApp extends StatelessWidget {
             final darkTheme = useMonet
                 ? AppTheme.dark(lightDynamic.primary)
                 : AppTheme.darkWithPreset(s.currentPreset);
-            return MaterialApp(
-              title: 'Mako Meme',
-              debugShowCheckedModeBanner: false,
-              theme: theme,
-              darkTheme: darkTheme,
-              themeMode: s.themeMode,
-              home: const HomeScreen(),
+            return Consumer<LocaleProvider>(
+              builder: (ctx, lp, _) {
+                return MaterialApp(
+                  title: 'Mako Meme',
+                  debugShowCheckedModeBanner: false,
+                  theme: theme,
+                  darkTheme: darkTheme,
+                  themeMode: s.themeMode,
+                  locale: lp.locale,
+                  localizationsDelegates: const [
+                    GlobalMaterialLocalizations.delegate,
+                    GlobalWidgetsLocalizations.delegate,
+                    GlobalCupertinoLocalizations.delegate,
+                  ],
+                  supportedLocales: const [
+                    Locale('zh', 'cn'),
+                    Locale('en', 'us'),
+                  ],
+                  home: const HomeScreen(),
+                );
+              },
             );
           },
         );

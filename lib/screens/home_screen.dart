@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import '../providers/meme_provider.dart';
+import '../providers/locale_provider.dart';
+import '../l10n/l10n.dart';
 import '../models/meme.dart';
 import '../models/mood.dart';
 import '../models/folder.dart';
@@ -27,26 +29,27 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final prov = context.watch<MemeProvider>();
+    final l10n = context.watch<LocaleProvider>().l10n;
 
     return Scaffold(
       appBar: AppBar(
         leading: Builder(
           builder: (ctx) => IconButton(
             icon: const Icon(Icons.menu),
-            tooltip: '打开菜单',
+            tooltip: l10n.tr('menu'),
             onPressed: () => Scaffold.of(ctx).openDrawer(),
           ),
         ),
-        title: Text(_getTitle(prov)),
+        title: Text(_getTitle(prov, l10n)),
         actions: [
           IconButton(
             icon: Icon(prov.isMulti ? Icons.close : Icons.checklist),
-            tooltip: prov.isMulti ? '退出多选' : '多选',
+            tooltip: prov.isMulti ? l10n.tr('exit_multi_select') : l10n.tr('multi_select'),
             onPressed: () => prov.toggleMulti(),
           ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.sort),
-            tooltip: '排序',
+            tooltip: l10n.tr('sort'),
             onSelected: (v) {
               switch (v) {
                 case 'date': prov.setSort(SortBy.date); break;
@@ -56,11 +59,11 @@ class _HomeScreenState extends State<HomeScreen> {
               }
             },
             itemBuilder: (_) => [
-              CheckedPopupMenuItem(value: 'date', checked: prov.sortBy == SortBy.date, child: const Text('按日期')),
-              CheckedPopupMenuItem(value: 'name', checked: prov.sortBy == SortBy.name, child: const Text('按名称')),
-              CheckedPopupMenuItem(value: 'size', checked: prov.sortBy == SortBy.size, child: const Text('按大小')),
+              CheckedPopupMenuItem(value: 'date', checked: prov.sortBy == SortBy.date, child: Text(l10n.tr('sort_by_date'))),
+              CheckedPopupMenuItem(value: 'name', checked: prov.sortBy == SortBy.name, child: Text(l10n.tr('sort_by_name'))),
+              CheckedPopupMenuItem(value: 'size', checked: prov.sortBy == SortBy.size, child: Text(l10n.tr('sort_by_size'))),
               const PopupMenuDivider(),
-              PopupMenuItem(value: 'order', child: Text(prov.order == SortOrder.asc ? '↑ 升序' : '↓ 降序')),
+              PopupMenuItem(value: 'order', child: Text(prov.order == SortOrder.asc ? '↑ ${l10n.tr('asc')}' : '↓ ${l10n.tr('desc')}')),
             ],
           ),
         ],
@@ -90,7 +93,7 @@ class _HomeScreenState extends State<HomeScreen> {
             await prov.loadAll();
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('导入了 ${files.length} 张图片'), duration: const Duration(seconds: 2)),
+                SnackBar(content: Text(l10n.tr('imported_images', args: {'count': files.length.toString()})), duration: const Duration(seconds: 2)),
               );
             }
           }
@@ -112,7 +115,7 @@ class _HomeScreenState extends State<HomeScreen> {
               if (_dragOver)
                 Positioned.fill(
                   child: Container(
-                    color: Colors.black45,  // 半透明黑底，总是清晰
+                    color: Colors.black45,
                     child: Center(
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -125,7 +128,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           children: [
                             Icon(Icons.cloud_upload, size: 48, color: Theme.of(context).colorScheme.primary),
                             const SizedBox(height: 8),
-                            Text('释放以导入图片', style: TextStyle(
+                            Text(l10n.tr('drop_to_import'), style: TextStyle(
                               fontSize: Theme.of(context).textTheme.titleMedium?.fontSize,
                               fontWeight: FontWeight.w600,
                               color: Colors.black87,
@@ -147,14 +150,21 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// 混合网格：文件夹 + 表情包卡片
+  String _getTitle(MemeProvider prov, L10n l10n) {
+    if (prov.isMulti) return l10n.tr('selected_count', args: {'count': prov.selected.length.toString()});
+    if (prov.moodFilter != null) {
+      final m = findMoodById(prov.moodFilter);
+      return m != null ? '${m.name} ${l10n.tr('scene')}' : 'Mako Meme';
+    }
+    if (prov.folderId == null) return 'Mako Meme';
+    return prov.folders.where((f) => f.id == prov.folderId).firstOrNull?.name ?? 'Mako Meme';
+  }
+
   Widget _buildMixedGrid(MemeProvider prov) {
-    // 如果已选中文件夹或场景，只显示表情
     if (prov.folderId != null || prov.moodFilter != null) {
       return MemeGrid(memes: prov.memes);
     }
 
-    // 显示文件夹 + 未分类的表情
     final folders = prov.folders;
     final uncategorized = prov.memes.where((m) => m.folderId == null).toList();
 
@@ -180,7 +190,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 isActive: prov.folderId == f.id,
               );
             }
-            // 未分类的表情作为普通 MemeCard 展示
             final meme = uncategorized[i - folders.length];
             return _buildMemeCardInGrid(meme);
           },
@@ -190,7 +199,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildMemeCardInGrid(Meme meme) {
-    // 使用简单的 Image.memory 预览
     return FutureBuilder<Uint8List?>(
       future: context.read<StorageService>().readMemeBytes(meme.filePath),
       builder: (ctx, snapshot) {
@@ -205,6 +213,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }
         final bytes = snapshot.data;
         if (bytes == null) {
+          final l10n = context.read<LocaleProvider>().l10n;
           return Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
@@ -216,7 +225,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Icon(Icons.cloud_off, size: 24, color: Colors.grey.shade500),
                   const SizedBox(height: 4),
-                  Text('丢失', style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+                  Text(l10n.tr('lost'), style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
                 ],
               ),
             ),
@@ -235,18 +244,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  String _getTitle(MemeProvider prov) {
-    if (prov.isMulti) return '已选 ${prov.selected.length} 项';
-    if (prov.moodFilter != null) {
-      final m = findMoodById(prov.moodFilter);
-      return m != null ? '${m.name} 场景' : 'Mako Meme';
-    }
-    if (prov.folderId == null) return 'Mako Meme';
-    return prov.folders.where((f) => f.id == prov.folderId).firstOrNull?.name ?? 'Mako Meme';
-  }
-
   Widget _buildDrawer(BuildContext context, MemeProvider prov) {
     final theme = Theme.of(context);
+    final l10n = context.read<LocaleProvider>().l10n;
     return Drawer(
       child: SafeArea(
         child: Column(
@@ -261,7 +261,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Text('Mako Meme', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
-                  Text('共 ${prov.allMemesCount} 个表情', style: theme.textTheme.bodySmall),
+                  Text(l10n.tr('total_memes', args: {'count': prov.allMemesCount.toString()}), style: theme.textTheme.bodySmall),
                 ],
               ),
             ),
@@ -271,23 +271,22 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   _drawerItem(
                     icon: Icons.all_inbox,
-                    label: '全部表情',
+                    label: l10n.tr('all_memes'),
                     count: prov.allMemesCount,
                     isActive: prov.folderId == null && prov.moodFilter == null,
                     onTap: () { prov.selectFolder(null); prov.clearMood(); Navigator.pop(context); },
                   ),
                   _drawerItem(
                     icon: Icons.favorite,
-                    label: '收藏',
+                    label: l10n.tr('favorites'),
                     count: prov.favorites.length,
                     isActive: false,
                     onTap: () { prov.selectMood(null); Navigator.pop(context); },
                   ),
                   const Divider(indent: 16, endIndent: 16),
-                  // 情绪/场景分类
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                    child: Text('场景', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurface.withAlpha(120))),
+                    child: Text(l10n.tr('scene'), style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurface.withAlpha(120))),
                   ),
                   ...presetMoods.map((m) => _drawerItem(
                     icon: m.icon,
@@ -300,7 +299,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const Divider(indent: 16, endIndent: 16),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                    child: Text('文件夹', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurface.withAlpha(120))),
+                    child: Text(l10n.tr('folder'), style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurface.withAlpha(120))),
                   ),
                   ...prov.folders.map((f) => _drawerItem(
                     icon: Icons.folder,
@@ -313,7 +312,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const Divider(indent: 16, endIndent: 16),
                   ListTile(
                     leading: const Icon(Icons.settings, size: 20),
-                    title: const Text('设置'),
+                    title: Text(l10n.tr('settings')),
                     onTap: () {
                       Navigator.pop(context);
                       Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
@@ -324,7 +323,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-
           ],
         ),
       ),
@@ -376,6 +374,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showImportMenu(BuildContext ctx, MemeProvider prov) {
+    final l10n = context.read<LocaleProvider>().l10n;
     showModalBottomSheet(
       context: ctx,
       builder: (bCtx) => SafeArea(
@@ -384,27 +383,27 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             ListTile(
               leading: const Icon(Icons.create_new_folder),
-              title: const Text('新建文件夹'),
+              title: Text(l10n.tr('new_folder')),
               onTap: () { Navigator.pop(bCtx); _showCreateFolderDialog(ctx, prov); },
             ),
             const Divider(),
             ListTile(
               leading: const Icon(Icons.image),
-              title: const Text('导入图片'),
+              title: Text(l10n.tr('import_images')),
               subtitle: const Text('JPG / PNG / GIF / WebP / BMP'),
               onTap: () { Navigator.pop(bCtx); _importFiles(ctx, prov); },
             ),
             ListTile(
               leading: const Icon(Icons.text_fields),
-              title: const Text('导入文字 / Emoji'),
-              subtitle: const Text('纯文本或 Emoji 符号'),
+              title: Text(l10n.tr('import_text')),
+              subtitle: const Text('Plain text or Emoji'),
               onTap: () { Navigator.pop(bCtx); _importText(ctx, prov); },
             ),
             const Divider(),
             ListTile(
               leading: const Icon(Icons.file_download_outlined),
-              title: const Text('导入备份'),
-              subtitle: const Text('ZIP 备份 / 图片包'),
+              title: Text(l10n.tr('import_backup')),
+              subtitle: const Text('ZIP backup'),
               onTap: () { Navigator.pop(bCtx); _importZip(ctx); },
             ),
           ],
@@ -421,31 +420,33 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _importText(BuildContext ctx, MemeProvider prov) {
+    final l10n = context.read<LocaleProvider>().l10n;
     final ctrl = TextEditingController();
     showDialog(
       context: ctx,
       builder: (dCtx) => AlertDialog(
-        title: const Text('导入文字 / Emoji'),
+        title: Text(l10n.tr('import_text')),
         content: TextField(
           controller: ctrl,
           autofocus: true,
           maxLines: 3,
-          decoration: const InputDecoration(hintText: '输入文字或 Emoji...'),
+          decoration: InputDecoration(hintText: l10n.tr('hint_text_or_emoji')),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dCtx), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(dCtx), child: Text(l10n.tr('cancel'))),
           FilledButton(onPressed: () {
             if (ctrl.text.trim().isNotEmpty) {
               prov.importText(ctrl.text.trim());
               Navigator.pop(dCtx);
             }
-          }, child: const Text('导入')),
+          }, child: Text(l10n.tr('import'))),
         ],
       ),
     );
   }
 
   Future<void> _importZip(BuildContext ctx) async {
+    final l10n = context.read<LocaleProvider>().l10n;
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['zip'],
@@ -461,11 +462,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final confirmed = await showDialog<bool>(
       context: ctx,
       builder: (dCtx) => AlertDialog(
-        title: const Text('导入备份'),
-        content: Text('是否从 ${zipFile.name} 导入？\n\n如果 ZIP 包含 memes.json，将覆盖当前所有数据。'),
+        title: Text(l10n.tr('import_backup')),
+        content: Text(l10n.tr('import_confirm', args: {'filename': zipFile.name})),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dCtx, false), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(dCtx, true), child: const Text('导入')),
+          TextButton(onPressed: () => Navigator.pop(dCtx, false), child: Text(l10n.tr('cancel'))),
+          FilledButton(onPressed: () => Navigator.pop(dCtx, true), child: Text(l10n.tr('import'))),
         ],
       ),
     );
@@ -478,41 +479,43 @@ class _HomeScreenState extends State<HomeScreen> {
     if (ctx.mounted) {
       String msg;
       if (count == 0) {
-        msg = '备份导入成功';
+        msg = l10n.tr('import_success');
       } else if (count > 0) {
-        msg = '导入了 $count 张图片';
+        msg = l10n.tr('imported_count', args: {'count': count.toString()});
       } else {
-        msg = '导入失败：无法识别的 ZIP 文件';
+        msg = l10n.tr('import_failed');
       }
       ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(msg)));
     }
   }
 
   void _showCreateFolderDialog(BuildContext ctx, MemeProvider prov) {
+    final l10n = context.read<LocaleProvider>().l10n;
     final ctrl = TextEditingController();
     showDialog(
       context: ctx,
       builder: (dCtx) => AlertDialog(
-        title: const Text('新建文件夹'),
+        title: Text(l10n.tr('new_folder')),
         content: TextField(
           controller: ctrl,
           autofocus: true,
-          decoration: const InputDecoration(hintText: '文件夹名称'),
+          decoration: InputDecoration(hintText: l10n.tr('folder_name')),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dCtx), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(dCtx), child: Text(l10n.tr('cancel'))),
           FilledButton(onPressed: () {
             if (ctrl.text.trim().isNotEmpty) {
               prov.createFolder(ctrl.text.trim());
               Navigator.pop(dCtx);
             }
-          }, child: const Text('创建')),
+          }, child: Text(l10n.tr('create'))),
         ],
       ),
     );
   }
 
   void _showFolderMenu(BuildContext ctx, MemeProvider prov, MemeFolder folder) {
+    final l10n = context.read<LocaleProvider>().l10n;
     showModalBottomSheet(
       context: ctx,
       builder: (bCtx) => SafeArea(
@@ -521,22 +524,22 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             ListTile(
               leading: const Icon(Icons.edit),
-              title: const Text('重命名'),
+              title: Text(l10n.tr('rename')),
               onTap: () { Navigator.pop(bCtx); _renameFolder(ctx, prov, folder); },
             ),
             ListTile(
               leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('删除', style: TextStyle(color: Colors.red)),
+              title: Text(l10n.tr('delete'), style: const TextStyle(color: Colors.red)),
               onTap: () async {
                 Navigator.pop(bCtx);
                 final confirm = await showDialog<bool>(
                   context: ctx,
                   builder: (c) => AlertDialog(
-                    title: const Text('删除文件夹'),
-                    content: Text('删除「${folder.name}」后，其中的表情不会删除，但会变为未分类。'),
+                    title: Text(l10n.tr('delete_folder')),
+                    content: Text(l10n.tr('delete_folder_confirm', args: {'name': folder.name})),
                     actions: [
-                      TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
-                      FilledButton(onPressed: () => Navigator.pop(c, true), style: FilledButton.styleFrom(backgroundColor: Colors.red), child: const Text('删除')),
+                      TextButton(onPressed: () => Navigator.pop(c, false), child: Text(l10n.tr('cancel'))),
+                      FilledButton(onPressed: () => Navigator.pop(c, true), style: FilledButton.styleFrom(backgroundColor: Colors.red), child: Text(l10n.tr('delete'))),
                     ],
                   ),
                 );
@@ -550,20 +553,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _renameFolder(BuildContext ctx, MemeProvider prov, MemeFolder folder) {
+    final l10n = context.read<LocaleProvider>().l10n;
     final ctrl = TextEditingController(text: folder.name);
     showDialog(
       context: ctx,
       builder: (dCtx) => AlertDialog(
-        title: const Text('重命名'),
-        content: TextField(controller: ctrl, autofocus: true, decoration: const InputDecoration(hintText: '名称')),
+        title: Text(l10n.tr('rename')),
+        content: TextField(controller: ctrl, autofocus: true, decoration: InputDecoration(hintText: l10n.tr('new_name'))),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dCtx), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(dCtx), child: Text(l10n.tr('cancel'))),
           FilledButton(onPressed: () {
             if (ctrl.text.trim().isNotEmpty) {
               prov.renameFolder(folder.id, ctrl.text.trim());
               Navigator.pop(dCtx);
             }
-          }, child: const Text('保存')),
+          }, child: Text(l10n.tr('save'))),
         ],
       ),
     );
