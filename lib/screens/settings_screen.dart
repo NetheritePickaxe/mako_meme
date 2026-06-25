@@ -53,7 +53,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _sectionHeader('数据'),
           ListTile(
             leading: const Icon(Icons.file_download_outlined),
-            title: const Text('导入数据'),
+            title: const Text('批量导入'),
             subtitle: const Text('从 ZIP 恢复数据或导入图片'),
             onTap: () => _importZip(context),
           ),

@@ -145,7 +145,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showImportMenu(context, prov),
-        child: const Icon(Icons.add, size: 32),
+        child: const Icon(Icons.add, size: 48),
       ),
     );
   }
@@ -403,7 +403,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ListTile(
               leading: const Icon(Icons.file_download_outlined),
               title: Text(l10n.tr('import_backup')),
-              subtitle: const Text('ZIP backup'),
+              subtitle: const Text('ZIP backup / 批量导入'),
               onTap: () { Navigator.pop(bCtx); _importZip(ctx); },
             ),
           ],
