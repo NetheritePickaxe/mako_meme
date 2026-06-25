@@ -74,7 +74,7 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
       - run: flutter pub get
-      - run: flutter build web --release
+      - run: flutter build web --release --base-href=/mako_meme/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: build/web
