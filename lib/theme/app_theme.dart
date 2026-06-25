@@ -5,12 +5,14 @@ class ColorSchemePreset {
   final Color primary;
   final Color secondary;
   final Color tertiary;
+  final Color? surfaceContainerHighest;
 
   const ColorSchemePreset({
     required this.name,
     required this.primary,
     required this.secondary,
     required this.tertiary,
+    this.surfaceContainerHighest,
   });
 
   @override
@@ -63,6 +65,7 @@ class AppTheme {
       primary: Color(0xFF9cd7e2),
       secondary: Color(0xFFF19eb6),
       tertiary: Color(0xFFc78dbd),
+      surfaceContainerHighest: Color(0xFFfdd97c),
     ),
   ];
 
@@ -109,11 +112,18 @@ class AppTheme {
   static ThemeData lightWithPreset(ColorSchemePreset p) => ThemeData(
     useMaterial3: true,
     brightness: Brightness.light,
-    colorScheme: ColorScheme.fromSeed(
+    colorScheme: (ColorScheme.fromSeed(
       seedColor: p.primary,
       secondary: p.secondary,
       tertiary: p.tertiary,
       brightness: Brightness.light,
+    )).copyWith(
+      surfaceContainerHighest: p.surfaceContainerHighest ?? ColorScheme.fromSeed(
+        seedColor: p.primary,
+        secondary: p.secondary,
+        tertiary: p.tertiary,
+        brightness: Brightness.light,
+      ).surfaceContainerHighest,
     ),
     appBarTheme: const AppBarTheme(centerTitle: false, elevation: 0),
     cardTheme: CardThemeData(
@@ -134,11 +144,18 @@ class AppTheme {
   static ThemeData darkWithPreset(ColorSchemePreset p) => ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
-    colorScheme: ColorScheme.fromSeed(
+    colorScheme: (ColorScheme.fromSeed(
       seedColor: p.primary,
       secondary: p.secondary,
       tertiary: p.tertiary,
       brightness: Brightness.dark,
+    )).copyWith(
+      surfaceContainerHighest: p.surfaceContainerHighest ?? ColorScheme.fromSeed(
+        seedColor: p.primary,
+        secondary: p.secondary,
+        tertiary: p.tertiary,
+        brightness: Brightness.dark,
+      ).surfaceContainerHighest,
     ),
     appBarTheme: const AppBarTheme(centerTitle: false, elevation: 0),
     cardTheme: CardThemeData(

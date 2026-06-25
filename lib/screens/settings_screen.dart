@@ -239,38 +239,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _presetCard(ColorSchemePreset preset, bool selected, ColorScheme cs, VoidCallback onTap) {
+    final colors = [
+      preset.primary,
+      if (preset.surfaceContainerHighest != null) preset.surfaceContainerHighest!,
+      preset.secondary,
+      preset.tertiary,
+    ];
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 6),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10),
-          border: selected ? Border.all(color: cs.onSurface, width: 2) : null,
+          borderRadius: BorderRadius.circular(12),
+          border: selected ? Border.all(color: cs.primary, width: 2) : null,
+          color: selected ? cs.primaryContainer.withValues(alpha: 0.15) : null,
         ),
         child: Row(
           children: [
-            _colorBar(preset.primary),
-            const SizedBox(width: 4),
-            _colorBar(preset.secondary),
-            const SizedBox(width: 4),
-            _colorBar(preset.tertiary),
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: preset.primary,
+                shape: BoxShape.circle,
+                border: Border.all(color: cs.outline, width: 1),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: colors.map((c) {
+                return Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: c,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: cs.outline, width: 0.5),
+                  ),
+                );
+              }).toList(),
+            ),
             const SizedBox(width: 12),
             Expanded(child: Text(preset.name, style: const TextStyle(fontSize: 14))),
             if (selected) Icon(Icons.check_circle, color: cs.primary, size: 20),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _colorBar(Color color) {
-    return Container(
-      width: 16,
-      height: 32,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(4),
       ),
     );
   }

@@ -85,6 +85,7 @@ class SettingsProvider extends ChangeNotifier {
       primary: Color(0xFF6366F1),
       secondary: Color(0xFF6366F1),
       tertiary: Color(0xFF6366F1),
+      surfaceContainerHighest: null,
     );
   }
 
