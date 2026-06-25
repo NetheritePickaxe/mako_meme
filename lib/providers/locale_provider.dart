@@ -6,7 +6,7 @@ class LocaleProvider extends ChangeNotifier {
   L10n? _l10n;
 
   Locale get locale => _locale;
-  L10n get l10n => _l10n!;
+  L10n get l10n => _l10n ?? const L10n(languageCode: 'unknown', messages: {});
 
   Future<void> init() async {
     _l10n = await L10n.load('zh_cn');

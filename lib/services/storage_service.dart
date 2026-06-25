@@ -338,6 +338,16 @@ class StorageService {
   }
 
   void _loadSettings() {
+    if (kIsWeb) {
+      try {
+        final raw = webStorageGetItem('mako_settings');
+        if (raw != null && raw.isNotEmpty) {
+          final data = jsonDecode(raw) as Map<String, dynamic>;
+          _settings = data.map((k, v) => MapEntry(k, v.toString()));
+        }
+      } catch (_) {}
+      return;
+    }
     final file = File(p.join(_basePath!, 'settings.json'));
     if (file.existsSync()) {
       try {
@@ -348,6 +358,12 @@ class StorageService {
   }
 
   Future<void> _saveSettings() async {
+    if (kIsWeb) {
+      try {
+        webStorageSetItem('mako_settings', jsonEncode(_settings));
+      } catch (_) {}
+      return;
+    }
     try {
       await File(p.join(_basePath!, 'settings.json')).writeAsString(
         jsonEncode(_settings),
