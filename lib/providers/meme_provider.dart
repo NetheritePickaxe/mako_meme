@@ -4,12 +4,15 @@ import 'package:file_picker/file_picker.dart';
 import '../models/meme.dart';
 import '../models/folder.dart';
 import '../services/storage_service.dart';
+import '../services/webdav_service.dart';
+import 'settings_provider.dart';
 
 enum SortBy { date, name, size }
 enum SortOrder { asc, desc }
 
 class MemeProvider with ChangeNotifier {
   final StorageService _storage;
+  final SettingsProvider _settings;
   List<Meme> _all = [];
   List<Meme> _filtered = [];
   List<MemeFolder> _folders = [];
@@ -23,7 +26,7 @@ class MemeProvider with ChangeNotifier {
   final Set<String> _tagFilter = {};
   String? _moodFilter;
 
-  MemeProvider(this._storage);
+  MemeProvider(this._storage, this._settings);
 
   List<Meme> get memes => _filtered;
   int get allMemesCount => _all.length;
@@ -207,6 +210,26 @@ class MemeProvider with ChangeNotifier {
     final meme = await _storage.importText(text, name: name, folderId: _folderId, tags: tags, mood: mood);
     await loadAll();
     return meme;
+  }
+
+  /// 同步所有 meme 到 WebDAV
+  Future<void> syncAllToWebDav() async {
+    if (!_settings.useWebDav || _settings.webDavBaseUrl == null) return;
+    
+    final webDavService = WebDavService(
+      baseUrl: _settings.webDavBaseUrl!,
+      username: _settings.webDavUsername!,
+      password: _settings.webDavPassword!,
+    );
+    
+    for (final meme in _all) {
+      if (meme.remotePath == null && meme.filePath.isNotEmpty) {
+        final bytes = await _storage.readMemeBytes(meme.filePath);
+        if (bytes != null) {
+          await _storage.syncToWebDav(meme, bytes, webDavService);
+        }
+      }
+    }
   }
 
   String getFullMemePath(String rel) => _storage.getFullMemePath(rel);

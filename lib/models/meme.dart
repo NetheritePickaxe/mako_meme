@@ -11,6 +11,7 @@ class Meme {
   String? mood;
   final String type; // "image" | "emoji" | "text"
   final String? textContent;
+  final String? remotePath;
 
   Meme({
     required this.id,
@@ -25,6 +26,7 @@ class Meme {
     this.mood,
     this.type = 'image',
     this.textContent,
+    this.remotePath,
   });
 
   Map<String, dynamic> toMap() => {
@@ -40,6 +42,7 @@ class Meme {
     'mood': mood,
     'type': type,
     'textContent': textContent,
+    'remotePath': remotePath,
   };
 
   factory Meme.fromMap(Map<String, dynamic> map) => Meme(
@@ -55,6 +58,7 @@ class Meme {
     mood: map['mood'] as String?,
     type: map['type'] as String? ?? 'image',
     textContent: map['textContent'] as String?,
+    remotePath: map['remotePath'] as String?,
   );
 
   Meme copyWith({
@@ -70,6 +74,7 @@ class Meme {
     String? mood,
     String? type,
     String? textContent,
+    String? remotePath,
   }) => Meme(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -83,5 +88,6 @@ class Meme {
     mood: mood ?? this.mood,
     type: type ?? this.type,
     textContent: textContent ?? this.textContent,
+    remotePath: remotePath ?? this.remotePath,
   );
 }

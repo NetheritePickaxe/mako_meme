@@ -9,6 +9,7 @@ import 'package:archive/archive_io.dart';
 import '../models/meme.dart';
 import '../models/folder.dart';
 import 'storage_platform.dart';
+import 'webdav_service.dart';
 
 /// JSON 文件存储 — 跨平台，Web 上使用 localStorage
 class StorageService {
@@ -484,6 +485,30 @@ class StorageService {
   }
 
   // ======================== Utility ========================
+
+  /// 同步 meme 到 WebDAV
+  Future<bool> syncToWebDav(Meme meme, Uint8List? bytes, WebDavService webDavService) async {
+    if (bytes == null || webDavService.baseUrl.isEmpty) return false;
+    
+    final remotePath = webDavService.generateRemotePath(meme.filePath);
+    final success = await webDavService.uploadFile(remotePath, bytes);
+    
+    if (success) {
+      // 更新 meme 的 remotePath
+      final idx = _memes.indexWhere((m) => m.id == meme.id);
+      if (idx != -1) {
+        _memes[idx] = _memes[idx].copyWith(remotePath: remotePath);
+        _save();
+      }
+    }
+    
+    return success;
+  }
+
+  /// 从 WebDAV 下载 meme 文件
+  Future<Uint8List?> downloadFromWebDav(String remotePath, WebDavService webDavService) async {
+    return await webDavService.downloadFile(remotePath);
+  }
 
   String _guessMime(String ext) {
     switch (ext) {

@@ -10,6 +10,16 @@ class SettingsProvider extends ChangeNotifier {
   Color _customSecondary = const Color(0xFF6366F1);
   Color _customTertiary = const Color(0xFF6366F1);
   bool _useMonet = true;
+  
+  // WebDAV 配置
+  bool _useWebDav = false;
+  String? _webDavBaseUrl;
+  String? _webDavUsername;
+  String? _webDavPassword;
+  
+  // 用户认证配置
+  bool _useUserAuth = false;
+  String? _currentUserId;
 
   SettingsProvider(this._storage) {
     _themeMode = _toThemeMode(_storage.getSetting('themeMode'));
@@ -37,7 +47,27 @@ class SettingsProvider extends ChangeNotifier {
     _customSecondary = _parseColor(_storage.getSetting('customSecondary')) ?? const Color(0xFF6366F1);
     _customTertiary = _parseColor(_storage.getSetting('customTertiary')) ?? const Color(0xFF6366F1);
     _useMonet = _storage.getSetting('useMonet') != 'false';
+    
+    // 加载 WebDAV 配置
+    _useWebDav = _storage.getSetting('useWebDav') == 'true';
+    _webDavBaseUrl = _storage.getSetting('webDavBaseUrl');
+    _webDavUsername = _storage.getSetting('webDavUsername');
+    _webDavPassword = _storage.getSetting('webDavPassword');
+    
+    // 加载用户认证配置
+    _useUserAuth = _storage.getSetting('useUserAuth') == 'true';
+    _currentUserId = _storage.getSetting('currentUserId');
   }
+
+  // WebDAV getters
+  bool get useWebDav => _useWebDav;
+  String? get webDavBaseUrl => _webDavBaseUrl;
+  String? get webDavUsername => _webDavUsername;
+  String? get webDavPassword => _webDavPassword;
+  
+  // 用户认证 getters
+  bool get useUserAuth => _useUserAuth;
+  String? get currentUserId => _currentUserId;
 
   ThemeMode get themeMode => _themeMode;
   bool get useMonet => _useMonet;
@@ -104,6 +134,40 @@ class SettingsProvider extends ChangeNotifier {
     await _storage.setSetting('customPrimary', '#${primary.toARGB32().toRadixString(16).padLeft(8, '0')}');
     await _storage.setSetting('customSecondary', '#${secondary.toARGB32().toRadixString(16).padLeft(8, '0')}');
     await _storage.setSetting('customTertiary', '#${tertiary.toARGB32().toRadixString(16).padLeft(8, '0')}');
+    notifyListeners();
+  }
+  
+  // WebDAV 设置方法
+  Future<void> setUseWebDav(bool v) async {
+    _useWebDav = v;
+    await _storage.setSetting('useWebDav', v.toString());
+    notifyListeners();
+  }
+  
+  Future<void> setWebDavConfig({
+    required String baseUrl,
+    required String username,
+    required String password,
+  }) async {
+    _webDavBaseUrl = baseUrl;
+    _webDavUsername = username;
+    _webDavPassword = password;
+    await _storage.setSetting('webDavBaseUrl', baseUrl);
+    await _storage.setSetting('webDavUsername', username);
+    await _storage.setSetting('webDavPassword', password);
+    notifyListeners();
+  }
+  
+  // 用户认证设置方法
+  Future<void> setUseUserAuth(bool v) async {
+    _useUserAuth = v;
+    await _storage.setSetting('useUserAuth', v.toString());
+    notifyListeners();
+  }
+  
+  Future<void> setCurrentUserId(String? userId) async {
+    _currentUserId = userId;
+    await _storage.setSetting('currentUserId', userId ?? '');
     notifyListeners();
   }
 }

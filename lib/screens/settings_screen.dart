@@ -8,6 +8,8 @@ import '../providers/settings_provider.dart';
 import '../providers/meme_provider.dart';
 import '../services/storage_service.dart';
 import '../services/update_service.dart';
+import '../services/webdav_service.dart';
+import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -58,6 +60,65 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: const Text('导出所有表情包和元数据到 ZIP'),
             onTap: () => _exportData(context),
           ),
+          const SizedBox(height: 16),
+
+          _sectionHeader('云同步'),
+          SwitchListTile(
+            secondary: const Icon(Icons.cloud_outlined),
+            title: const Text('启用 WebDAV 同步'),
+            subtitle: const Text('将表情包上传到 WebDAV 服务器'),
+            value: settings.useWebDav,
+            onChanged: (v) => settings.setUseWebDav(v),
+          ),
+          if (settings.useWebDav) ...[
+            ListTile(
+              leading: const Icon(Icons.link),
+              title: const Text('服务器地址'),
+              subtitle: Text(settings.webDavBaseUrl ?? ''),
+              onTap: () => _showWebDavConfigDialog(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.person),
+              title: const Text('用户名'),
+              subtitle: Text(settings.webDavUsername ?? ''),
+              onTap: () => _showWebDavConfigDialog(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.lock),
+              title: const Text('密码'),
+              subtitle: const Text('******'),
+              onTap: () => _showWebDavConfigDialog(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.sync),
+              title: const Text('同步所有数据'),
+              subtitle: const Text('将所有本地表情包上传到 WebDAV'),
+              onTap: () => _syncAllToWebDav(context),
+            ),
+          ],
+          const SizedBox(height: 16),
+
+          _sectionHeader('用户认证'),
+          SwitchListTile(
+            secondary: const Icon(Icons.security_outlined),
+            title: const Text('启用用户认证'),
+            subtitle: const Text('支持多用户切换和权限控制'),
+            value: settings.useUserAuth,
+            onChanged: (v) => settings.setUseUserAuth(v),
+          ),
+          if (settings.useUserAuth) ...[
+            ListTile(
+              leading: const Icon(Icons.person_outline),
+              title: const Text('当前用户'),
+              subtitle: Text(settings.currentUserId ?? '未登录'),
+              onTap: () => _showUserAuthDialog(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.login),
+              title: const Text('切换用户'),
+              onTap: () => _showUserAuthDialog(context),
+            ),
+          ],
           const SizedBox(height: 16),
 
           _sectionHeader('关于'),
@@ -499,6 +560,223 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (result == true) {
       await UpdateService.openUrl(info.downloadUrl);
     }
+  }
+
+  void _showWebDavConfigDialog(BuildContext context) {
+    final settings = context.read<SettingsProvider>();
+    final baseUrlCtrl = TextEditingController(text: settings.webDavBaseUrl ?? '');
+    final usernameCtrl = TextEditingController(text: settings.webDavUsername ?? '');
+    final passwordCtrl = TextEditingController(text: settings.webDavPassword ?? '');
+    
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('WebDAV 配置'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: baseUrlCtrl,
+                decoration: const InputDecoration(
+                  labelText: '服务器地址',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: usernameCtrl,
+                decoration: const InputDecoration(
+                  labelText: '用户名',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: passwordCtrl,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: '密码',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final webDavService = WebDavService(
+                baseUrl: baseUrlCtrl.text,
+                username: usernameCtrl.text,
+                password: passwordCtrl.text,
+              );
+              
+              final connected = await webDavService.testConnection();
+              if (connected) {
+                await settings.setWebDavConfig(
+                  baseUrl: baseUrlCtrl.text,
+                  username: usernameCtrl.text,
+                  password: passwordCtrl.text,
+                );
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('WebDAV 配置保存成功')),
+                  );
+                }
+              } else {
+                if (ctx.mounted) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('连接失败，请检查配置')),
+                  );
+                }
+              }
+            },
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _syncAllToWebDav(BuildContext context) async {
+    final settings = context.read<SettingsProvider>();
+    final prov = context.read<MemeProvider>();
+    
+    if (settings.webDavBaseUrl == null || settings.webDavUsername == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请先配置 WebDAV')),
+      );
+      return;
+    }
+    
+    // 显示同步进度
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('正在同步到 WebDAV...'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    
+    await prov.syncAllToWebDav();
+    
+    if (context.mounted) {
+      Navigator.pop(context); // 关闭对话框
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('同步完成')),
+      );
+    }
+  }
+
+  void _showUserAuthDialog(BuildContext context) {
+    final settings = context.read<SettingsProvider>();
+    final authService = AuthService();
+    final usernameCtrl = TextEditingController();
+    final passwordCtrl = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('用户认证'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: usernameCtrl,
+                decoration: const InputDecoration(
+                  labelText: '用户名',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: passwordCtrl,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: '密码',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () async {
+                        final success = await authService.register(
+                          usernameCtrl.text,
+                          passwordCtrl.text,
+                        );
+                        if (success && ctx.mounted) {
+                          await settings.setCurrentUserId(usernameCtrl.text);
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            const SnackBar(content: Text('注册成功')),
+                          );
+                        } else if (ctx.mounted) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            const SnackBar(content: Text('注册失败，用户名可能已存在')),
+                          );
+                        }
+                      },
+                      child: const Text('注册'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () async {
+                        final success = await authService.login(
+                          usernameCtrl.text,
+                          passwordCtrl.text,
+                        );
+                        if (success && ctx.mounted) {
+                          await settings.setCurrentUserId(usernameCtrl.text);
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            const SnackBar(content: Text('登录成功')),
+                          );
+                        } else if (ctx.mounted) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            const SnackBar(content: Text('登录失败，请检查用户名和密码')),
+                          );
+                        }
+                      },
+                      child: const Text('登录'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+        ],
+      ),
+    );
   }
 }
 
