@@ -251,10 +251,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: Row(
           children: [
             _colorBar(preset.primary),
-            const SizedBox(width: 4),
-            _colorBar(preset.secondary),
-            const SizedBox(width: 4),
-            _colorBar(preset.tertiary),
             const SizedBox(width: 12),
             Expanded(child: Text(preset.name, style: const TextStyle(fontSize: 14))),
             if (selected) Icon(Icons.check_circle, color: cs.primary, size: 20),
