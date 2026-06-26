@@ -65,19 +65,19 @@
 
 ## 🔐 管理员配置
 
-Web 端支持管理员登录，配置文件位于 `assets/config.json`：
+Web 端支持管理员登录，首次启动会在项目根目录自动生成 `config.json`：
 
 ```json
 {
   "admin": {
-    "username": "admin",
-    "password": "0721"
+    "username": "",
+    "password": ""
   }
 }
 ```
 
-- 修改 `username` 和 `password` 即可更改管理员账号
-- 密码在传输过程中以 SHA-256 哈希比对，不存储明文哈希
+- 编辑 `config.json` 填写管理员用户名和密码
+- 密码在传输过程中以 SHA-256 哈希比对
 
 ### GitHub Actions 部署
 
@@ -86,15 +86,9 @@ Web 端支持管理员登录，配置文件位于 `assets/config.json`：
 | Secret 名称 | 说明 |
 |---|---|
 | `ADMIN_USERNAME` | 管理员用户名 |
-| `ADMIN_PASSWORD_HASH` | 管理员密码的 SHA-256 哈希值 |
+| `ADMIN_PASSWORD` | 管理员密码 |
 
-构建时 CI 会自动将 Secret 注入 `assets/config.json`。
-
-生成密码哈希：
-```bash
-echo -n "0721" | sha256sum
-# 输出: e4339e761261c995b73b91d0d00cc8137d80a226c730fc72e19a35547a4b91f3
-```
+构建时 CI 会自动将 Secret 注入 `config.json`。
 
 ## 🚀 快速上手
 

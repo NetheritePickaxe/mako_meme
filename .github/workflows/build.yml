@@ -75,19 +75,12 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
       - run: flutter pub get
       - name: Inject admin config
-        if: env.ADMIN_USERNAME != '' && env.ADMIN_PASSWORD_HASH != ''
+        if: env.ADMIN_USERNAME != '' && env.ADMIN_PASSWORD != ''
         run: |
-          cat > assets/config.json << EOF
-          {
-            "admin": {
-              "username": "${{ env.ADMIN_USERNAME }}",
-              "password_hash": "${{ env.ADMIN_PASSWORD_HASH }}"
-            }
-          }
-          EOF
+          echo '{"admin":{"username":"${{ env.ADMIN_USERNAME }}","password":"${{ env.ADMIN_PASSWORD }}"}}' > config.json
         env:
           ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
-          ADMIN_PASSWORD_HASH: ${{ secrets.ADMIN_PASSWORD_HASH }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
       - run: flutter build web --release --base-href=/mako_meme/
       - uses: actions/upload-pages-artifact@v3
         with:

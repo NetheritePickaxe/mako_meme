@@ -1,14 +1,26 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:crypto/crypto.dart';
-import 'package:flutter/services.dart';
 
-/// 配置加载器
+/// 配置加载器 — 从 config.json 读取管理员配置
 class ConfigLoader {
   static Map<String, dynamic>? _config;
+  static const String _configPath = 'config.json';
 
   static Future<void> load() async {
+    final file = File(_configPath);
+    if (!file.existsSync()) {
+      // 首次启动生成默认配置
+      await file.writeAsString('''{
+  "admin": {
+    "username": "",
+    "password": ""
+  }
+}
+''');
+    }
     try {
-      final raw = await rootBundle.loadString('assets/config.json');
+      final raw = await file.readAsString();
       _config = jsonDecode(raw) as Map<String, dynamic>;
     } catch (_) {
       _config = {};
