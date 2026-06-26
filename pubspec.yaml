@@ -52,4 +52,3 @@ flutter_launcher_icons:
   uses-material-design: true
   assets:
     - assets/l10n/
-    - assets/config.json

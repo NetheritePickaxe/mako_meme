@@ -81,14 +81,10 @@ Web 端支持管理员登录，首次启动会在项目根目录自动生成 `co
 
 ### GitHub Actions 部署
 
-在 GitHub 仓库 **Settings → Secrets and variables → Actions** 中添加以下 Secret：
-
-| Secret 名称 | 说明 |
+| Secret名称 | 说明 |
 |---|---|
 | `ADMIN_USERNAME` | 管理员用户名 |
 | `ADMIN_PASSWORD` | 管理员密码 |
-
-构建时 CI 会自动将 Secret 注入 `config.json`。
 
 ## 🚀 快速上手
 
