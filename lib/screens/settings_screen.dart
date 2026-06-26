@@ -227,18 +227,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _presetCard(ColorSchemePreset preset, bool selected, ColorScheme cs, VoidCallback onTap) {
-    final colors = [
-      preset.primary,
-      if (preset.surfaceContainerHighest != null) preset.surfaceContainerHighest!,
-      preset.secondary,
-      preset.tertiary,
-    ];
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           border: selected ? Border.all(color: cs.primary, width: 2) : null,
@@ -247,31 +241,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: Row(
           children: [
             Container(
-              width: 36,
+              width: 4,
               height: 36,
               decoration: BoxDecoration(
                 color: preset.primary,
-                shape: BoxShape.circle,
-                border: Border.all(color: cs.outline, width: 1),
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
             Wrap(
               spacing: 6,
-              runSpacing: 4,
-              children: colors.map((c) {
+              runSpacing: 6,
+              children: [
+                preset.primary,
+                if (preset.surfaceContainerHighest != null) preset.surfaceContainerHighest!,
+                preset.secondary,
+                preset.tertiary,
+              ].map((c) {
                 return Container(
-                  width: 12,
-                  height: 12,
+                  width: 16,
+                  height: 16,
                   decoration: BoxDecoration(
                     color: c,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: cs.outline, width: 0.5),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: cs.outline.withValues(alpha: 0.3), width: 0.5),
                   ),
                 );
               }).toList(),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
             Expanded(child: Text(preset.name, style: const TextStyle(fontSize: 14))),
             if (selected) Icon(Icons.check_circle, color: cs.primary, size: 20),
           ],
