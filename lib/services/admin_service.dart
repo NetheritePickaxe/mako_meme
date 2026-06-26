@@ -31,12 +31,13 @@ class AdminService {
     final config = ConfigLoader.config;
     final admin = config?['admin'] as Map<String, dynamic>?;
     final storedUsername = admin?['username'] as String?;
-    final storedHash = admin?['password_hash'] as String?;
+    final storedPassword = admin?['password'] as String?;
 
-    if (storedUsername == null || (storedHash ?? '').isEmpty) return false;
+    if (storedUsername == null || (storedPassword ?? '').isEmpty) return false;
     if (username != storedUsername) return false;
 
     final inputHash = sha256.convert(utf8.encode(password)).toString();
+    final storedHash = sha256.convert(utf8.encode(storedPassword!)).toString();
     if (inputHash != storedHash) return false;
 
     _loggedInUsername = username;

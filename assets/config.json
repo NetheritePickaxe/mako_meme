@@ -1,9 +1,6 @@
 {
-  // 管理员账号配置
-  // 本地部署：手动编辑 username 和 password_hash（SHA-256 哈希）
-  // CI 部署：通过 GitHub Actions Secret ADMIN_USERNAME 和 ADMIN_PASSWORD_HASH 注入
   "admin": {
     "username": "admin",
-    "password_hash": ""
+    "password": "0721"
   }
 }
