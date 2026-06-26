@@ -24,6 +24,7 @@ class StorageService {
     if (kIsWeb) {
       await _initWeb();
       await _loadFromWeb();
+      await _loadSettingsFromWeb();
     } else {
       final dir = await getApplicationDocumentsDirectory();
       _basePath = p.join(dir.path, 'mako_meme');
@@ -341,9 +342,10 @@ class StorageService {
   // ======================== Settings ========================
 
   Map<String, String> _settings = {};
+  bool _settingsLoaded = false;
 
   String? getSetting(String key) {
-    if (_settings.isEmpty) _loadSettings();
+    if (!_settingsLoaded) _loadSettings();
     return _settings[key];
   }
 
@@ -353,16 +355,7 @@ class StorageService {
   }
 
   void _loadSettings() {
-    if (kIsWeb) {
-      try {
-        final raw = webStorageGetJsonSync('mako_settings_data');
-        if (raw is String && raw.isNotEmpty) {
-          final data = jsonDecode(raw) as Map<String, dynamic>;
-          _settings = data.map((k, v) => MapEntry(k, v.toString()));
-        }
-      } catch (_) {}
-      return;
-    }
+    if (kIsWeb) return;
     final file = File(p.join(_basePath!, 'settings.json'));
     if (file.existsSync()) {
       try {
@@ -370,6 +363,18 @@ class StorageService {
         _settings = data.map((k, v) => MapEntry(k, v.toString()));
       } catch (_) {}
     }
+    _settingsLoaded = true;
+  }
+
+  Future<void> _loadSettingsFromWeb() async {
+    try {
+      final raw = await webStorageGetJson('mako_settings_data');
+      if (raw is String && raw.isNotEmpty) {
+        final data = jsonDecode(raw) as Map<String, dynamic>;
+        _settings = data.map((k, v) => MapEntry(k, v.toString()));
+      }
+    } catch (_) {}
+    _settingsLoaded = true;
   }
 
   Future<void> _saveSettings() async {
