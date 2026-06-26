@@ -33,8 +33,8 @@ class AppTheme {
     ColorSchemePreset(
       name: '巫女大人',
       primary: Color(0xFFfbfbfe),
-      secondary: Color(0xFF80bce7),
-      tertiary: Color(0xFFffb7cd),
+      secondary: Color(0xFFffb7cd),
+      tertiary: Color(0xFF80bce7),
     ),
     ColorSchemePreset(
       name: '下流忍者',
@@ -68,6 +68,11 @@ class AppTheme {
       surfaceContainerHighest: Color(0xFFfdd97c),
     ),
   ];
+
+  static Color _onColor(Color bg) {
+    final luminance = bg.computeLuminance();
+    return luminance > 0.4 ? Colors.black : Colors.white;
+  }
 
   static ThemeData light(Color seed) => ThemeData(
     useMaterial3: true,
@@ -109,67 +114,71 @@ class AppTheme {
     ),
   );
 
-  static ThemeData lightWithPreset(ColorSchemePreset p) => ThemeData(
-    useMaterial3: true,
-    brightness: Brightness.light,
-    colorScheme: (ColorScheme.fromSeed(
+  static ThemeData lightWithPreset(ColorSchemePreset p) {
+    final scheme = ColorScheme.fromSeed(
       seedColor: p.primary,
-      secondary: p.secondary,
-      tertiary: p.tertiary,
       brightness: Brightness.light,
-    )).copyWith(
-      surfaceContainerHighest: p.surfaceContainerHighest ?? ColorScheme.fromSeed(
-        seedColor: p.primary,
-        secondary: p.secondary,
-        tertiary: p.tertiary,
-        brightness: Brightness.light,
-      ).surfaceContainerHighest,
-    ),
-    appBarTheme: const AppBarTheme(centerTitle: false, elevation: 0),
-    cardTheme: CardThemeData(
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-    ),
-    inputDecorationTheme: InputDecorationTheme(
-      filled: true,
-      fillColor: Colors.grey.shade100,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
-      ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    ),
-  );
-
-  static ThemeData darkWithPreset(ColorSchemePreset p) => ThemeData(
-    useMaterial3: true,
-    brightness: Brightness.dark,
-    colorScheme: (ColorScheme.fromSeed(
-      seedColor: p.primary,
+    ).copyWith(
       secondary: p.secondary,
+      onSecondary: _onColor(p.secondary),
+      secondaryContainer: p.secondary.withValues(alpha: 0.15),
       tertiary: p.tertiary,
-      brightness: Brightness.dark,
-    )).copyWith(
-      surfaceContainerHighest: p.surfaceContainerHighest ?? ColorScheme.fromSeed(
-        seedColor: p.primary,
-        secondary: p.secondary,
-        tertiary: p.tertiary,
-        brightness: Brightness.dark,
-      ).surfaceContainerHighest,
-    ),
-    appBarTheme: const AppBarTheme(centerTitle: false, elevation: 0),
-    cardTheme: CardThemeData(
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-    ),
-    inputDecorationTheme: InputDecorationTheme(
-      filled: true,
-      fillColor: Colors.grey.shade900,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
+      onTertiary: _onColor(p.tertiary),
+      tertiaryContainer: p.tertiary.withValues(alpha: 0.15),
+      surfaceContainerHighest: p.surfaceContainerHighest,
+    );
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.light,
+      colorScheme: scheme,
+      appBarTheme: const AppBarTheme(centerTitle: false, elevation: 0),
+      cardTheme: CardThemeData(
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    ),
-  );
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.grey.shade100,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      ),
+    );
+  }
+
+  static ThemeData darkWithPreset(ColorSchemePreset p) {
+    final scheme = ColorScheme.fromSeed(
+      seedColor: p.primary,
+      brightness: Brightness.dark,
+    ).copyWith(
+      secondary: p.secondary,
+      onSecondary: _onColor(p.secondary),
+      secondaryContainer: p.secondary.withValues(alpha: 0.2),
+      tertiary: p.tertiary,
+      onTertiary: _onColor(p.tertiary),
+      tertiaryContainer: p.tertiary.withValues(alpha: 0.2),
+      surfaceContainerHighest: p.surfaceContainerHighest,
+    );
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      colorScheme: scheme,
+      appBarTheme: const AppBarTheme(centerTitle: false, elevation: 0),
+      cardTheme: CardThemeData(
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.grey.shade900,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      ),
+    );
+  }
 }

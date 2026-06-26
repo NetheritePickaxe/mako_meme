@@ -19,17 +19,34 @@ class _MakoSearchBarState extends State<MakoSearchBar> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.all(12),
       child: TextField(
         controller: _controller,
         decoration: InputDecoration(
-          hintText: '搜索表情（用 #前缀 搜索标签）',
-          prefixIcon: const Icon(Icons.search),
+          hintText: '搜索表情（# 标签，@ 文件夹）',
+          hintStyle: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
+          prefixIcon: Icon(Icons.search, color: theme.colorScheme.onSurfaceVariant),
           suffixIcon: _controller.text.isNotEmpty
-              ? IconButton(icon: const Icon(Icons.clear), onPressed: () { _controller.clear(); widget.onSearch(''); })
+              ? IconButton(icon: Icon(Icons.clear, color: theme.colorScheme.onSurfaceVariant), onPressed: () { _controller.clear(); widget.onSearch(''); })
               : null,
+          filled: true,
+          fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(28),
+            borderSide: BorderSide(color: theme.colorScheme.outline),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(28),
+            borderSide: BorderSide(color: theme.colorScheme.outline),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(28),
+            borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
+          ),
         ),
+        style: TextStyle(color: theme.colorScheme.onSurface),
         onChanged: (v) { setState(() {}); widget.onSearch(v); },
         onSubmitted: widget.onSearch,
       ),

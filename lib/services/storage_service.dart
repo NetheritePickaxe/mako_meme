@@ -312,6 +312,15 @@ class StorageService {
     }
   }
 
+  Future<void> updateFolderCover(String folderId, String? coverMemeId) async {
+    final i = _folders.indexWhere((f) => f.id == folderId);
+    if (i != -1) {
+      final folder = _folders[i];
+      _folders[i] = folder.copyWith(coverMemeId: coverMemeId);
+      _save();
+    }
+  }
+
   Future<void> deleteFolder(String id) async {
     _folders.removeWhere((f) => f.id == id);
     // 将文件夹内的表情移出

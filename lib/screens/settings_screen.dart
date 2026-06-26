@@ -75,21 +75,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           if (settings.useWebDav) ...[
             ListTile(
-              leading: const Icon(Icons.link),
-              title: const Text('服务器地址'),
-              subtitle: Text(settings.webDavBaseUrl ?? ''),
-              onTap: () => _showWebDavConfigDialog(context),
-            ),
-            ListTile(
-              leading: const Icon(Icons.person),
-              title: const Text('用户名'),
-              subtitle: Text(settings.webDavUsername ?? ''),
-              onTap: () => _showWebDavConfigDialog(context),
-            ),
-            ListTile(
-              leading: const Icon(Icons.lock),
-              title: const Text('密码'),
-              subtitle: const Text('******'),
+              leading: const Icon(Icons.cloud_outlined),
+              title: const Text('WebDAV 配置'),
+              subtitle: Text(settings.webDavBaseUrl != null ? '已配置' : '未配置'),
               onTap: () => _showWebDavConfigDialog(context),
             ),
             ListTile(
@@ -245,8 +233,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       preset.secondary,
       preset.tertiary,
     ];
-    return GestureDetector(
+    return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -293,8 +282,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _customPresetCard(SettingsProvider settings, ColorScheme cs) {
     final selected = settings.presetIndex >= AppTheme.presets.length;
-    return GestureDetector(
+    return InkWell(
       onTap: () => _showCustomColorPicker(context, settings, cs),
+      borderRadius: BorderRadius.circular(10),
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -863,8 +853,8 @@ class _ColorWheelState extends State<_ColorWheel> {
   void _handlePanUpdate(DragUpdateDetails details) {
     final RenderBox box = context.findRenderObject() as RenderBox;
     final offset = box.globalToLocal(details.globalPosition);
-    final dx = offset.dx / box.size.width;
-    final dy = offset.dy / box.size.height;
+    final dx = (offset.dx / box.size.width) * 2 - 1;
+    final dy = (offset.dy / box.size.height) * 2 - 1;
     final clampedDx = max(-1.0, min(1.0, dx));
     final clampedDy = max(-1.0, min(1.0, dy));
     setState(() {

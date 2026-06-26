@@ -34,11 +34,20 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: Builder(
-          builder: (ctx) => IconButton(
-            icon: const Icon(Icons.menu),
-            tooltip: l10n.tr('menu'),
-            onPressed: () => Scaffold.of(ctx).openDrawer(),
-          ),
+          builder: (ctx) {
+            if (prov.folderId != null) {
+              return IconButton(
+                icon: const Icon(Icons.arrow_back),
+                tooltip: '返回',
+                onPressed: () => prov.selectFolder(null),
+              );
+            }
+            return IconButton(
+              icon: const Icon(Icons.menu),
+              tooltip: l10n.tr('menu'),
+              onPressed: () => Scaffold.of(ctx).openDrawer(),
+            );
+          },
         ),
         title: Text(_getTitle(prov, l10n)),
         actions: [
@@ -106,7 +115,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Column(
                 children: [
                   custom.MakoSearchBar(onSearch: (q) => prov.setQuery(q)),
-                  if (prov.tagFilter.isNotEmpty) _buildTagChips(prov),
+                  if (prov.tagFilter.isNotEmpty || prov.folderFilter.isNotEmpty) _buildFilterChips(prov),
                   Expanded(
                     child: _buildMixedGrid(prov),
                   ),
@@ -145,7 +154,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showImportMenu(context, prov),
-        child: const Icon(Icons.add, size: 48),
+        child: const Icon(Icons.add, size: 32),
       ),
     );
   }
@@ -353,7 +362,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildTagChips(MemeProvider prov) {
+  Widget _buildFilterChips(MemeProvider prov) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -364,6 +373,16 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Chip(
               label: Text('#$tag', style: const TextStyle(fontSize: 12)),
               onDeleted: () => prov.toggleTag(tag),
+              visualDensity: VisualDensity.compact,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          )),
+          ...prov.folders.where((f) => prov.folderFilter.contains(f.id)).map((f) => Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: Chip(
+              avatar: Icon(Icons.folder, size: 16, color: Color(f.colorValue)),
+              label: Text('@${f.name}', style: const TextStyle(fontSize: 12)),
+              onDeleted: () => prov.toggleFolderFilter(f.id),
               visualDensity: VisualDensity.compact,
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
@@ -381,12 +400,14 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(
-              leading: const Icon(Icons.create_new_folder),
-              title: Text(l10n.tr('new_folder')),
-              onTap: () { Navigator.pop(bCtx); _showCreateFolderDialog(ctx, prov); },
-            ),
-            const Divider(),
+            if (prov.folderId == null) ...[
+              ListTile(
+                leading: const Icon(Icons.create_new_folder),
+                title: Text(l10n.tr('new_folder')),
+                onTap: () { Navigator.pop(bCtx); _showCreateFolderDialog(ctx, prov); },
+              ),
+              const Divider(),
+            ],
             ListTile(
               leading: const Icon(Icons.image),
               title: Text(l10n.tr('import_images')),

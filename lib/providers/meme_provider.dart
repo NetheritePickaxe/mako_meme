@@ -25,6 +25,9 @@ class MemeProvider with ChangeNotifier {
   final Set<String> _sel = {};
   final Set<String> _tagFilter = {};
   String? _moodFilter;
+  final Set<String> _folderFilter = {};
+
+  Set<String> get folderFilter => _folderFilter;
 
   MemeProvider(this._storage, this._settings);
 
@@ -77,6 +80,18 @@ class MemeProvider with ChangeNotifier {
 
   void clearTagFilter() {
     _tagFilter.clear();
+    _apply();
+    notifyListeners();
+  }
+
+  void toggleFolderFilter(String folderId) {
+    _folderFilter.contains(folderId) ? _folderFilter.remove(folderId) : _folderFilter.add(folderId);
+    _apply();
+    notifyListeners();
+  }
+
+  void clearFolderFilter() {
+    _folderFilter.clear();
     _apply();
     notifyListeners();
   }
@@ -237,7 +252,21 @@ class MemeProvider with ChangeNotifier {
   int countInFolder(String folderId) =>
       _all.where((m) => m.folderId == folderId).length;
 
+  List<Meme> memesInFolder(String folderId) =>
+      _all.where((m) => m.folderId == folderId).toList()
+        ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
   List<Meme> get favorites => _all.where((m) => m.isFavorite).toList();
+
+  bool _matchWildcard(String text, String pattern) {
+    final lowerText = text.toLowerCase();
+    final lowerPattern = pattern.toLowerCase();
+    if (lowerPattern.contains('*')) {
+      final regexPattern = '^${lowerPattern.replaceAll('*', '.*')}\$';
+      return RegExp(regexPattern).hasMatch(lowerText);
+    }
+    return lowerText.contains(lowerPattern);
+  }
 
   void _apply() {
     var list = List<Meme>.from(_all);
@@ -249,12 +278,19 @@ class MemeProvider with ChangeNotifier {
     }
 
     if (_tagFilter.isNotEmpty) {
-      list = list.where((m) => _tagFilter.every((t) => m.tags.contains(t))).toList();
+      list = list.where((m) => _tagFilter.every((t) => m.tags.any((tag) => _matchWildcard(tag, t)))).toList();
+    }
+    if (_folderFilter.isNotEmpty) {
+      list = list.where((m) => _folderFilter.any((fid) => m.folderId == fid)).toList();
     }
     if (_query.isNotEmpty) {
       if (_query.startsWith('#')) {
         final tq = _query.substring(1).toLowerCase();
-        list = list.where((m) => m.tags.any((t) => t.contains(tq))).toList();
+        list = list.where((m) => m.tags.any((tag) => _matchWildcard(tag, tq))).toList();
+      } else if (_query.startsWith('@')) {
+        final fq = _query.substring(1).toLowerCase();
+        final matchedFolderIds = _folders.where((f) => f.name.toLowerCase().contains(fq) || _matchWildcard(f.name, fq)).map((f) => f.id).toSet();
+        list = list.where((m) => m.folderId != null && matchedFolderIds.contains(m.folderId)).toList();
       } else {
         final searchList = list.map((m) => '${m.name} ${m.tags.join(" ")}').toList();
         final fuse = Fuzzy(searchList, options: FuzzyOptions(threshold: 0.3));
