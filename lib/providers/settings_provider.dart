@@ -80,11 +80,11 @@ class SettingsProvider extends ChangeNotifier {
     if (_presetIndex < AppTheme.presets.length) {
       return AppTheme.presets[_presetIndex];
     }
-    return const ColorSchemePreset(
+    return ColorSchemePreset(
       name: '自定义',
-      primary: Color(0xFF6366F1),
-      secondary: Color(0xFF6366F1),
-      tertiary: Color(0xFF6366F1),
+      primary: _customPrimary,
+      secondary: _customSecondary,
+      tertiary: _customTertiary,
       surfaceContainerHighest: null,
     );
   }
