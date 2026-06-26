@@ -24,7 +24,6 @@ class StorageService {
     if (kIsWeb) {
       await _initWeb();
       await _loadFromWeb();
-      await _cleanupExpiredWebData();
     } else {
       final dir = await getApplicationDocumentsDirectory();
       _basePath = p.join(dir.path, 'mako_meme');
@@ -68,38 +67,6 @@ class StorageService {
         'folders': _folders.map((f) => f.toMap()).toList(),
       });
       await webStorageSetJson('mako_memes', data);
-    } catch (_) {}
-  }
-
-  /// 清理过期的 Web 数据（非管理员 7 天 + 容量超限）
-  Future<void> _cleanupExpiredWebData() async {
-    try {
-      final settingsRaw = await webStorageGetJson('mako_settings_data');
-      Map<String, dynamic> settings = {};
-      if (settingsRaw != null && settingsRaw is String) {
-        settings = jsonDecode(settingsRaw) as Map<String, dynamic>;
-      }
-
-      final adminUsers = (settings['adminUsers'] as List?)
-          ?.cast<String>()
-          .toSet() ??
-          <String>{};
-
-      final currentUserId = settings['currentUserId'] as String?;
-      final isAdmin = currentUserId != null && adminUsers.contains(currentUserId);
-
-      if (isAdmin) return; // 管理员不过期
-
-      // 1. 7 天过期清理
-      final cutoff = DateTime.now().subtract(const Duration(days: 7));
-      _memes = _memes.where((m) => m.createdAt.isAfter(cutoff)).toList();
-
-      // 2. 清理空文件夹
-      final folderIds = _memes.map((m) => m.folderId).whereType<String>().toSet();
-      _folders = _folders.where((f) => folderIds.contains(f.id)).toList();
-
-      // 3. 保存清理后的数据
-      await _saveToWeb();
     } catch (_) {}
   }
 

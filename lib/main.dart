@@ -6,15 +6,15 @@ import 'services/storage_service.dart';
 import 'providers/meme_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/locale_provider.dart';
-import 'services/auth_service.dart';
+import 'services/admin_service.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await ConfigLoader.load();
   final storage = StorageService();
   await storage.init();
-  final authService = AuthService();
   final localeProvider = LocaleProvider();
   await localeProvider.init();
   runApp(
@@ -24,7 +24,7 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => MemeProvider(storage, SettingsProvider(storage))..init()),
         ChangeNotifierProvider(create: (_) => SettingsProvider(storage)),
         Provider.value(value: storage),
-        Provider.value(value: authService),
+        Provider.value(value: AdminService()),
       ],
       child: const MakoMemeApp(),
     ),

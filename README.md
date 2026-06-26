@@ -86,4 +86,3 @@ flutter test                         # 测试
 - 🌸 茉子（Mako）出自 Yuzusoft（柚子社）作品《千恋万花》。
 - 🎨 应用图标来源于游戏素材解包，版权归 Yuzusoft 所有。
 - 🤖 本项目为 AI 辅助开发的 vibecoding 作品。
-  

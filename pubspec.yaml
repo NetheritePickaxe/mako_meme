@@ -48,7 +48,8 @@ flutter_launcher_icons:
   adaptive_icon_background: "#6366F1"
   adaptive_icon_foreground: "assets/icon_foreground.png"
 
-flutter:
+  flutter:
   uses-material-design: true
   assets:
     - assets/l10n/
+    - assets/config.json
