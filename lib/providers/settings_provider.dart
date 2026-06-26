@@ -20,6 +20,7 @@ class SettingsProvider extends ChangeNotifier {
   // 用户认证配置
   bool _useUserAuth = false;
   String? _currentUserId;
+  Set<String> _adminUsers = {};
 
   SettingsProvider(this._storage) {
     _themeMode = _toThemeMode(_storage.getSetting('themeMode'));
@@ -57,6 +58,10 @@ class SettingsProvider extends ChangeNotifier {
     // 加载用户认证配置
     _useUserAuth = _storage.getSetting('useUserAuth') == 'true';
     _currentUserId = _storage.getSetting('currentUserId');
+    final adminStr = _storage.getSetting('adminUsers');
+    if (adminStr != null && adminStr.isNotEmpty) {
+      _adminUsers = adminStr.split(',').where((s) => s.isNotEmpty).toSet();
+    }
   }
 
   // WebDAV getters
@@ -68,6 +73,8 @@ class SettingsProvider extends ChangeNotifier {
   // 用户认证 getters
   bool get useUserAuth => _useUserAuth;
   String? get currentUserId => _currentUserId;
+  Set<String> get adminUsers => _adminUsers;
+  bool isAdmin(String? userId) => userId != null && _adminUsers.contains(userId);
 
   ThemeMode get themeMode => _themeMode;
   bool get useMonet => _useMonet;
@@ -169,6 +176,12 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setCurrentUserId(String? userId) async {
     _currentUserId = userId;
     await _storage.setSetting('currentUserId', userId ?? '');
+    notifyListeners();
+  }
+  
+  Future<void> setAdminUsers(Set<String> users) async {
+    _adminUsers = users;
+    await _storage.setSetting('adminUsers', users.join(','));
     notifyListeners();
   }
 }

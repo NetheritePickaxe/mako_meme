@@ -11,21 +11,20 @@ import '../models/folder.dart';
 import 'storage_platform.dart';
 import 'webdav_service.dart';
 
-/// JSON 文件存储 — 跨平台，Web 上使用 localStorage
+/// JSON 文件存储 — 跨平台，Web 上使用 IndexedDB
 class StorageService {
   final Uuid _uuid = const Uuid();
   List<Meme> _memes = [];
   List<MemeFolder> _folders = [];
   String? _basePath;
 
-  /// Web 上存储图片字节（key = filePath, value = bytes）
-  final Map<String, Uint8List> _webBytes = {};
-
   String get basePath => _basePath ?? '.';
 
   Future<void> init() async {
     if (kIsWeb) {
-      _loadFromWeb();
+      await _initWeb();
+      await _loadFromWeb();
+      await _cleanupExpiredWebData();
     } else {
       final dir = await getApplicationDocumentsDirectory();
       _basePath = p.join(dir.path, 'mako_meme');
@@ -37,12 +36,18 @@ class StorageService {
     }
   }
 
-  // ======================== Web 存储 ========================
+  // ======================== Web 存储 (IndexedDB) ========================
 
-  void _loadFromWeb() {
+  Future<void> _initWeb() async {
     try {
-      final raw = webStorageGetItem('mako_memes');
-      if (raw != null && raw.isNotEmpty) {
+      await initWebStorage();
+    } catch (_) {}
+  }
+
+  Future<void> _loadFromWeb() async {
+    try {
+      final raw = await webStorageGetJson('mako_memes');
+      if (raw != null && raw is String) {
         final data = jsonDecode(raw) as Map<String, dynamic>;
         _memes = (data['memes'] as List? ?? [])
             .cast<Map<String, dynamic>>()
@@ -53,18 +58,48 @@ class StorageService {
             .map((f) => MemeFolder.fromMap(f))
             .toList();
       }
-      // 图片字节不持久化 — 刷新后需重新导入，元数据保留
     } catch (_) {}
   }
 
-  void _saveToWeb() {
+  Future<void> _saveToWeb() async {
     try {
-      // 只存元数据，不存图片字节
       final data = jsonEncode({
         'memes': _memes.map((m) => m.toMap()).toList(),
         'folders': _folders.map((f) => f.toMap()).toList(),
       });
-      webStorageSetItem('mako_memes', data);
+      await webStorageSetJson('mako_memes', data);
+    } catch (_) {}
+  }
+
+  /// 清理过期的 Web 数据（非管理员 7 天 + 容量超限）
+  Future<void> _cleanupExpiredWebData() async {
+    try {
+      final settingsRaw = await webStorageGetJson('mako_settings_data');
+      Map<String, dynamic> settings = {};
+      if (settingsRaw != null && settingsRaw is String) {
+        settings = jsonDecode(settingsRaw) as Map<String, dynamic>;
+      }
+
+      final adminUsers = (settings['adminUsers'] as List?)
+          ?.cast<String>()
+          .toSet() ??
+          <String>{};
+
+      final currentUserId = settings['currentUserId'] as String?;
+      final isAdmin = currentUserId != null && adminUsers.contains(currentUserId);
+
+      if (isAdmin) return; // 管理员不过期
+
+      // 1. 7 天过期清理
+      final cutoff = DateTime.now().subtract(const Duration(days: 7));
+      _memes = _memes.where((m) => m.createdAt.isAfter(cutoff)).toList();
+
+      // 2. 清理空文件夹
+      final folderIds = _memes.map((m) => m.folderId).whereType<String>().toSet();
+      _folders = _folders.where((f) => folderIds.contains(f.id)).toList();
+
+      // 3. 保存清理后的数据
+      await _saveToWeb();
     } catch (_) {}
   }
 
@@ -127,11 +162,11 @@ class StorageService {
     String filePath;
 
     if (kIsWeb) {
-      // Web: 从内存读取
+      // Web: 存储图片字节到 IndexedDB
       bytes = file.bytes;
       filePath = 'memes/$fileName';
       if (bytes != null) {
-        _webBytes[filePath] = bytes;
+        await webStorageSetBinary(filePath, bytes);
       }
     } else {
       // Native: 复制文件到存储目录
@@ -164,7 +199,7 @@ class StorageService {
   /// 获取图片字节（跨平台）
   Future<Uint8List?> readMemeBytes(String filePath) async {
     if (kIsWeb) {
-      return _webBytes[filePath];
+      return await webStorageGetBinary(filePath);
     }
     try {
       final file = File(p.join(_basePath!, filePath));
@@ -191,7 +226,7 @@ class StorageService {
 
     if (kIsWeb) {
       if (file.bytes != null) {
-        _webBytes[old.filePath] = file.bytes!;
+        await webStorageSetBinary(old.filePath, file.bytes!);
       }
     } else {
       final dest = File(p.join(_basePath!, old.filePath));
@@ -236,6 +271,10 @@ class StorageService {
     if (meme != null && !kIsWeb && meme.filePath.isNotEmpty) {
       final file = File(p.join(_basePath!, meme.filePath));
       if (await file.exists()) await file.delete();
+    }
+    // Web: 删除 IndexedDB 中的图片
+    if (kIsWeb && meme != null && meme.filePath.isNotEmpty) {
+      await webStorageDelete(meme.filePath);
     }
     _memes.removeWhere((m) => m.id == id);
     _save();
@@ -349,8 +388,8 @@ class StorageService {
   void _loadSettings() {
     if (kIsWeb) {
       try {
-        final raw = webStorageGetItem('mako_settings');
-        if (raw != null && raw.isNotEmpty) {
+        final raw = webStorageGetJsonSync('mako_settings_data');
+        if (raw is String && raw.isNotEmpty) {
           final data = jsonDecode(raw) as Map<String, dynamic>;
           _settings = data.map((k, v) => MapEntry(k, v.toString()));
         }
@@ -369,7 +408,7 @@ class StorageService {
   Future<void> _saveSettings() async {
     if (kIsWeb) {
       try {
-        webStorageSetItem('mako_settings', jsonEncode(_settings));
+        await webStorageSetJson('mako_settings_data', _settings);
       } catch (_) {}
       return;
     }

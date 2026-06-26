@@ -109,6 +109,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: const Text('切换用户'),
               onTap: () => _showUserAuthDialog(context),
             ),
+            ListTile(
+              leading: const Icon(Icons.admin_panel_settings),
+              title: const Text('管理员设置'),
+              subtitle: Text(settings.adminUsers.isEmpty ? '暂无管理员' : '管理员: ${settings.adminUsers.join(", ")}'),
+              onTap: () => _showAdminSettingsDialog(context, settings),
+            ),
           ],
           const SizedBox(height: 16),
 
@@ -802,6 +808,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('取消'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAdminSettingsDialog(BuildContext context, SettingsProvider settings) {
+    final ctrl = TextEditingController(text: settings.adminUsers.join(', '));
+    
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('管理员设置'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('管理员逗号分隔（英文逗号），例如：admin,user1'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              decoration: const InputDecoration(
+                labelText: '管理员列表',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final users = ctrl.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toSet();
+              settings.setAdminUsers(users);
+              Navigator.pop(ctx);
+            },
+            child: const Text('保存'),
           ),
         ],
       ),
