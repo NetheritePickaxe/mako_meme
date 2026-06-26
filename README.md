@@ -10,29 +10,22 @@
 </p>
 
 <p align="center">
-  <a href="https://netheritepickaxe.github.io/mako_meme/">在线体验</a>
-</p>
-
-<p align="center">
   <a href="https://github.com/anomalyco/mako_meme/actions">
     <img src="https://img.shields.io/github/actions/workflow/status/anomalyco/mako_meme/build.yml?style=flat-square" alt="Build">
   </a>
   <a href="https://github.com/anomalyco/mako_meme/releases">
     <img src="https://img.shields.io/github/v/release/anomalyco/mako_meme?style=flat-square" alt="Release">
   </a>
-  <p align="center">
-  <a href="https://netheritepickaxe.github.io/mako_meme/">
-    <img src="https://img.shields.io/badge/在线体验-Web%20Demo-6366F1?style=for-the-badge" alt="Web Demo">
-  </a>
-</p>
   <a href="https://github.com/anomalyco/mako_meme/blob/main/LICENSE">
     <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License">
   </a>
 </p>
 
-> 🌸 茉子（Mako）出自 Yuzusoft（柚子社）作品《千恋万花》。  
-> 🎨 应用图标来源于游戏素材解包，版权归 Yuzusoft 所有。  
-> 🤖 本项目为 AI 辅助开发的 vibecoding 作品。
+<p align="center">
+  <a href="https://netheritepickaxe.github.io/mako_meme/">
+    <img src="https://img.shields.io/badge/在线体验-Web%20Demo-6366F1?style=for-the-badge" alt="Web Demo">
+  </a>
+</p>
 
 ---
 
@@ -60,15 +53,15 @@
 
 ## 🧱 技术栈
 
-| 类别 | 选型 |
-|------|------|
-| 框架 | Flutter 3.29+ / Dart ^3.12.2 |
-| 状态管理 | Provider (ChangeNotifier) |
-| 持久化 | JSON 文件 + Hive 缓存 |
-| 同步 | WebDAV |
-| 图片 | photo_view · mime · crypto |
-| 工具 | file_picker · share_plus · desktop_drop · uuid · fuzzy · archive |
-| 主题 | dynamic_color (Monet) |
+| 类别     | 选型                                                             |
+| -------- | ---------------------------------------------------------------- |
+| 框架     | Flutter 3.29+ / Dart ^3.12.2                                     |
+| 状态管理 | Provider (ChangeNotifier)                                        |
+| 持久化   | JSON 文件 + Hive 缓存                                            |
+| 同步     | WebDAV                                                           |
+| 图片     | photo_view · mime · crypto                                       |
+| 工具     | file_picker · share_plus · desktop_drop · uuid · fuzzy · archive |
+| 主题     | dynamic_color (Monet)                                            |
 
 ## 🚀 快速上手
 
@@ -88,3 +81,8 @@ flutter test                         # 测试
 
 **Web** — 元数据持久化到 `localStorage`，图片保留在运行内存中（刷新后丢失，显示占位符提示重新导入）。
 
+## ⚖️ 免责声明
+
+- 🌸 茉子（Mako）出自 Yuzusoft（柚子社）作品《千恋万花》。
+- 🎨 应用图标来源于游戏素材解包，版权归 Yuzusoft 所有。
+- 🤖 本项目为 AI 辅助开发的 vibecoding 作品。
