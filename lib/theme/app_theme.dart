@@ -78,6 +78,7 @@ class AppTheme {
     useMaterial3: true,
     brightness: Brightness.light,
     colorScheme: ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.light),
+    fontFamily: 'Noto Sans SC',
     appBarTheme: const AppBarTheme(centerTitle: false, elevation: 0),
     cardTheme: const CardThemeData(
       elevation: 0,
@@ -98,6 +99,7 @@ class AppTheme {
     useMaterial3: true,
     brightness: Brightness.dark,
     colorScheme: ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.dark),
+    fontFamily: 'Noto Sans SC',
     appBarTheme: const AppBarTheme(centerTitle: false, elevation: 0),
     cardTheme: const CardThemeData(
       elevation: 0,
@@ -131,6 +133,7 @@ class AppTheme {
       useMaterial3: true,
       brightness: Brightness.light,
       colorScheme: scheme,
+      fontFamily: 'Noto Sans SC',
       appBarTheme: const AppBarTheme(centerTitle: false, elevation: 0),
       cardTheme: const CardThemeData(
         elevation: 0,
@@ -165,6 +168,7 @@ class AppTheme {
       useMaterial3: true,
       brightness: Brightness.dark,
       colorScheme: scheme,
+      fontFamily: 'Noto Sans SC',
       appBarTheme: const AppBarTheme(centerTitle: false, elevation: 0),
       cardTheme: const CardThemeData(
         elevation: 0,

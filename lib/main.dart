@@ -9,22 +9,9 @@ import 'providers/locale_provider.dart';
 import 'services/admin_service.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
-import 'dart:html' as html;
-
-void injectGoogleFonts() {
-  try {
-    final link = html.AnchorElement(
-      href: 'https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap',
-    )
-      ..setAttribute('rel', 'stylesheet')
-      ..setAttribute('type', 'text/css');
-    html.document.head?.children.add(link);
-  } catch (_) {}
-}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  injectGoogleFonts();
   await ConfigLoader.load();
   final storage = StorageService();
   await storage.init();
