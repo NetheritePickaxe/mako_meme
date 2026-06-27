@@ -79,9 +79,9 @@ class AppTheme {
     brightness: Brightness.light,
     colorScheme: ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.light),
     appBarTheme: const AppBarTheme(centerTitle: false, elevation: 0),
-    cardTheme: CardThemeData(
+    cardTheme: const CardThemeData(
       elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
@@ -99,9 +99,9 @@ class AppTheme {
     brightness: Brightness.dark,
     colorScheme: ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.dark),
     appBarTheme: const AppBarTheme(centerTitle: false, elevation: 0),
-    cardTheme: CardThemeData(
+    cardTheme: const CardThemeData(
       elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
@@ -132,9 +132,9 @@ class AppTheme {
       brightness: Brightness.light,
       colorScheme: scheme,
       appBarTheme: const AppBarTheme(centerTitle: false, elevation: 0),
-      cardTheme: CardThemeData(
+      cardTheme: const CardThemeData(
         elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -166,9 +166,9 @@ class AppTheme {
       brightness: Brightness.dark,
       colorScheme: scheme,
       appBarTheme: const AppBarTheme(centerTitle: false, elevation: 0),
-      cardTheme: CardThemeData(
+      cardTheme: const CardThemeData(
         elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
