@@ -2,7 +2,7 @@
   <img src="assets/icon_foreground.png" width="128" height="128" alt="Mako Meme">
 </p>
 
-<h1 align="center">Mako Meme 🌸</h1>
+<h1 align="center">Mako Meme</h1>
 
 <p align="center">
   <b>跨平台表情包管理器</b><br>
