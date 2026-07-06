@@ -10,7 +10,6 @@ import '../providers/locale_provider.dart';
 import '../services/storage_service.dart';
 import '../services/update_service.dart';
 import '../services/webdav_service.dart';
-import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -89,29 +88,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
           const SizedBox(height: 16),
 
-          if (kIsWeb) ...[
-            _sectionHeader('用户认证'),
-            SwitchListTile(
-              secondary: const Icon(Icons.security_outlined),
-              title: const Text('启用用户认证'),
-              subtitle: const Text('支持多用户切换和权限控制'),
-              value: settings.useUserAuth,
-              onChanged: (v) => settings.setUseUserAuth(v),
-            ),
-            if (settings.useUserAuth) ...[
-              ListTile(
-                leading: const Icon(Icons.person_outline),
-                title: const Text('当前用户'),
-                subtitle: Text(settings.currentUserId ?? '未登录'),
-                onTap: () => _showUserAuthDialog(context),
-              ),
-              ListTile(
-                leading: const Icon(Icons.login),
-                title: const Text('切换用户'),
-                onTap: () => _showUserAuthDialog(context),
-              ),
-            ],
-          ],
           const SizedBox(height: 16),
 
           _sectionHeader('关于'),
@@ -714,99 +690,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const SnackBar(content: Text('同步完成')),
       );
     }
-  }
-
-  void _showUserAuthDialog(BuildContext context) {
-    final settings = context.read<SettingsProvider>();
-    final authService = AuthService();
-    final usernameCtrl = TextEditingController();
-    final passwordCtrl = TextEditingController();
-    
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('用户认证'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: usernameCtrl,
-                decoration: const InputDecoration(
-                  labelText: '用户名',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: passwordCtrl,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: '密码',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () async {
-                        final success = await authService.register(
-                          usernameCtrl.text,
-                          passwordCtrl.text,
-                        );
-                        if (success && ctx.mounted) {
-                          await settings.setCurrentUserId(usernameCtrl.text);
-                          Navigator.pop(ctx);
-                          ScaffoldMessenger.of(ctx).showSnackBar(
-                            const SnackBar(content: Text('注册成功')),
-                          );
-                        } else if (ctx.mounted) {
-                          ScaffoldMessenger.of(ctx).showSnackBar(
-                            const SnackBar(content: Text('注册失败，用户名可能已存在')),
-                          );
-                        }
-                      },
-                      child: const Text('注册'),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: () async {
-                        final success = await authService.login(
-                          usernameCtrl.text,
-                          passwordCtrl.text,
-                        );
-                        if (success && ctx.mounted) {
-                          await settings.setCurrentUserId(usernameCtrl.text);
-                          Navigator.pop(ctx);
-                          ScaffoldMessenger.of(ctx).showSnackBar(
-                            const SnackBar(content: Text('登录成功')),
-                          );
-                        } else if (ctx.mounted) {
-                          ScaffoldMessenger.of(ctx).showSnackBar(
-                            const SnackBar(content: Text('登录失败，请检查用户名和密码')),
-                          );
-                        }
-                      },
-                      child: const Text('登录'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-        ],
-      ),
-    );
   }
 }
 

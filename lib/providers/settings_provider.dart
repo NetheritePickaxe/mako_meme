@@ -16,10 +16,6 @@ class SettingsProvider extends ChangeNotifier {
   String? _webDavBaseUrl;
   String? _webDavUsername;
   String? _webDavPassword;
-  
-  // 用户认证配置
-  bool _useUserAuth = false;
-  String? _currentUserId;
 
   SettingsProvider(this._storage) {
     _themeMode = _toThemeMode(_storage.getSetting('themeMode'));
@@ -53,10 +49,6 @@ class SettingsProvider extends ChangeNotifier {
     _webDavBaseUrl = _storage.getSetting('webDavBaseUrl');
     _webDavUsername = _storage.getSetting('webDavUsername');
     _webDavPassword = _storage.getSetting('webDavPassword');
-    
-    // 加载用户认证配置
-    _useUserAuth = _storage.getSetting('useUserAuth') == 'true';
-    _currentUserId = _storage.getSetting('currentUserId');
   }
 
   // WebDAV getters
@@ -64,10 +56,6 @@ class SettingsProvider extends ChangeNotifier {
   String? get webDavBaseUrl => _webDavBaseUrl;
   String? get webDavUsername => _webDavUsername;
   String? get webDavPassword => _webDavPassword;
-  
-  // 用户认证 getters
-  bool get useUserAuth => _useUserAuth;
-  String? get currentUserId => _currentUserId;
 
   ThemeMode get themeMode => _themeMode;
   bool get useMonet => _useMonet;
@@ -156,19 +144,6 @@ class SettingsProvider extends ChangeNotifier {
     await _storage.setSetting('webDavBaseUrl', baseUrl);
     await _storage.setSetting('webDavUsername', username);
     await _storage.setSetting('webDavPassword', password);
-    notifyListeners();
-  }
-  
-  // 用户认证设置方法
-  Future<void> setUseUserAuth(bool v) async {
-    _useUserAuth = v;
-    await _storage.setSetting('useUserAuth', v.toString());
-    notifyListeners();
-  }
-  
-  Future<void> setCurrentUserId(String? userId) async {
-    _currentUserId = userId;
-    await _storage.setSetting('currentUserId', userId ?? '');
     notifyListeners();
   }
 }

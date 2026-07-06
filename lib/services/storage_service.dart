@@ -10,6 +10,7 @@ import '../models/meme.dart';
 import '../models/folder.dart';
 import 'storage_platform.dart';
 import 'webdav_service.dart';
+import 'admin_service.dart';
 
 /// JSON 文件存储 — 跨平台，Web 上使用 IndexedDB
 class StorageService {
@@ -17,23 +18,52 @@ class StorageService {
   List<Meme> _memes = [];
   List<MemeFolder> _folders = [];
   String? _basePath;
+  String? _userId;
+  String _storageMode = 'personal';
 
   String get basePath => _basePath ?? '.';
+  String? get userId => _userId;
+  String get storageMode => _storageMode;
 
-  Future<void> init() async {
+  Future<void> init({String? userId}) async {
+    _userId = userId ?? _getDefaultUserId();
+
+    final config = ConfigLoader.config;
+    final storageConfig = config?['storage'] as Map<String, dynamic>?;
+    _storageMode = storageConfig?['mode'] as String? ?? 'personal';
+
     if (kIsWeb) {
       await _initWeb();
       await _loadFromWeb();
       await _loadSettingsFromWeb();
     } else {
       final dir = await getApplicationDocumentsDirectory();
-      _basePath = p.join(dir.path, 'mako_meme');
+      _basePath = _getPlatformBasePath(dir.path);
       final storageDir = Directory(_basePath!);
       if (!await storageDir.exists()) {
         await storageDir.create(recursive: true);
       }
       _loadFromFile();
     }
+  }
+
+  String _getDefaultUserId() {
+    if (!kIsWeb) return 'default';
+    try {
+      final uri = Uri.base;
+      final userIdParam = uri.queryParameters['user'];
+      if (userIdParam != null && userIdParam.isNotEmpty) {
+        return userIdParam;
+      }
+    } catch (_) {}
+    return 'default';
+  }
+
+  String _getPlatformBasePath(String appDir) {
+    if (_storageMode == 'shared') {
+      return p.join(appDir, 'mako_meme', 'shared');
+    }
+    return p.join(appDir, 'mako_meme', 'users', _userId ?? 'default');
   }
 
   // ======================== Web 存储 (IndexedDB) ========================
@@ -46,7 +76,8 @@ class StorageService {
 
   Future<void> _loadFromWeb() async {
     try {
-      final raw = await webStorageGetJson('mako_memes');
+      final key = _storageMode == 'shared' ? 'mako_memes_shared' : 'mako_memes_${_userId ?? 'default'}';
+      final raw = await webStorageGetJson(key);
       if (raw != null && raw is String) {
         final data = jsonDecode(raw) as Map<String, dynamic>;
         _memes = (data['memes'] as List? ?? [])
@@ -63,11 +94,12 @@ class StorageService {
 
   Future<void> _saveToWeb() async {
     try {
+      final key = _storageMode == 'shared' ? 'mako_memes_shared' : 'mako_memes_${_userId ?? 'default'}';
       final data = jsonEncode({
         'memes': _memes.map((m) => m.toMap()).toList(),
         'folders': _folders.map((f) => f.toMap()).toList(),
       });
-      await webStorageSetJson('mako_memes', data);
+      await webStorageSetJson(key, data);
     } catch (_) {}
   }
 
@@ -353,7 +385,8 @@ class StorageService {
 
   Future<void> _loadSettingsFromWeb() async {
     try {
-      final raw = await webStorageGetJson('mako_settings_data');
+      final key = _storageMode == 'shared' ? 'mako_settings_shared' : 'mako_settings_${_userId ?? 'default'}';
+      final raw = await webStorageGetJson(key);
       if (raw is String && raw.isNotEmpty) {
         final data = jsonDecode(raw) as Map<String, dynamic>;
         _settings = data.map((k, v) => MapEntry(k, v.toString()));
@@ -365,7 +398,8 @@ class StorageService {
   Future<void> _saveSettings() async {
     if (kIsWeb) {
       try {
-        await webStorageSetJson('mako_settings_data', _settings);
+        final key = _storageMode == 'shared' ? 'mako_settings_shared' : 'mako_settings_${_userId ?? 'default'}';
+        await webStorageSetJson(key, _settings);
       } catch (_) {}
       return;
     }

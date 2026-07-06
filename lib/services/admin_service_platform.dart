@@ -23,6 +23,11 @@ Future<void> platformLoadConfig(String path) async {
   "admin": {
     "username": "",
     "password": ""
+  },
+  "storage": {
+    "mode": "personal",
+    "sharedPath": "shared",
+    "personalPath": "users"
   }
 }
 ''');
