@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/meme.dart';
 import '../providers/meme_provider.dart';
 
 class MultiSelectBar extends StatelessWidget {
@@ -31,6 +32,11 @@ class MultiSelectBar extends StatelessWidget {
               onPressed: () => _showMoveDialog(context, prov),
             ),
             IconButton(
+              icon: const Icon(Icons.label_outline, size: 20),
+              tooltip: '修改分类',
+              onPressed: () => _showTypeDialog(context, prov),
+            ),
+            IconButton(
               icon: const Icon(Icons.ios_share, size: 20),
               tooltip: '导出选中',
               onPressed: () => _exportSelected(context, prov),
@@ -60,6 +66,43 @@ class MultiSelectBar extends StatelessWidget {
             onPressed: () { prov.moveSelectedToFolder(f.id); Navigator.pop(dCtx); },
             child: Text(f.name),
           )),
+        ],
+      ),
+    );
+  }
+
+  void _showTypeDialog(BuildContext ctx, MemeProvider prov) {
+    final types = [
+      {'type': Meme.typeEmoji, 'label': '表情', 'icon': Icons.face},
+      {'type': Meme.typeGif, 'label': 'GIF', 'icon': Icons.gif},
+      {'type': Meme.typeImage, 'label': '图片', 'icon': Icons.image},
+      {'type': Meme.typeText, 'label': '文字', 'icon': Icons.text_fields},
+      {'type': Meme.typePortrait, 'label': '立绘', 'icon': Icons.portrait},
+      {'type': Meme.typeCg, 'label': 'CG', 'icon': Icons.photo_library},
+    ];
+
+    showDialog(
+      context: ctx,
+      builder: (dCtx) => AlertDialog(
+        title: const Text('设置分类'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: types.map((t) {
+            final type = t['type'] as String;
+            final label = t['label'] as String;
+            final icon = t['icon'] as IconData;
+            return ListTile(
+              leading: Icon(icon),
+              title: Text(label),
+              onTap: () {
+                prov.setSelectedType(type);
+                Navigator.pop(dCtx);
+              },
+            );
+          }).toList(),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dCtx), child: const Text('取消')),
         ],
       ),
     );

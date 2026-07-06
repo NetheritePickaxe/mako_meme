@@ -176,7 +176,7 @@ class StorageService {
     return p.join(base, relPath);
   }
 
-  Future<Meme> importFile(PlatformFile file, {String? folderId}) async {
+  Future<Meme> importFile(PlatformFile file, {String? folderId, String? type}) async {
     final id = _uuid.v4();
     final ext = _guessExt(file.name);
     final fileName = '$id$ext';
@@ -204,6 +204,8 @@ class StorageService {
       }
     }
 
+    final memeType = type ?? _guessType(ext);
+
     final meme = Meme(
       id: id,
       name: p.basenameWithoutExtension(file.name),
@@ -213,7 +215,7 @@ class StorageService {
       createdAt: now,
       mimeType: _guessMime(ext),
       fileSize: bytes?.length ?? file.size,
-      type: 'image',
+      type: memeType,
     );
     _memes.insert(0, meme);
     _save();
@@ -313,6 +315,14 @@ class StorageService {
     final idx = _memes.indexWhere((m) => m.id == id);
     if (idx != -1) {
       _memes[idx] = _memes[idx].copyWith(name: newName);
+      _save();
+    }
+  }
+
+  Future<void> setMemeType(String id, String type) async {
+    final idx = _memes.indexWhere((m) => m.id == id);
+    if (idx != -1) {
+      _memes[idx] = _memes[idx].copyWith(type: type);
       _save();
     }
   }
@@ -545,7 +555,7 @@ class StorageService {
                 createdAt: DateTime.now(),
                 mimeType: _guessMime(ext),
                 fileSize: await f.length(),
-                type: 'image',
+                type: _guessType(ext),
               ));
               count++;
             }
@@ -604,5 +614,10 @@ class StorageService {
     final dot = fileName.lastIndexOf('.');
     if (dot == -1) return '.png';
     return fileName.substring(dot).toLowerCase();
+  }
+
+  String _guessType(String ext) {
+    if (ext == '.gif') return Meme.typeGif;
+    return Meme.typeImage;
   }
 }

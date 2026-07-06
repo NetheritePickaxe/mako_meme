@@ -33,7 +33,7 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
   Future<void> _ensureBytes(int index) async {
     if (_bytesCache.containsKey(index)) return;
     final m = widget.memes[index];
-    if (m.type != 'image' || m.filePath.isEmpty) {
+    if (!m.isImageType || m.filePath.isEmpty) {
       _bytesCache[index] = null;
       return;
     }
@@ -84,6 +84,8 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
             onSelected: (v) {
               if (v == 'rename') {
                 _rename();
+              } else if (v == 'type') {
+                _showTypeDialog();
               } else if (v == 'delete') {
                 _confirmDelete();
               }
@@ -91,6 +93,8 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
             itemBuilder: (_) => [
               const PopupMenuItem(value: 'rename', child: ListTile(
                 leading: Icon(Icons.edit), title: Text('重命名'), dense: true)),
+              const PopupMenuItem(value: 'type', child: ListTile(
+                leading: Icon(Icons.label_outline), title: Text('修改分类'), dense: true)),
               const PopupMenuItem(value: 'delete', child: ListTile(
                 leading: Icon(Icons.delete, color: Colors.red),
                 title: Text('删除', style: TextStyle(color: Colors.red)), dense: true)),
@@ -111,9 +115,9 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                 if (bytes == null) {
                   return const Center(child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white));
                 }
-                if (m.type == 'image') {
+                if (m.isImageType) {
                   // GIF 用普通 Image.memory（支持动画），非 GIF 用 PhotoView（支持缩放）
-                  if (m.mimeType == 'image/gif') {
+                  if (m.type == Meme.typeGif) {
                     return Center(
                       child: InteractiveViewer(
                         child: Image.memory(bytes, fit: BoxFit.contain),
@@ -198,6 +202,47 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
     if (newName != null && newName.isNotEmpty) {
       if (mounted) context.read<MemeProvider>().renameMeme(_meme.id, newName);
     }
+  }
+
+  void _showTypeDialog() {
+    final types = [
+      {'type': Meme.typeEmoji, 'label': '表情', 'icon': Icons.face},
+      {'type': Meme.typeGif, 'label': 'GIF', 'icon': Icons.gif},
+      {'type': Meme.typeImage, 'label': '图片', 'icon': Icons.image},
+      {'type': Meme.typeText, 'label': '文字', 'icon': Icons.text_fields},
+      {'type': Meme.typePortrait, 'label': '立绘', 'icon': Icons.portrait},
+      {'type': Meme.typeCg, 'label': 'CG', 'icon': Icons.photo_library},
+    ];
+
+    showDialog(
+      context: context,
+      builder: (dCtx) => AlertDialog(
+        title: const Text('选择分类'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: types.map((t) {
+            final type = t['type'] as String;
+            final label = t['label'] as String;
+            final icon = t['icon'] as IconData;
+            final selected = _meme.type == type;
+            return ListTile(
+              leading: Icon(icon, color: selected ? Theme.of(dCtx).colorScheme.primary : null),
+              title: Text(label),
+              trailing: selected ? Icon(Icons.check, color: Theme.of(dCtx).colorScheme.primary) : null,
+              onTap: () async {
+                if (mounted) {
+                  context.read<MemeProvider>().setMemeType(_meme.id, type);
+                }
+                Navigator.pop(dCtx);
+              },
+            );
+          }).toList(),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dCtx), child: const Text('取消')),
+        ],
+      ),
+    );
   }
 
   void _confirmDelete() async {

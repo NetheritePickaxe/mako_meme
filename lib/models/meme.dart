@@ -1,4 +1,15 @@
 class Meme {
+  static const String typeEmoji = 'emoji';
+  static const String typeGif = 'gif';
+  static const String typeImage = 'image';
+  static const String typeText = 'text';
+  static const String typePortrait = 'portrait';
+  static const String typeCg = 'cg';
+
+  static const List<String> allTypes = [typeEmoji, typeGif, typeImage, typeText, typePortrait, typeCg];
+
+  bool get isImageType => type == typeImage || type == typeGif || type == typePortrait || type == typeCg;
+
   final String id;
   final String name;
   final String filePath;
@@ -8,7 +19,7 @@ class Meme {
   bool isFavorite;
   final String mimeType;
   final int fileSize;
-  final String type; // "image" | "emoji" | "text"
+  final String type;
   final String? textContent;
   final String? remotePath;
 
@@ -22,7 +33,7 @@ class Meme {
     this.isFavorite = false,
     this.mimeType = '',
     this.fileSize = 0,
-    this.type = 'image',
+    this.type = typeImage,
     this.textContent,
     this.remotePath,
   });

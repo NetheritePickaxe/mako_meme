@@ -115,6 +115,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Column(
                 children: [
                   custom.MakoSearchBar(onSearch: (q) => prov.setQuery(q)),
+                  _buildCategoryChips(prov),
                   if (prov.tagFilter.isNotEmpty || prov.folderFilter.isNotEmpty) _buildFilterChips(prov),
                   Expanded(
                     child: _buildMixedGrid(prov),
@@ -343,6 +344,71 @@ class _HomeScreenState extends State<HomeScreen> {
       onLongPress: onLongPress,
       dense: true,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+    );
+  }
+
+  Widget _buildCategoryChips(MemeProvider prov) {
+    final categories = [
+      {'type': Meme.typeEmoji, 'label': '表情', 'icon': Icons.face},
+      {'type': Meme.typeGif, 'label': 'GIF', 'icon': Icons.gif},
+      {'type': Meme.typeImage, 'label': '图片', 'icon': Icons.image},
+      {'type': Meme.typeText, 'label': '文字', 'icon': Icons.text_fields},
+      {'type': Meme.typePortrait, 'label': '立绘', 'icon': Icons.portrait},
+      {'type': Meme.typeCg, 'label': 'CG', 'icon': Icons.photo_library},
+    ];
+
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        itemCount: categories.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 6),
+        itemBuilder: (ctx, i) {
+          final cat = categories[i];
+          final type = cat['type'] as String;
+          final label = cat['label'] as String;
+          final icon = cat['icon'] as IconData;
+          final selected = prov.typeFilter.contains(type);
+          final theme = Theme.of(ctx);
+          final cs = theme.colorScheme;
+
+          return FilterChip(
+            label: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 16, color: selected ? cs.onSecondaryContainer : cs.onSurfaceVariant),
+                const SizedBox(width: 4),
+                Text(label, style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                  color: selected ? cs.onSecondaryContainer : cs.onSurface,
+                )),
+              ],
+            ),
+            selected: selected,
+            onSelected: (v) {
+              if (v) {
+                prov.setTypeFilter(type);
+              } else {
+                prov.clearTypeFilter();
+              }
+            },
+            showCheckmark: false,
+            selectedColor: cs.secondaryContainer,
+            backgroundColor: cs.surfaceContainerHighest.withValues(alpha: 0.4),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: BorderSide(
+                color: selected ? cs.secondary : cs.outline.withValues(alpha: 0.3),
+                width: selected ? 1.5 : 0.5,
+              ),
+            ),
+            visualDensity: VisualDensity.compact,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          );
+        },
+      ),
     );
   }
 

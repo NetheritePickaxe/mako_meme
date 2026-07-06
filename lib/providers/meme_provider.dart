@@ -25,8 +25,10 @@ class MemeProvider with ChangeNotifier {
   final Set<String> _sel = {};
   final Set<String> _tagFilter = {};
   final Set<String> _folderFilter = {};
+  final Set<String> _typeFilter = {};
 
   Set<String> get folderFilter => _folderFilter;
+  Set<String> get typeFilter => _typeFilter;
 
   MemeProvider(this._storage, this._settings);
 
@@ -94,6 +96,27 @@ class MemeProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  void toggleTypeFilter(String type) {
+    _typeFilter.contains(type) ? _typeFilter.remove(type) : _typeFilter.add(type);
+    _apply();
+    notifyListeners();
+  }
+
+  void clearTypeFilter() {
+    _typeFilter.clear();
+    _apply();
+    notifyListeners();
+  }
+
+  void setTypeFilter(String? type) {
+    _typeFilter.clear();
+    if (type != null) {
+      _typeFilter.add(type);
+    }
+    _apply();
+    notifyListeners();
+  }
+
   void setSort(SortBy b) {
     _sortBy = b;
     _apply();
@@ -152,6 +175,18 @@ class MemeProvider with ChangeNotifier {
 
   Future<void> renameMeme(String id, String newName) async {
     await _storage.renameMeme(id, newName);
+    await loadAll();
+  }
+
+  Future<void> setMemeType(String id, String type) async {
+    await _storage.setMemeType(id, type);
+    await loadAll();
+  }
+
+  Future<void> setSelectedType(String type) async {
+    for (final id in _sel) {
+      await _storage.setMemeType(id, type);
+    }
     await loadAll();
   }
 
@@ -243,6 +278,9 @@ class MemeProvider with ChangeNotifier {
     }
     if (_folderFilter.isNotEmpty) {
       list = list.where((m) => _folderFilter.any((fid) => m.folderId == fid)).toList();
+    }
+    if (_typeFilter.isNotEmpty) {
+      list = list.where((m) => _typeFilter.contains(m.type)).toList();
     }
     if (_query.isNotEmpty) {
       if (_query.startsWith('#')) {

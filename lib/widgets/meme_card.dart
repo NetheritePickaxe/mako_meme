@@ -30,7 +30,7 @@ class _MemeCardState extends State<MemeCard> {
   void _loadBytes() {
     if (!_loading) return;
     final storage = context.read<StorageService>();
-    if (widget.meme.type == 'image' && widget.meme.filePath.isNotEmpty) {
+    if (widget.meme.isImageType && widget.meme.filePath.isNotEmpty) {
       storage.readMemeBytes(widget.meme.filePath).then((b) {
         if (mounted) {
           setState(() {
@@ -110,13 +110,13 @@ class _MemeCardState extends State<MemeCard> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              if (widget.meme.type == 'image' && _loading)
+              if (widget.meme.isImageType && _loading)
                 const Center(child: CircularProgressIndicator(strokeWidth: 2))
-              else if (widget.meme.type == 'image' && _bytes != null)
+              else if (widget.meme.isImageType && _bytes != null)
                 Image.memory(_bytes!, fit: BoxFit.cover,
                   errorBuilder: (_, _, _) => _placeholder(),
                 )
-              else if (widget.meme.type == 'image')
+              else if (widget.meme.isImageType)
                 // 图片丢失（Web 刷新后）
                 Container(
                   color: Colors.grey.shade200,
@@ -137,8 +137,8 @@ class _MemeCardState extends State<MemeCard> {
                   padding: const EdgeInsets.all(8),
                   child: Center(child: Text(
                     widget.meme.textContent ?? '',
-                    style: TextStyle(fontSize: widget.meme.type == 'emoji' ? 28 : 16,
-                      fontWeight: widget.meme.type == 'text' ? FontWeight.w500 : FontWeight.normal,
+                    style: TextStyle(fontSize: widget.meme.type == Meme.typeEmoji ? 28 : 16,
+                      fontWeight: widget.meme.type == Meme.typeText ? FontWeight.w500 : FontWeight.normal,
                       color: Colors.black87),
                     textAlign: TextAlign.center, overflow: TextOverflow.ellipsis, maxLines: 4,
                   )),
@@ -161,18 +161,11 @@ class _MemeCardState extends State<MemeCard> {
                     child: isSelected ? const Icon(Icons.check, size: 14, color: Colors.white) : const SizedBox(width: 14, height: 14),
                   ),
                 ),
-              if (widget.meme.mimeType == 'image/gif')
+              if (widget.meme.type != Meme.typeImage)
                 Positioned(bottom: 6, left: 6,
                   child: Container(padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                     decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.6), borderRadius: BorderRadius.circular(4)),
-                    child: const Text('GIF', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                  ),
-                ),
-              if (widget.meme.type != 'image')
-                Positioned(bottom: 6, left: 6,
-                  child: Container(padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                    decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.6), borderRadius: BorderRadius.circular(4)),
-                    child: Text(widget.meme.type == 'emoji' ? 'Emoji' : '文本',
+                    child: Text(_typeLabel(widget.meme.type),
                       style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
                   ),
                 ),
@@ -229,6 +222,10 @@ class _MemeCardState extends State<MemeCard> {
           child: ListTile(leading: Icon(Icons.edit), title: Text('重命名'), dense: true),
         ),
         const PopupMenuItem<String>(
+          value: 'type',
+          child: ListTile(leading: Icon(Icons.label_outline), title: Text('修改分类'), dense: true),
+        ),
+        const PopupMenuItem<String>(
           value: 'copy',
           child: ListTile(leading: Icon(Icons.copy), title: Text('复制'), dense: true),
         ),
@@ -256,6 +253,7 @@ class _MemeCardState extends State<MemeCard> {
         case 'preview': _openViewer(); break;
         case 'reimport': _reimport(); break;
         case 'rename': _showRenameDialog(); break;
+        case 'type': _showTypeDialog(); break;
         case 'copy': _copyToClipboard(); break;
         case 'share': _shareMeme(); break;
         case 'favorite':
@@ -288,6 +286,47 @@ class _MemeCardState extends State<MemeCard> {
     }
   }
 
+  void _showTypeDialog() {
+    final types = [
+      {'type': Meme.typeEmoji, 'label': '表情', 'icon': Icons.face},
+      {'type': Meme.typeGif, 'label': 'GIF', 'icon': Icons.gif},
+      {'type': Meme.typeImage, 'label': '图片', 'icon': Icons.image},
+      {'type': Meme.typeText, 'label': '文字', 'icon': Icons.text_fields},
+      {'type': Meme.typePortrait, 'label': '立绘', 'icon': Icons.portrait},
+      {'type': Meme.typeCg, 'label': 'CG', 'icon': Icons.photo_library},
+    ];
+
+    showDialog(
+      context: context,
+      builder: (dCtx) => AlertDialog(
+        title: const Text('选择分类'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: types.map((t) {
+            final type = t['type'] as String;
+            final label = t['label'] as String;
+            final icon = t['icon'] as IconData;
+            final selected = widget.meme.type == type;
+            return ListTile(
+              leading: Icon(icon, color: selected ? Theme.of(dCtx).colorScheme.primary : null),
+              title: Text(label),
+              trailing: selected ? Icon(Icons.check, color: Theme.of(dCtx).colorScheme.primary) : null,
+              onTap: () async {
+                if (mounted) {
+                  context.read<MemeProvider>().setMemeType(widget.meme.id, type);
+                }
+                Navigator.pop(dCtx);
+              },
+            );
+          }).toList(),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dCtx), child: const Text('取消')),
+        ],
+      ),
+    );
+  }
+
   void _confirmDelete() async {
     final prov = context.read<MemeProvider>();
     final confirm = await showDialog<bool>(
@@ -310,6 +349,17 @@ class _MemeCardState extends State<MemeCard> {
     color: Colors.grey.shade200,
     child: Icon(Icons.broken_image, color: Colors.grey.shade400),
   );
+
+  String _typeLabel(String type) {
+    switch (type) {
+      case Meme.typeEmoji: return '表情';
+      case Meme.typeGif: return 'GIF';
+      case Meme.typeText: return '文字';
+      case Meme.typePortrait: return '立绘';
+      case Meme.typeCg: return 'CG';
+      default: return '';
+    }
+  }
 
   void _reimport() async {
     final result = await FilePicker.platform.pickFiles(type: FileType.image);
