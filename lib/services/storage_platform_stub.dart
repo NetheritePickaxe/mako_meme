@@ -1,4 +1,4 @@
-/// Web 存储存根 — 非 Web 平台返回 null/空操作
+// Web storage stub - no-op on non-web platforms
 import 'dart:typed_data';
 
 String? webStorageGetItem(String key) => null;

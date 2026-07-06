@@ -1,49 +1,20 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
-import 'package:metadata_god/metadata_god.dart';
 
 class CharacterCardService {
-  static const String _metaKey = 'chara';
-
   static Future<Map<String, dynamic>?> parseFromBytes(Uint8List bytes) async {
     try {
-      if (kIsWeb) {
-        return _parsePngMetaWeb(bytes);
-      } else {
-        return _parsePngMetaNative(bytes);
-      }
+      return _parsePngMeta(bytes);
     } catch (_) {
       return null;
     }
   }
 
   static Future<Map<String, dynamic>?> parseFromPath(String path) async {
-    try {
-      if (kIsWeb) return null;
-      final metadata = await MetadataGod.readMetadata(path: path);
-      final charaData = metadata.get('chara')?.toString();
-      if (charaData != null && charaData.isNotEmpty) {
-        return jsonDecode(charaData) as Map<String, dynamic>;
-      }
-      return null;
-    } catch (_) {
-      return null;
-    }
+    return null;
   }
 
-  static Future<Map<String, dynamic>?> _parsePngMetaNative(Uint8List bytes) async {
-    try {
-      final tempDir = await _getTempDir();
-      final tempPath = '${tempDir.path}/temp_char_card.png';
-      await Future(() => null);
-      return null;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  static Map<String, dynamic>? _parsePngMetaWeb(Uint8List bytes) {
+  static Map<String, dynamic>? _parsePngMeta(Uint8List bytes) {
     try {
       final metaData = _extractITxtChunk(bytes);
       if (metaData != null) {
@@ -107,10 +78,6 @@ class CharacterCardService {
            (bytes[offset + 1] << 16) |
            (bytes[offset + 2] << 8) |
            bytes[offset + 3];
-  }
-
-  static Future<Map<String, dynamic>?> _getTempDir() async {
-    return {};
   }
 
   static bool isValidCharacterCard(Map<String, dynamic>? data) {

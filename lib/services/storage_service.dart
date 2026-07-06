@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:file_picker/file_picker.dart';
@@ -108,7 +107,7 @@ class StorageService {
       final key = _storageMode == 'shared' ? 'mako_memes_shared' : 'mako_memes_${_userId ?? 'default'}';
       final raw = await webStorageGetJson(key);
       if (raw != null && raw is String) {
-        final data = jsonDecode(raw) as Map<String, dynamic>;
+        final Map<String, dynamic> data = jsonDecode(raw);
         final memes = (data['memes'] as List? ?? [])
             .cast<Map<String, dynamic>>()
             .map((m) => Meme.fromMap(m))
@@ -142,7 +141,7 @@ class StorageService {
 
     if (await oldMemes.exists()) {
       try {
-        final data = jsonDecode(await oldMemes.readAsString()) as Map<String, dynamic>;
+        final Map<String, dynamic> data = jsonDecode(await oldMemes.readAsString());
         memes = (data['memes'] as List? ?? [])
             .cast<Map<String, dynamic>>()
             .map((m) => Meme.fromMap(m))
@@ -154,7 +153,7 @@ class StorageService {
       } catch (_) {}
     } else if (await oldMeta.exists()) {
       try {
-        final data = jsonDecode(await oldMeta.readAsString()) as Map<String, dynamic>;
+        final Map<String, dynamic> data = jsonDecode(await oldMeta.readAsString());
         folders = (data['folders'] as List? ?? [])
             .cast<Map<String, dynamic>>()
             .map((f) => MemeFolder.fromMap(f))
@@ -170,7 +169,7 @@ class StorageService {
 
           for (final f in files) {
             try {
-              final chunkData = jsonDecode(f.readAsStringSync()) as Map<String, dynamic>;
+              final Map<String, dynamic> chunkData = jsonDecode(f.readAsStringSync());
               final chunkMemes = (chunkData['memes'] as List? ?? [])
                   .cast<Map<String, dynamic>>()
                   .map((m) => Meme.fromMap(m))
@@ -201,6 +200,14 @@ class StorageService {
     } catch (_) {}
   }
 
+  // ======================== 辅助方法 ========================
+
+  Map<String, dynamic>? _castMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return Map<String, dynamic>.from(value);
+    return null;
+  }
+
   // ======================== Meme CRUD ========================
 
   List<Meme> getAllMemes() {
@@ -209,10 +216,9 @@ class StorageService {
     for (var i = 0; i < _memeBox!.length; i++) {
       final key = _memeBox!.keyAt(i);
       final value = _memeBox!.get(key);
-      if (value is Map) {
-        memes.add(Meme.fromMap(Map<String, dynamic>.from(value as Map)));
-      } else if (value is Map<String, dynamic>) {
-        memes.add(Meme.fromMap(value));
+      final map = _castMap(value);
+      if (map != null) {
+        memes.add(Meme.fromMap(map));
       }
     }
     memes.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -225,10 +231,9 @@ class StorageService {
     for (var i = 0; i < _folderBox!.length; i++) {
       final key = _folderBox!.keyAt(i);
       final value = _folderBox!.get(key);
-      if (value is Map) {
-        folders.add(MemeFolder.fromMap(Map<String, dynamic>.from(value as Map)));
-      } else if (value is Map<String, dynamic>) {
-        folders.add(MemeFolder.fromMap(value));
+      final map = _castMap(value);
+      if (map != null) {
+        folders.add(MemeFolder.fromMap(map));
       }
     }
     folders.sort((a, b) => a.createdAt.compareTo(b.createdAt));
@@ -263,10 +268,9 @@ class StorageService {
     final memeId = _hashBox!.get(hash) as String?;
     if (memeId == null) return null;
     final value = _memeBox!.get(memeId);
-    if (value == null) return null;
-    if (value is Map<String, dynamic>) return Meme.fromMap(value);
-    if (value is Map) return Meme.fromMap(Map<String, dynamic>.from(value as Map));
-    return null;
+    final map = _castMap(value);
+    if (map == null) return null;
+    return Meme.fromMap(map);
   }
 
   Future<Meme> importFile(PlatformFile file, {String? folderId, String? type}) async {
@@ -295,13 +299,13 @@ class StorageService {
         fileHash = await _computeFileHash(dest.path);
       } else if (file.bytes != null) {
         bytes = file.bytes;
-        fileHash = _computeHash(bytes!);
+        fileHash = _computeHash(bytes);
         await dest.writeAsBytes(bytes);
       }
     }
 
     if (fileHash != null) {
-      final existing = await _findByHash(fileHash!);
+      final existing = await _findByHash(fileHash);
       if (existing != null) {
         if (!kIsWeb) {
           final dest = File(p.join(_basePath!, filePath));
@@ -320,7 +324,10 @@ class StorageService {
       if (bytes != null) {
         characterData = await CharacterCardService.parseFromBytes(bytes);
       } else if (file.path != null) {
-        characterData = await CharacterCardService.parseFromPath(file.path!);
+        try {
+          final fileBytes = await File(file.path!).readAsBytes();
+          characterData = await CharacterCardService.parseFromBytes(fileBytes);
+        } catch (_) {}
       }
 
       if (CharacterCardService.isValidCharacterCard(characterData)) {
@@ -390,18 +397,18 @@ class StorageService {
     return results;
   }
 
+  Meme? _getMeme(String id) {
+    if (_memeBox == null) return null;
+    final value = _memeBox!.get(id);
+    final map = _castMap(value);
+    if (map == null) return null;
+    return Meme.fromMap(map);
+  }
+
   Future<void> reimportMeme(String memeId, PlatformFile file) async {
     if (_memeBox == null) return;
-    final value = _memeBox!.get(memeId);
-    if (value == null) return;
-    Meme old;
-    if (value is Map<String, dynamic>) {
-      old = Meme.fromMap(value);
-    } else if (value is Map) {
-      old = Meme.fromMap(Map<String, dynamic>.from(value as Map));
-    } else {
-      return;
-    }
+    final old = _getMeme(memeId);
+    if (old == null) return;
 
     Uint8List? bytes;
     String? newHash;
@@ -410,7 +417,7 @@ class StorageService {
       bytes = file.bytes;
       if (bytes != null) {
         newHash = _computeHash(bytes);
-        await webStorageSetBinary(old.filePath, bytes!);
+        await webStorageSetBinary(old.filePath, bytes);
       }
     } else {
       final dest = File(p.join(_basePath!, old.filePath));
@@ -420,7 +427,7 @@ class StorageService {
         newHash = await _computeFileHash(dest.path);
       } else if (file.bytes != null) {
         bytes = file.bytes;
-        newHash = _computeHash(bytes!);
+        newHash = _computeHash(bytes);
         await dest.writeAsBytes(bytes);
       }
     }
@@ -463,13 +470,7 @@ class StorageService {
 
   Future<void> deleteMeme(String id) async {
     if (_memeBox == null) return;
-    final value = _memeBox!.get(id);
-    Meme? meme;
-    if (value is Map<String, dynamic>) {
-      meme = Meme.fromMap(value);
-    } else if (value is Map) {
-      meme = Meme.fromMap(Map<String, dynamic>.from(value as Map));
-    }
+    final meme = _getMeme(id);
     if (meme == null) return;
 
     if (!kIsWeb && meme.filePath.isNotEmpty) {
@@ -498,71 +499,36 @@ class StorageService {
 
   Future<void> renameMeme(String id, String newName) async {
     if (_memeBox == null) return;
-    final value = _memeBox!.get(id);
-    Meme meme;
-    if (value is Map<String, dynamic>) {
-      meme = Meme.fromMap(value);
-    } else if (value is Map) {
-      meme = Meme.fromMap(Map<String, dynamic>.from(value as Map));
-    } else {
-      return;
-    }
+    final meme = _getMeme(id);
+    if (meme == null) return;
     await _memeBox!.put(id, meme.copyWith(name: newName).toMap());
   }
 
   Future<void> setMemeType(String id, String type) async {
     if (_memeBox == null) return;
-    final value = _memeBox!.get(id);
-    Meme meme;
-    if (value is Map<String, dynamic>) {
-      meme = Meme.fromMap(value);
-    } else if (value is Map) {
-      meme = Meme.fromMap(Map<String, dynamic>.from(value as Map));
-    } else {
-      return;
-    }
+    final meme = _getMeme(id);
+    if (meme == null) return;
     await _memeBox!.put(id, meme.copyWith(type: type).toMap());
   }
 
   Future<void> updateCharacterData(String id, Map<String, dynamic> data) async {
     if (_memeBox == null) return;
-    final value = _memeBox!.get(id);
-    Meme meme;
-    if (value is Map<String, dynamic>) {
-      meme = Meme.fromMap(value);
-    } else if (value is Map) {
-      meme = Meme.fromMap(Map<String, dynamic>.from(value as Map));
-    } else {
-      return;
-    }
+    final meme = _getMeme(id);
+    if (meme == null) return;
     await _memeBox!.put(id, meme.copyWith(characterData: data).toMap());
   }
 
   Future<void> toggleFavorite(String id) async {
     if (_memeBox == null) return;
-    final value = _memeBox!.get(id);
-    Meme meme;
-    if (value is Map<String, dynamic>) {
-      meme = Meme.fromMap(value);
-    } else if (value is Map) {
-      meme = Meme.fromMap(Map<String, dynamic>.from(value as Map));
-    } else {
-      return;
-    }
+    final meme = _getMeme(id);
+    if (meme == null) return;
     await _memeBox!.put(id, meme.copyWith(isFavorite: !meme.isFavorite).toMap());
   }
 
   Future<void> moveToFolder(String memeId, String? folderId) async {
     if (_memeBox == null) return;
-    final value = _memeBox!.get(memeId);
-    Meme meme;
-    if (value is Map<String, dynamic>) {
-      meme = Meme.fromMap(value);
-    } else if (value is Map) {
-      meme = Meme.fromMap(Map<String, dynamic>.from(value as Map));
-    } else {
-      return;
-    }
+    final meme = _getMeme(memeId);
+    if (meme == null) return;
     await _memeBox!.put(memeId, meme.copyWith(folderId: folderId).toMap());
   }
 
@@ -604,23 +570,14 @@ class StorageService {
     for (var i = 0; i < _memeBox!.length; i++) {
       final key = _memeBox!.keyAt(i);
       final value = _memeBox!.get(key);
-      Map<String, dynamic>? map;
-      if (value is Map<String, dynamic>) {
-        map = value;
-      } else if (value is Map) {
-        map = Map<String, dynamic>.from(value as Map);
-      }
+      final map = _castMap(value);
       if (map != null && map['folderId'] == id) {
         folderMemes.add(key);
       }
     }
     for (final memeId in folderMemes) {
-      final value = _memeBox!.get(memeId);
-      if (value is Map<String, dynamic>) {
-        final meme = Meme.fromMap(value);
-        await _memeBox!.put(memeId, meme.copyWith(folderId: null).toMap());
-      } else if (value is Map) {
-        final meme = Meme.fromMap(Map<String, dynamic>.from(value as Map));
+      final meme = _getMeme(memeId);
+      if (meme != null) {
         await _memeBox!.put(memeId, meme.copyWith(folderId: null).toMap());
       }
     }
@@ -648,7 +605,7 @@ class StorageService {
       final defaultPath = _getPlatformBasePath(dir.path);
       final file = File(p.join(defaultPath, 'settings.json'));
       if (file.existsSync()) {
-        final data = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+        final Map<String, dynamic> data = jsonDecode(file.readAsStringSync());
         _settings = data.map((k, v) => MapEntry(k, v.toString()));
       }
     } catch (_) {}
@@ -660,7 +617,7 @@ class StorageService {
     final file = File(p.join(_basePath!, 'settings.json'));
     if (file.existsSync()) {
       try {
-        final data = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+        final Map<String, dynamic> data = jsonDecode(file.readAsStringSync());
         _settings = data.map((k, v) => MapEntry(k, v.toString()));
       } catch (_) {}
     }
@@ -672,7 +629,7 @@ class StorageService {
       final key = _storageMode == 'shared' ? 'mako_settings_shared' : 'mako_settings_${_userId ?? 'default'}';
       final raw = await webStorageGetJson(key);
       if (raw is String && raw.isNotEmpty) {
-        final data = jsonDecode(raw) as Map<String, dynamic>;
+        final Map<String, dynamic> data = jsonDecode(raw);
         _settings = data.map((k, v) => MapEntry(k, v.toString()));
       }
     } catch (_) {}
@@ -822,7 +779,7 @@ class StorageService {
       List<MemeFolder> importedFolders = [];
 
       if (await metaFile.exists()) {
-        final metaData = jsonDecode(await metaFile.readAsString()) as Map<String, dynamic>;
+        final Map<String, dynamic> metaData = jsonDecode(await metaFile.readAsString());
         importedFolders = (metaData['folders'] as List? ?? [])
             .cast<Map<String, dynamic>>()
             .map((f) => MemeFolder.fromMap(f))
@@ -835,7 +792,7 @@ class StorageService {
       for (final line in lines) {
         if (line.trim().isEmpty) continue;
         try {
-          final data = jsonDecode(line) as Map<String, dynamic>;
+          final Map<String, dynamic> data = jsonDecode(line);
           importedMemes.add(Meme.fromMap(data));
         } catch (_) {}
       }
@@ -890,7 +847,7 @@ class StorageService {
       final oldMemesFile = File(p.join(extractDir.path, 'memes.json'));
 
       if (await oldMemesFile.exists()) {
-        final data = jsonDecode(await oldMemesFile.readAsString()) as Map<String, dynamic>;
+        final Map<String, dynamic> data = jsonDecode(await oldMemesFile.readAsString());
         importedMemes = (data['memes'] as List? ?? [])
             .cast<Map<String, dynamic>>()
             .map((m) => Meme.fromMap(m))
@@ -900,7 +857,7 @@ class StorageService {
             .map((f) => MemeFolder.fromMap(f))
             .toList();
       } else if (await metaFile.exists()) {
-        final data = jsonDecode(await metaFile.readAsString()) as Map<String, dynamic>;
+        final Map<String, dynamic> data = jsonDecode(await metaFile.readAsString());
         importedFolders = (data['folders'] as List? ?? [])
             .cast<Map<String, dynamic>>()
             .map((f) => MemeFolder.fromMap(f))
@@ -911,7 +868,7 @@ class StorageService {
             .where((f) => p.basename(f.path).startsWith('memes_') && p.extension(f.path) == '.json');
         for (final f in chunkFiles) {
           try {
-            final chunkData = jsonDecode(f.readAsStringSync()) as Map<String, dynamic>;
+            final Map<String, dynamic> chunkData = jsonDecode(f.readAsStringSync());
             final chunkMemes = (chunkData['memes'] as List? ?? [])
                 .cast<Map<String, dynamic>>()
                 .map((m) => Meme.fromMap(m))
@@ -971,16 +928,8 @@ class StorageService {
     final success = await webDavService.uploadFile(remotePath, bytes);
 
     if (success && _memeBox != null) {
-      final value = _memeBox!.get(meme.id);
-      if (value != null) {
-        Meme m;
-        if (value is Map<String, dynamic>) {
-          m = Meme.fromMap(value);
-        } else if (value is Map) {
-          m = Meme.fromMap(Map<String, dynamic>.from(value as Map));
-        } else {
-          return success;
-        }
+      final m = _getMeme(meme.id);
+      if (m != null) {
         await _memeBox!.put(meme.id, m.copyWith(remotePath: remotePath).toMap());
       }
     }
