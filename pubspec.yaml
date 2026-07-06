@@ -33,7 +33,7 @@ dependencies:
   hive: ^2.2.3
   idb_shim: ^2.9.4
   sembast_web: ^2.4.5
-  metadata_god: ^2.1.0
+  metadata_god: ^1.1.0
 
 dev_dependencies:
   flutter_test:

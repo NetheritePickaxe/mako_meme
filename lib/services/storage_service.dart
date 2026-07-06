@@ -9,7 +9,6 @@ import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 import 'package:archive/archive_io.dart';
 import 'package:hive/hive.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import '../models/meme.dart';
 import '../models/folder.dart';
 import 'character_card_service.dart';
