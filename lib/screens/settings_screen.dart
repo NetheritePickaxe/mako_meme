@@ -50,7 +50,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 16),
 
           _sectionHeader('数据'),
-          if (defaultTargetPlatform == TargetPlatform.android) ...[
+          if (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.windows) ...[
             _storageLocationTile(settings),
             const Divider(indent: 16, endIndent: 16),
           ],
