@@ -21,6 +21,12 @@ class StorageService {
   String? _userId;
   String _storageMode = 'personal';
 
+  static const int _chunkSize = 1000;
+  static const String _metaFile = 'meta.json';
+  static const String _memesPrefix = 'memes_';
+  static const String _oldMemesFile = 'memes.json';
+  static const int _storageVersion = 2;
+
   String get basePath => _basePath ?? '.';
   String? get userId => _userId;
   String get storageMode => _storageMode;
@@ -130,30 +136,144 @@ class StorageService {
   // ======================== 文件存储 (Native) ========================
 
   void _loadFromFile() {
-    final memesFile = File(p.join(_basePath!, 'memes.json'));
-    if (memesFile.existsSync()) {
-      try {
-        final data = jsonDecode(memesFile.readAsStringSync()) as Map<String, dynamic>;
-        _memes = (data['memes'] as List? ?? [])
-            .cast<Map<String, dynamic>>()
-            .map((m) => Meme.fromMap(m))
-            .toList();
+    _migrateIfNeeded();
+    _loadMeta();
+    _loadAllChunks();
+  }
+
+  void _migrateIfNeeded() {
+    final oldFile = File(p.join(_basePath!, _oldMemesFile));
+    if (!oldFile.existsSync()) return;
+
+    try {
+      final data = jsonDecode(oldFile.readAsStringSync()) as Map<String, dynamic>;
+      final memes = (data['memes'] as List? ?? [])
+          .cast<Map<String, dynamic>>()
+          .map((m) => Meme.fromMap(m))
+          .toList();
+      final folders = (data['folders'] as List? ?? [])
+          .cast<Map<String, dynamic>>()
+          .map((f) => MemeFolder.fromMap(f))
+          .toList();
+
+      _memes = memes;
+      _folders = folders;
+      _saveMeta();
+      _saveAllChunks();
+
+      oldFile.renameSync(p.join(_basePath!, '${_oldMemesFile}.bak'));
+    } catch (_) {}
+  }
+
+  void _loadMeta() {
+    final metaFile = File(p.join(_basePath!, _metaFile));
+    if (!metaFile.existsSync()) {
+      _folders = [];
+      return;
+    }
+    try {
+      final data = jsonDecode(metaFile.readAsStringSync()) as Map<String, dynamic>;
+      final version = data['version'] as int? ?? 1;
+      if (version < _storageVersion) {
+        _migrateFromMetaV1(data);
+      } else {
         _folders = (data['folders'] as List? ?? [])
             .cast<Map<String, dynamic>>()
             .map((f) => MemeFolder.fromMap(f))
             .toList();
+      }
+    } catch (_) {
+      _folders = [];
+    }
+  }
+
+  void _migrateFromMetaV1(Map<String, dynamic> data) {
+    _folders = (data['folders'] as List? ?? [])
+        .cast<Map<String, dynamic>>()
+        .map((f) => MemeFolder.fromMap(f))
+        .toList();
+    _memes = (data['memes'] as List? ?? [])
+        .cast<Map<String, dynamic>>()
+        .map((m) => Meme.fromMap(m))
+        .toList();
+    _saveMeta();
+    _saveAllChunks();
+  }
+
+  void _loadAllChunks() {
+    _memes = [];
+    final dir = Directory(_basePath!);
+    if (!dir.existsSync()) return;
+
+    final files = dir.listSync()
+        .whereType<File>()
+        .where((f) => p.basename(f.path).startsWith(_memesPrefix) && p.extension(f.path) == '.json')
+        .map((f) {
+          final name = p.basenameWithoutExtension(f.path);
+          final numStr = name.substring(_memesPrefix.length);
+          final index = int.tryParse(numStr);
+          return {'file': f, 'index': index};
+        })
+        .where((e) => e['index'] != null)
+        .toList()
+      ..sort((a, b) => (a['index'] as int).compareTo(b['index'] as int));
+
+    for (final item in files) {
+      final file = item['file'] as File;
+      try {
+        final data = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+        final chunkMemes = (data['memes'] as List? ?? [])
+            .cast<Map<String, dynamic>>()
+            .map((m) => Meme.fromMap(m))
+            .toList();
+        _memes.addAll(chunkMemes);
       } catch (_) {}
     }
   }
 
   void _saveToFile() {
     try {
-      final memesFile = File(p.join(_basePath!, 'memes.json'));
-      memesFile.writeAsStringSync(jsonEncode({
-        'memes': _memes.map((m) => m.toMap()).toList(),
-        'folders': _folders.map((f) => f.toMap()).toList(),
-      }));
+      _saveMeta();
+      _saveAllChunks();
     } catch (_) {}
+  }
+
+  void _saveMeta() {
+    final metaFile = File(p.join(_basePath!, _metaFile));
+    metaFile.writeAsStringSync(jsonEncode({
+      'version': _storageVersion,
+      'folders': _folders.map((f) => f.toMap()).toList(),
+    }));
+  }
+
+  void _saveAllChunks() {
+    final dir = Directory(_basePath!);
+    if (!dir.existsSync()) dir.createSync(recursive: true);
+
+    final existingChunks = dir.listSync()
+        .whereType<File>()
+        .where((f) => p.basename(f.path).startsWith(_memesPrefix) && p.extension(f.path) == '.json')
+        .toList();
+
+    final chunkCount = (_memes.length / _chunkSize).ceil();
+    for (var i = 0; i < chunkCount; i++) {
+      final start = i * _chunkSize;
+      final end = min(start + _chunkSize, _memes.length);
+      final chunk = _memes.sublist(start, end);
+      final chunkFile = File(p.join(_basePath!, '${_memesPrefix}${i.toString().padLeft(3, '0')}.json'));
+      chunkFile.writeAsStringSync(jsonEncode({
+        'memes': chunk.map((m) => m.toMap()).toList(),
+      }));
+    }
+
+    for (final file in existingChunks) {
+      final name = p.basename(file.path);
+      final numStr = name.substring(_memesPrefix.length).replaceAll('.json', '');
+      final index = int.tryParse(numStr);
+      if (index != null && index >= chunkCount) {
+        file.deleteSync();
+      }
+    }
   }
 
   void _save() {
@@ -456,9 +576,16 @@ class StorageService {
       final memesDir = Directory(p.join(exportDir.path, 'memes'));
       await memesDir.create();
 
-      await File(p.join(_basePath!, 'memes.json')).copy(
-        p.join(exportDir.path, 'memes.json'),
+      await File(p.join(_basePath!, _metaFile)).copy(
+        p.join(exportDir.path, _metaFile),
       );
+
+      final chunkFiles = Directory(_basePath!).listSync()
+          .whereType<File>()
+          .where((f) => p.basename(f.path).startsWith(_memesPrefix) && p.extension(f.path) == '.json');
+      for (final f in chunkFiles) {
+        await f.copy(p.join(exportDir.path, p.basename(f.path)));
+      }
 
       final srcMemesDir = Directory(p.join(_basePath!, 'memes'));
       if (await srcMemesDir.exists()) {
@@ -501,11 +628,55 @@ class StorageService {
       }
       inputStream.close();
 
-      final hasMeta = await File(p.join(extractDir.path, 'memes.json')).exists();
+      final hasMeta = await File(p.join(extractDir.path, _metaFile)).exists();
+      final hasOldMemes = await File(p.join(extractDir.path, _oldMemesFile)).exists();
 
       if (hasMeta) {
         final data = jsonDecode(
-          await File(p.join(extractDir.path, 'memes.json')).readAsString(),
+          await File(p.join(extractDir.path, _metaFile)).readAsString(),
+        ) as Map<String, dynamic>;
+
+        final importedFolders = (data['folders'] as List? ?? [])
+            .cast<Map<String, dynamic>>()
+            .map((f) => MemeFolder.fromMap(f))
+            .toList();
+
+        final importedMemes = <Meme>[];
+        final chunkFiles = Directory(extractDir.path).listSync()
+            .whereType<File>()
+            .where((f) => p.basename(f.path).startsWith(_memesPrefix) && p.extension(f.path) == '.json');
+        for (final f in chunkFiles) {
+          try {
+            final chunkData = jsonDecode(f.readAsStringSync()) as Map<String, dynamic>;
+            final chunkMemes = (chunkData['memes'] as List? ?? [])
+                .cast<Map<String, dynamic>>()
+                .map((m) => Meme.fromMap(m))
+                .toList();
+            importedMemes.addAll(chunkMemes);
+          } catch (_) {}
+        }
+
+        final srcImages = Directory(p.join(extractDir.path, 'memes'));
+        if (await srcImages.exists()) {
+          final dstImages = Directory(p.join(_basePath!, 'memes'));
+          if (!await dstImages.exists()) await dstImages.create(recursive: true);
+          await for (final f in srcImages.list()) {
+            if (f is File) {
+              await f.copy(p.join(dstImages.path, p.basename(f.path)));
+            }
+          }
+        }
+
+        _memes = importedMemes;
+        _folders = importedFolders;
+        _save();
+        await extractDir.delete(recursive: true);
+        return 0;
+      }
+
+      if (hasOldMemes) {
+        final data = jsonDecode(
+          await File(p.join(extractDir.path, _oldMemesFile)).readAsString(),
         ) as Map<String, dynamic>;
 
         final importedMemes = (data['memes'] as List? ?? [])
