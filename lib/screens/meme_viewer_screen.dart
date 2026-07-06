@@ -47,7 +47,6 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
   @override
   Widget build(BuildContext context) {
     final prov = context.watch<MemeProvider>();
-    final theme = Theme.of(context);
 
     return Scaffold(
       backgroundColor: Colors.black,
