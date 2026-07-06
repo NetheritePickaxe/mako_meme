@@ -451,14 +451,6 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (prov.folderId == null) ...[
-              ListTile(
-                leading: const Icon(Icons.create_new_folder),
-                title: Text(l10n.tr('new_folder')),
-                onTap: () { Navigator.pop(bCtx); _showCreateFolderDialog(ctx, prov); },
-              ),
-              const Divider(),
-            ],
             ListTile(
               leading: const Icon(Icons.image),
               title: Text(l10n.tr('import_images')),
@@ -471,6 +463,14 @@ class _HomeScreenState extends State<HomeScreen> {
               subtitle: const Text('Plain text or Emoji'),
               onTap: () { Navigator.pop(bCtx); _importText(ctx, prov); },
             ),
+            if (prov.folderId == null) ...[
+              ListTile(
+                leading: const Icon(Icons.create_new_folder),
+                title: Text(l10n.tr('new_folder')),
+                onTap: () { Navigator.pop(bCtx); _showCreateFolderDialog(ctx, prov); },
+              ),
+              const Divider(),
+            ],
             const Divider(),
             ListTile(
               leading: const Icon(Icons.file_download_outlined),
