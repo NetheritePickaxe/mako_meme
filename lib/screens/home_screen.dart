@@ -155,7 +155,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showImportMenu(context, prov),
-        child: const Icon(CupertinoIcons.add, size: 40),
+        child: const Icon(CupertinoIcons.add, size: 30),
       ),
     );
   }
