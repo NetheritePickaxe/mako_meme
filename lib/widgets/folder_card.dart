@@ -64,7 +64,7 @@ class FolderCard extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.folder, size: 48, color: color),
+                Icon(Icons.folder, size: 48, color: isActive ? Theme.of(context).colorScheme.tertiary : color),
                 const SizedBox(height: 8),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8),

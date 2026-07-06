@@ -254,7 +254,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               runSpacing: 6,
               children: [
                 preset.primary,
-                if (preset.surfaceContainerHighest != null) preset.surfaceContainerHighest!,
                 preset.secondary,
                 preset.tertiary,
               ].map((c) {

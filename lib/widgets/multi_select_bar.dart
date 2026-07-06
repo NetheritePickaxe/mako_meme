@@ -32,7 +32,7 @@ class MultiSelectBar extends StatelessWidget {
               onPressed: () => _showMoveDialog(context, prov),
             ),
             IconButton(
-              icon: Icon(Icons.auto_awesome, size: 20, color: Theme.of(context).colorScheme.primary),
+              icon: Icon(Icons.auto_awesome, size: 20, color: Theme.of(context).colorScheme.tertiary),
               tooltip: '设置场景',
               onPressed: () => _showMoodDialog(context, prov),
             ),

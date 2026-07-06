@@ -148,20 +148,20 @@ class _MemeCardState extends State<MemeCard> {
                 Positioned(top: 6, right: widget.meme.isFavorite ? 30 : 6,
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                    decoration: BoxDecoration(color: (findMoodById(widget.meme.mood)?.color ?? Colors.grey).withValues(alpha: 0.85),
+                    decoration: BoxDecoration(color: Theme.of(context).colorScheme.tertiaryContainer,
                       borderRadius: BorderRadius.circular(4)),
                     child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(findMoodById(widget.meme.mood)?.icon ?? Icons.help, size: 10, color: Colors.white),
+                      Icon(findMoodById(widget.meme.mood)?.icon ?? Icons.help, size: 10, color: Theme.of(context).colorScheme.onTertiaryContainer),
                       const SizedBox(width: 2),
-                      Text(findMoodById(widget.meme.mood)?.name ?? '', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                      Text(findMoodById(widget.meme.mood)?.name ?? '', style: TextStyle(color: Theme.of(context).colorScheme.onTertiaryContainer, fontSize: 9, fontWeight: FontWeight.bold)),
                     ]),
                   ),
                 ),
               if (widget.meme.isFavorite)
                 Positioned(top: 6, right: 6,
                   child: Container(padding: const EdgeInsets.all(3),
-                    decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.85), shape: BoxShape.circle),
-                    child: const Icon(Icons.favorite, size: 14, color: Colors.white),
+                    decoration: BoxDecoration(color: Theme.of(context).colorScheme.tertiary, shape: BoxShape.circle),
+                    child: Icon(Icons.favorite, size: 14, color: Theme.of(context).colorScheme.onTertiary),
                   ),
                 ),
               if (isMulti)

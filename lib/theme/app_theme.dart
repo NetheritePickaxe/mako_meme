@@ -65,7 +65,6 @@ class AppTheme {
       primary: Color(0xFF9cd7e2),
       secondary: Color(0xFFF19eb6),
       tertiary: Color(0xFFc78dbd),
-      surfaceContainerHighest: Color(0xFFfdd97c),
     ),
   ];
 
