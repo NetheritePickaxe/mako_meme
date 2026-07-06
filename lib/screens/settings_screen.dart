@@ -89,26 +89,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
           const SizedBox(height: 16),
 
-          _sectionHeader('用户认证'),
-          SwitchListTile(
-            secondary: const Icon(Icons.security_outlined),
-            title: const Text('启用用户认证'),
-            subtitle: const Text('支持多用户切换和权限控制'),
-            value: settings.useUserAuth,
-            onChanged: (v) => settings.setUseUserAuth(v),
-          ),
-          if (settings.useUserAuth) ...[
-            ListTile(
-              leading: const Icon(Icons.person_outline),
-              title: const Text('当前用户'),
-              subtitle: Text(settings.currentUserId ?? '未登录'),
-              onTap: () => _showUserAuthDialog(context),
+          if (kIsWeb) ...[
+            _sectionHeader('用户认证'),
+            SwitchListTile(
+              secondary: const Icon(Icons.security_outlined),
+              title: const Text('启用用户认证'),
+              subtitle: const Text('支持多用户切换和权限控制'),
+              value: settings.useUserAuth,
+              onChanged: (v) => settings.setUseUserAuth(v),
             ),
-            ListTile(
-              leading: const Icon(Icons.login),
-              title: const Text('切换用户'),
-              onTap: () => _showUserAuthDialog(context),
-            ),
+            if (settings.useUserAuth) ...[
+              ListTile(
+                leading: const Icon(Icons.person_outline),
+                title: const Text('当前用户'),
+                subtitle: Text(settings.currentUserId ?? '未登录'),
+                onTap: () => _showUserAuthDialog(context),
+              ),
+              ListTile(
+                leading: const Icon(Icons.login),
+                title: const Text('切换用户'),
+                onTap: () => _showUserAuthDialog(context),
+              ),
+            ],
           ],
           const SizedBox(height: 16),
 
