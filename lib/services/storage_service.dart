@@ -8,19 +8,21 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 import 'package:archive/archive_io.dart';
-import 'package:isar/isar.dart';
+import 'package:hive/hive.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import '../models/meme.dart';
 import '../models/folder.dart';
-import '../models/isar_meme.dart';
 import 'character_card_service.dart';
 import 'storage_platform.dart';
 import 'webdav_service.dart';
 import 'admin_service.dart';
 
-/// Isar 数据库存储 — 跨平台，Web 上使用 IndexedDB
+/// Hive 数据库存储 — 跨平台，Web 上使用 IndexedDB
 class StorageService {
   final Uuid _uuid = const Uuid();
-  Isar? _isar;
+  Box? _memeBox;
+  Box? _folderBox;
+  Box? _hashBox;
   String? _basePath;
   String? _userId;
   String _storageMode = 'personal';
@@ -53,7 +55,8 @@ class StorageService {
       if (!await storageDir.exists()) {
         await storageDir.create(recursive: true);
       }
-      await _initIsar();
+      Hive.init(p.join(_basePath!, 'hive'));
+      await _openBoxes();
       await _migrateFromJsonIfNeeded();
     }
   }
@@ -77,30 +80,60 @@ class StorageService {
     return p.join(appDir, 'mako_meme', 'users', _userId ?? 'default');
   }
 
-  // ======================== Isar 初始化 ========================
+  // ======================== Hive 初始化 ========================
 
-  Future<void> _initIsar() async {
-    if (kIsWeb) {
-      _isar = await Isar.open(
-        [IsarMemeSchema, IsarFolderSchema],
-        name: 'mako_meme_${_userId ?? 'default'}',
-      );
-    } else {
-      _isar = await Isar.open(
-        [IsarMemeSchema, IsarFolderSchema],
-        directory: _basePath!,
-        name: 'mako_meme',
-      );
-    }
+  Future<void> _openBoxes() async {
+    final boxName = _storageMode == 'shared' ? 'shared' : _userId ?? 'default';
+    _memeBox = await Hive.openBox('memes_$boxName');
+    _folderBox = await Hive.openBox('folders_$boxName');
+    _hashBox = await Hive.openBox('hashes_$boxName');
+  }
+
+  // ======================== Web 存储 ========================
+
+  Future<void> _initWeb() async {
+    try {
+      await initWebStorage();
+      Hive.init('mako_meme_hive');
+      await _openBoxes();
+      await _migrateWebFromIndexedDB();
+      await _loadSettingsFromWeb();
+    } catch (_) {}
+  }
+
+  Future<void> _migrateWebFromIndexedDB() async {
+    if (_memeBox == null) return;
+    if (_memeBox!.isNotEmpty) return;
+
+    try {
+      final key = _storageMode == 'shared' ? 'mako_memes_shared' : 'mako_memes_${_userId ?? 'default'}';
+      final raw = await webStorageGetJson(key);
+      if (raw != null && raw is String) {
+        final data = jsonDecode(raw) as Map<String, dynamic>;
+        final memes = (data['memes'] as List? ?? [])
+            .cast<Map<String, dynamic>>()
+            .map((m) => Meme.fromMap(m))
+            .toList();
+        final folders = (data['folders'] as List? ?? [])
+            .cast<Map<String, dynamic>>()
+            .map((f) => MemeFolder.fromMap(f))
+            .toList();
+
+        for (final folder in folders) {
+          await _folderBox!.put(folder.id, folder.toMap());
+        }
+        for (final meme in memes) {
+          await _memeBox!.put(meme.id, meme.toMap());
+        }
+      }
+    } catch (_) {}
   }
 
   // ======================== 从旧 JSON 迁移 ========================
 
   Future<void> _migrateFromJsonIfNeeded() async {
-    if (_isar == null) return;
-
-    final memeCount = await _isar!.isarMemes.count();
-    if (memeCount > 0) return;
+    if (_memeBox == null) return;
+    if (_memeBox!.isNotEmpty) return;
 
     final oldMeta = File(p.join(_basePath!, 'meta.json'));
     final oldMemes = File(p.join(_basePath!, 'memes.json'));
@@ -152,20 +185,12 @@ class StorageService {
 
     if (memes.isEmpty && folders.isEmpty) return;
 
-    await _isar!.writeTxn(() async {
-      for (final folder in folders) {
-        final isarFolder = IsarFolder()
-          ..uuid = folder.id
-          ..name = folder.name
-          ..createdAt = folder.createdAt;
-        await _isar!.isarFolders.put(isarFolder);
-      }
-
-      for (final meme in memes) {
-        final isarMeme = _memeToIsar(meme);
-        await _isar!.isarMemes.put(isarMeme);
-      }
-    });
+    for (final folder in folders) {
+      await _folderBox!.put(folder.id, folder.toMap());
+    }
+    for (final meme in memes) {
+      await _memeBox!.put(meme.id, meme.toMap());
+    }
 
     try {
       if (await oldMemes.exists()) {
@@ -180,15 +205,35 @@ class StorageService {
   // ======================== Meme CRUD ========================
 
   List<Meme> getAllMemes() {
-    if (_isar == null) return [];
-    final results = _isar!.isarMemes.where().sortByCreatedAtDesc().findAllSync();
-    return results.map(_isarToMeme).toList();
+    if (_memeBox == null) return [];
+    final memes = <Meme>[];
+    for (var i = 0; i < _memeBox!.length; i++) {
+      final key = _memeBox!.keyAt(i);
+      final value = _memeBox!.get(key);
+      if (value is Map) {
+        memes.add(Meme.fromMap(Map<String, dynamic>.from(value as Map)));
+      } else if (value is Map<String, dynamic>) {
+        memes.add(Meme.fromMap(value));
+      }
+    }
+    memes.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return memes;
   }
 
   List<MemeFolder> getAllFolders() {
-    if (_isar == null) return [];
-    final results = _isar!.isarFolders.where().sortByCreatedAt().findAllSync();
-    return results.map(_isarToFolder).toList();
+    if (_folderBox == null) return [];
+    final folders = <MemeFolder>[];
+    for (var i = 0; i < _folderBox!.length; i++) {
+      final key = _folderBox!.keyAt(i);
+      final value = _folderBox!.get(key);
+      if (value is Map) {
+        folders.add(MemeFolder.fromMap(Map<String, dynamic>.from(value as Map)));
+      } else if (value is Map<String, dynamic>) {
+        folders.add(MemeFolder.fromMap(value));
+      }
+    }
+    folders.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return folders;
   }
 
   String getFullMemePath(String relPath) {
@@ -196,65 +241,6 @@ class StorageService {
     final base = _basePath;
     if (base == null) return relPath;
     return p.join(base, relPath);
-  }
-
-  IsarMeme _memeToIsar(Meme meme) {
-    return IsarMeme()
-      ..uuid = meme.id
-      ..name = meme.name
-      ..filePath = meme.filePath
-      ..folderId = meme.folderId
-      ..tagList = meme.tags
-      ..createdAt = meme.createdAt
-      ..isFavorite = meme.isFavorite
-      ..mimeType = meme.mimeType
-      ..fileSize = meme.fileSize
-      ..type = meme.type
-      ..textContent = meme.textContent
-      ..remotePath = meme.remotePath
-      ..characterData = meme.characterData != null ? jsonEncode(meme.characterData) : null
-      ..fileHash = null;
-  }
-
-  Meme _isarToMeme(IsarMeme isarMeme) {
-    return Meme(
-      id: isarMeme.uuid,
-      name: isarMeme.name,
-      filePath: isarMeme.filePath,
-      folderId: isarMeme.folderId,
-      tags: isarMeme.tagList,
-      createdAt: isarMeme.createdAt,
-      isFavorite: isarMeme.isFavorite,
-      mimeType: isarMeme.mimeType,
-      fileSize: isarMeme.fileSize,
-      type: isarMeme.type,
-      textContent: isarMeme.textContent,
-      remotePath: isarMeme.remotePath,
-      characterData: isarMeme.characterData != null && isarMeme.characterData!.isNotEmpty
-          ? (() {
-              try {
-                return jsonDecode(isarMeme.characterData!) as Map<String, dynamic>;
-              } catch (_) {
-                return null;
-              }
-            })()
-          : null,
-    );
-  }
-
-  IsarFolder _folderToIsar(MemeFolder folder) {
-    return IsarFolder()
-      ..uuid = folder.id
-      ..name = folder.name
-      ..createdAt = folder.createdAt;
-  }
-
-  MemeFolder _isarToFolder(IsarFolder isarFolder) {
-    return MemeFolder(
-      id: isarFolder.uuid,
-      name: isarFolder.name,
-      createdAt: isarFolder.createdAt,
-    );
   }
 
   // ======================== 导入 / 去重 ========================
@@ -273,17 +259,15 @@ class StorageService {
     }
   }
 
-  Future<bool> _hashExists(String hash) async {
-    if (_isar == null) return false;
-    final count = await _isar!.isarMemes.filter().fileHashEqualTo(hash).count();
-    return count > 0;
-  }
-
   Future<Meme?> _findByHash(String hash) async {
-    if (_isar == null) return null;
-    final result = _isar!.isarMemes.filter().fileHashEqualTo(hash).findFirstSync();
-    if (result == null) return null;
-    return _isarToMeme(result);
+    if (_hashBox == null || _memeBox == null) return null;
+    final memeId = _hashBox!.get(hash) as String?;
+    if (memeId == null) return null;
+    final value = _memeBox!.get(memeId);
+    if (value == null) return null;
+    if (value is Map<String, dynamic>) return Meme.fromMap(value);
+    if (value is Map) return Meme.fromMap(Map<String, dynamic>.from(value as Map));
+    return null;
   }
 
   Future<Meme> importFile(PlatformFile file, {String? folderId, String? type}) async {
@@ -356,7 +340,7 @@ class StorageService {
             type: memeType,
             characterData: CharacterCardService.sanitizeCard(characterData),
           );
-          await _saveMemeToIsar(meme, fileHash);
+          await _saveMeme(meme, fileHash);
           return meme;
         }
       }
@@ -374,17 +358,16 @@ class StorageService {
       type: memeType,
       characterData: characterData != null ? CharacterCardService.sanitizeCard(characterData) : null,
     );
-    await _saveMemeToIsar(meme, fileHash);
+    await _saveMeme(meme, fileHash);
     return meme;
   }
 
-  Future<void> _saveMemeToIsar(Meme meme, String? fileHash) async {
-    if (_isar == null) return;
-    await _isar!.writeTxn(() async {
-      final isarMeme = _memeToIsar(meme);
-      isarMeme.fileHash = fileHash;
-      await _isar!.isarMemes.put(isarMeme);
-    });
+  Future<void> _saveMeme(Meme meme, String? fileHash) async {
+    if (_memeBox == null) return;
+    await _memeBox!.put(meme.id, meme.toMap());
+    if (fileHash != null && _hashBox != null) {
+      await _hashBox!.put(fileHash, meme.id);
+    }
   }
 
   Future<Uint8List?> readMemeBytes(String filePath) async {
@@ -409,9 +392,17 @@ class StorageService {
   }
 
   Future<void> reimportMeme(String memeId, PlatformFile file) async {
-    if (_isar == null) return;
-    final isarMeme = _isar!.isarMemes.filter().uuidEqualTo(memeId).findFirstSync();
-    if (isarMeme == null) return;
+    if (_memeBox == null) return;
+    final value = _memeBox!.get(memeId);
+    if (value == null) return;
+    Meme old;
+    if (value is Map<String, dynamic>) {
+      old = Meme.fromMap(value);
+    } else if (value is Map) {
+      old = Meme.fromMap(Map<String, dynamic>.from(value as Map));
+    } else {
+      return;
+    }
 
     Uint8List? bytes;
     String? newHash;
@@ -420,10 +411,10 @@ class StorageService {
       bytes = file.bytes;
       if (bytes != null) {
         newHash = _computeHash(bytes);
-        await webStorageSetBinary(isarMeme.filePath, bytes!);
+        await webStorageSetBinary(old.filePath, bytes!);
       }
     } else {
-      final dest = File(p.join(_basePath!, isarMeme.filePath));
+      final dest = File(p.join(_basePath!, old.filePath));
       await dest.create(recursive: true);
       if (file.path != null) {
         await File(file.path!).copy(dest.path);
@@ -435,12 +426,21 @@ class StorageService {
       }
     }
 
-    await _isar!.writeTxn(() async {
-      isarMeme.mimeType = _guessMime(_guessExt(file.name));
-      isarMeme.fileSize = file.size;
-      isarMeme.fileHash = newHash;
-      await _isar!.isarMemes.put(isarMeme);
-    });
+    if (_hashBox != null && old.filePath.isNotEmpty && !kIsWeb) {
+      final oldHash = await _computeFileHash(p.join(_basePath!, old.filePath));
+      if (oldHash != null) {
+        await _hashBox!.delete(oldHash);
+      }
+    }
+
+    final updated = old.copyWith(
+      mimeType: _guessMime(_guessExt(file.name)),
+      fileSize: file.size,
+    );
+    await _memeBox!.put(memeId, updated.toMap());
+    if (newHash != null && _hashBox != null) {
+      await _hashBox!.put(newHash, memeId);
+    }
   }
 
   Future<Meme> importText(String text, {String? name, String? folderId, List<String> tags = const []}) async {
@@ -458,26 +458,37 @@ class StorageService {
       type: 'text',
       textContent: text,
     );
-    await _saveMemeToIsar(meme, null);
+    await _saveMeme(meme, null);
     return meme;
   }
 
   Future<void> deleteMeme(String id) async {
-    if (_isar == null) return;
-    final isarMeme = _isar!.isarMemes.filter().uuidEqualTo(id).findFirstSync();
-    if (isarMeme == null) return;
+    if (_memeBox == null) return;
+    final value = _memeBox!.get(id);
+    Meme? meme;
+    if (value is Map<String, dynamic>) {
+      meme = Meme.fromMap(value);
+    } else if (value is Map) {
+      meme = Meme.fromMap(Map<String, dynamic>.from(value as Map));
+    }
+    if (meme == null) return;
 
-    if (!kIsWeb && isarMeme.filePath.isNotEmpty) {
-      final file = File(p.join(_basePath!, isarMeme.filePath));
+    if (!kIsWeb && meme.filePath.isNotEmpty) {
+      final file = File(p.join(_basePath!, meme.filePath));
       if (await file.exists()) await file.delete();
     }
-    if (kIsWeb && isarMeme.filePath.isNotEmpty) {
-      await webStorageDelete(isarMeme.filePath);
+    if (kIsWeb && meme.filePath.isNotEmpty) {
+      await webStorageDelete(meme.filePath);
     }
 
-    await _isar!.writeTxn(() async {
-      await _isar!.isarMemes.delete(isarMeme.id);
-    });
+    await _memeBox!.delete(id);
+    if (_hashBox != null && meme.filePath.isNotEmpty && !kIsWeb) {
+      final fullPath = p.join(_basePath!, meme.filePath);
+      final hash = await _computeFileHash(fullPath);
+      if (hash != null) {
+        await _hashBox!.delete(hash);
+      }
+    }
   }
 
   Future<void> deleteMemes(List<String> ids) async {
@@ -487,53 +498,73 @@ class StorageService {
   }
 
   Future<void> renameMeme(String id, String newName) async {
-    if (_isar == null) return;
-    final isarMeme = _isar!.isarMemes.filter().uuidEqualTo(id).findFirstSync();
-    if (isarMeme == null) return;
-    await _isar!.writeTxn(() async {
-      isarMeme.name = newName;
-      await _isar!.isarMemes.put(isarMeme);
-    });
+    if (_memeBox == null) return;
+    final value = _memeBox!.get(id);
+    Meme meme;
+    if (value is Map<String, dynamic>) {
+      meme = Meme.fromMap(value);
+    } else if (value is Map) {
+      meme = Meme.fromMap(Map<String, dynamic>.from(value as Map));
+    } else {
+      return;
+    }
+    await _memeBox!.put(id, meme.copyWith(name: newName).toMap());
   }
 
   Future<void> setMemeType(String id, String type) async {
-    if (_isar == null) return;
-    final isarMeme = _isar!.isarMemes.filter().uuidEqualTo(id).findFirstSync();
-    if (isarMeme == null) return;
-    await _isar!.writeTxn(() async {
-      isarMeme.type = type;
-      await _isar!.isarMemes.put(isarMeme);
-    });
+    if (_memeBox == null) return;
+    final value = _memeBox!.get(id);
+    Meme meme;
+    if (value is Map<String, dynamic>) {
+      meme = Meme.fromMap(value);
+    } else if (value is Map) {
+      meme = Meme.fromMap(Map<String, dynamic>.from(value as Map));
+    } else {
+      return;
+    }
+    await _memeBox!.put(id, meme.copyWith(type: type).toMap());
   }
 
   Future<void> updateCharacterData(String id, Map<String, dynamic> data) async {
-    if (_isar == null) return;
-    final isarMeme = _isar!.isarMemes.filter().uuidEqualTo(id).findFirstSync();
-    if (isarMeme == null) return;
-    await _isar!.writeTxn(() async {
-      isarMeme.characterData = jsonEncode(data);
-      await _isar!.isarMemes.put(isarMeme);
-    });
+    if (_memeBox == null) return;
+    final value = _memeBox!.get(id);
+    Meme meme;
+    if (value is Map<String, dynamic>) {
+      meme = Meme.fromMap(value);
+    } else if (value is Map) {
+      meme = Meme.fromMap(Map<String, dynamic>.from(value as Map));
+    } else {
+      return;
+    }
+    await _memeBox!.put(id, meme.copyWith(characterData: data).toMap());
   }
 
   Future<void> toggleFavorite(String id) async {
-    if (_isar == null) return;
-    final isarMeme = _isar!.isarMemes.filter().uuidEqualTo(id).findFirstSync();
-    if (isarMeme == null) return;
-    await _isar!.writeTxn(() async {
-      isarMeme.isFavorite = !isarMeme.isFavorite;
-      await _isar!.isarMemes.put(isarMeme);
-    });
+    if (_memeBox == null) return;
+    final value = _memeBox!.get(id);
+    Meme meme;
+    if (value is Map<String, dynamic>) {
+      meme = Meme.fromMap(value);
+    } else if (value is Map) {
+      meme = Meme.fromMap(Map<String, dynamic>.from(value as Map));
+    } else {
+      return;
+    }
+    await _memeBox!.put(id, meme.copyWith(isFavorite: !meme.isFavorite).toMap());
   }
 
   Future<void> moveToFolder(String memeId, String? folderId) async {
-    if (_isar == null) return;
-    final isarMeme = _isar!.isarMemes.filter().uuidEqualTo(memeId).findFirstSync();
-    if (isarMeme == null) return;
-    await _isar!.writeTxn(() async {
-      isarMeme.folderId = folderId;
-      await _isar!.isarMemes.put(isarMeme);
-    });
+    if (_memeBox == null) return;
+    final value = _memeBox!.get(memeId);
+    Meme meme;
+    if (value is Map<String, dynamic>) {
+      meme = Meme.fromMap(value);
+    } else if (value is Map) {
+      meme = Meme.fromMap(Map<String, dynamic>.from(value as Map));
+    } else {
+      return;
+    }
+    await _memeBox!.put(memeId, meme.copyWith(folderId: folderId).toMap());
   }
 
   Future<void> moveToFolderBatch(List<String> ids, String? folderId) async {
@@ -545,7 +576,7 @@ class StorageService {
   // ======================== Folder CRUD ========================
 
   Future<MemeFolder> createFolder(String name) async {
-    if (_isar == null) {
+    if (_folderBox == null) {
       return MemeFolder(id: _uuid.v4(), name: name, createdAt: DateTime.now());
     }
     final folder = MemeFolder(
@@ -553,20 +584,13 @@ class StorageService {
       name: name,
       createdAt: DateTime.now(),
     );
-    await _isar!.writeTxn(() async {
-      await _isar!.isarFolders.put(_folderToIsar(folder));
-    });
+    await _folderBox!.put(folder.id, folder.toMap());
     return folder;
   }
 
   Future<void> updateFolder(MemeFolder folder) async {
-    if (_isar == null) return;
-    final isarFolder = _isar!.isarFolders.filter().uuidEqualTo(folder.id).findFirstSync();
-    if (isarFolder == null) return;
-    await _isar!.writeTxn(() async {
-      isarFolder.name = folder.name;
-      await _isar!.isarFolders.put(isarFolder);
-    });
+    if (_folderBox == null) return;
+    await _folderBox!.put(folder.id, folder.toMap());
   }
 
   Future<void> updateFolderCover(String folderId, String? coverMemeId) async {
@@ -574,18 +598,33 @@ class StorageService {
   }
 
   Future<void> deleteFolder(String id) async {
-    if (_isar == null) return;
-    final isarFolder = _isar!.isarFolders.filter().uuidEqualTo(id).findFirstSync();
-    if (isarFolder == null) return;
+    if (_folderBox == null || _memeBox == null) return;
+    await _folderBox!.delete(id);
 
-    await _isar!.writeTxn(() async {
-      final folderMemes = _isar!.isarMemes.filter().folderIdEqualTo(id).findAllSync();
-      for (final m in folderMemes) {
-        m.folderId = null;
+    final folderMemes = <String>[];
+    for (var i = 0; i < _memeBox!.length; i++) {
+      final key = _memeBox!.keyAt(i);
+      final value = _memeBox!.get(key);
+      Map<String, dynamic>? map;
+      if (value is Map<String, dynamic>) {
+        map = value;
+      } else if (value is Map) {
+        map = Map<String, dynamic>.from(value as Map);
       }
-      await _isar!.isarMemes.putAll(folderMemes);
-      await _isar!.isarFolders.delete(isarFolder.id);
-    });
+      if (map != null && map['folderId'] == id) {
+        folderMemes.add(key);
+      }
+    }
+    for (final memeId in folderMemes) {
+      final value = _memeBox!.get(memeId);
+      if (value is Map<String, dynamic>) {
+        final meme = Meme.fromMap(value);
+        await _memeBox!.put(memeId, meme.copyWith(folderId: null).toMap());
+      } else if (value is Map) {
+        final meme = Meme.fromMap(Map<String, dynamic>.from(value as Map));
+        await _memeBox!.put(memeId, meme.copyWith(folderId: null).toMap());
+      }
+    }
   }
 
   // ======================== Settings ========================
@@ -671,35 +710,21 @@ class StorageService {
       final folders = getAllFolders();
       final allMemes = getAllMemes();
 
-      await File(p.join(exportDir.path, 'folders.json')).writeAsString(
-        jsonEncode({
-          'version': 3,
-          'folders': folders.map((f) => f.toMap()).toList(),
-        }),
-      );
+      final meta = {
+        'version': 4,
+        'format': 'jsonl',
+        'folders': folders.map((f) => f.toMap()).toList(),
+        'meme_count': allMemes.length,
+      };
+      await File(p.join(exportDir.path, 'meta.json')).writeAsString(jsonEncode(meta));
 
-      for (final folder in folders) {
-        final folderMemes = allMemes.where((m) => m.folderId == folder.id).toList();
-        final safeName = folder.name.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
-        await File(p.join(exportDir.path, '$safeName.json')).writeAsString(
-          jsonEncode({
-            'folder_id': folder.id,
-            'folder_name': folder.name,
-            'memes': folderMemes.map((m) => m.toMap()).toList(),
-          }),
-        );
+      final jsonlFile = File(p.join(exportDir.path, 'memes.jsonl'));
+      final sink = jsonlFile.openWrite();
+      for (final meme in allMemes) {
+        sink.writeln(jsonEncode(meme.toMap()));
       }
-
-      final uncategorized = allMemes.where((m) => m.folderId == null).toList();
-      if (uncategorized.isNotEmpty) {
-        await File(p.join(exportDir.path, '未分类.json')).writeAsString(
-          jsonEncode({
-            'folder_id': null,
-            'folder_name': '未分类',
-            'memes': uncategorized.map((m) => m.toMap()).toList(),
-          }),
-        );
-      }
+      await sink.flush();
+      await sink.close();
 
       final srcMemesDir = Directory(p.join(_basePath!, 'memes'));
       if (kIsWeb) {
@@ -752,12 +777,12 @@ class StorageService {
       }
       inputStream.close();
 
-      final foldersFile = File(p.join(extractDir.path, 'folders.json'));
+      final jsonlFile = File(p.join(extractDir.path, 'memes.jsonl'));
       final metaFile = File(p.join(extractDir.path, 'meta.json'));
       final oldMemesFile = File(p.join(extractDir.path, 'memes.json'));
 
-      if (await foldersFile.exists()) {
-        return await _importFromFolderJson(extractDir);
+      if (await jsonlFile.exists()) {
+        return await _importFromJsonl(extractDir);
       } else if (await metaFile.exists() || await oldMemesFile.exists()) {
         return await _importFromOldFormat(extractDir);
       }
@@ -792,33 +817,27 @@ class StorageService {
     }
   }
 
-  Future<int> _importFromFolderJson(Directory extractDir) async {
+  Future<int> _importFromJsonl(Directory extractDir) async {
     try {
-      final foldersData = jsonDecode(
-        await File(p.join(extractDir.path, 'folders.json')).readAsString(),
-      ) as Map<String, dynamic>;
+      final metaFile = File(p.join(extractDir.path, 'meta.json'));
+      List<MemeFolder> importedFolders = [];
 
-      final importedFolders = (foldersData['folders'] as List? ?? [])
-          .cast<Map<String, dynamic>>()
-          .map((f) => MemeFolder.fromMap(f))
-          .toList();
+      if (await metaFile.exists()) {
+        final metaData = jsonDecode(await metaFile.readAsString()) as Map<String, dynamic>;
+        importedFolders = (metaData['folders'] as List? ?? [])
+            .cast<Map<String, dynamic>>()
+            .map((f) => MemeFolder.fromMap(f))
+            .toList();
+      }
 
       final importedMemes = <Meme>[];
-      final jsonFiles = extractDir.listSync()
-          .whereType<File>()
-          .where((f) => p.extension(f.path) == '.json' && p.basename(f.path) != 'folders.json')
-          .toList();
-
-      for (final f in jsonFiles) {
+      final jsonlFile = File(p.join(extractDir.path, 'memes.jsonl'));
+      final lines = await jsonlFile.readAsLines();
+      for (final line in lines) {
+        if (line.trim().isEmpty) continue;
         try {
-          final data = jsonDecode(f.readAsStringSync()) as Map<String, dynamic>;
-          if (data.containsKey('memes')) {
-            final chunkMemes = (data['memes'] as List? ?? [])
-                .cast<Map<String, dynamic>>()
-                .map((m) => Meme.fromMap(m))
-                .toList();
-            importedMemes.addAll(chunkMemes);
-          }
+          final data = jsonDecode(line) as Map<String, dynamic>;
+          importedMemes.add(Meme.fromMap(data));
         } catch (_) {}
       }
 
@@ -833,33 +852,31 @@ class StorageService {
         }
       }
 
-      if (_isar != null) {
-        await _isar!.writeTxn(() async {
-          for (final folder in importedFolders) {
-            final existing = _isar!.isarFolders.filter().uuidEqualTo(folder.id).findFirstSync();
-            if (existing == null) {
-              await _isar!.isarFolders.put(_folderToIsar(folder));
-            }
+      if (_folderBox != null) {
+        for (final folder in importedFolders) {
+          if (!_folderBox!.containsKey(folder.id)) {
+            await _folderBox!.put(folder.id, folder.toMap());
           }
+        }
+      }
 
-          for (final meme in importedMemes) {
-            final existing = _isar!.isarMemes.filter().uuidEqualTo(meme.id).findFirstSync();
-            if (existing == null) {
-              final isarMeme = _memeToIsar(meme);
-              if (meme.filePath.isNotEmpty && !kIsWeb) {
-                final fullPath = p.join(_basePath!, meme.filePath);
-                if (await File(fullPath).exists()) {
-                  isarMeme.fileHash = await _computeFileHash(fullPath);
-                }
-              }
-              await _isar!.isarMemes.put(isarMeme);
+      int addedCount = 0;
+      for (final meme in importedMemes) {
+        if (_memeBox != null && !_memeBox!.containsKey(meme.id)) {
+          String? fileHash;
+          if (meme.filePath.isNotEmpty && !kIsWeb) {
+            final fullPath = p.join(_basePath!, meme.filePath);
+            if (await File(fullPath).exists()) {
+              fileHash = await _computeFileHash(fullPath);
             }
           }
-        });
+          await _saveMeme(meme, fileHash);
+          addedCount++;
+        }
       }
 
       await extractDir.delete(recursive: true);
-      return importedMemes.length;
+      return addedCount;
     } catch (_) {
       return -1;
     }
@@ -916,70 +933,34 @@ class StorageService {
         }
       }
 
-      if (_isar != null) {
-        await _isar!.writeTxn(() async {
-          for (final folder in importedFolders) {
-            final existing = _isar!.isarFolders.filter().uuidEqualTo(folder.id).findFirstSync();
-            if (existing == null) {
-              await _isar!.isarFolders.put(_folderToIsar(folder));
+      if (_folderBox != null) {
+        for (final folder in importedFolders) {
+          if (!_folderBox!.containsKey(folder.id)) {
+            await _folderBox!.put(folder.id, folder.toMap());
+          }
+        }
+      }
+
+      int addedCount = 0;
+      for (final meme in importedMemes) {
+        if (_memeBox != null && !_memeBox!.containsKey(meme.id)) {
+          String? fileHash;
+          if (meme.filePath.isNotEmpty && !kIsWeb) {
+            final fullPath = p.join(_basePath!, meme.filePath);
+            if (await File(fullPath).exists()) {
+              fileHash = await _computeFileHash(fullPath);
             }
           }
-          for (final meme in importedMemes) {
-            final existing = _isar!.isarMemes.filter().uuidEqualTo(meme.id).findFirstSync();
-            if (existing == null) {
-              await _isar!.isarMemes.put(_memeToIsar(meme));
-            }
-          }
-        });
+          await _saveMeme(meme, fileHash);
+          addedCount++;
+        }
       }
 
       await extractDir.delete(recursive: true);
-      return importedMemes.length;
+      return addedCount;
     } catch (_) {
       return -1;
     }
-  }
-
-  // ======================== Web 存储 ========================
-
-  Future<void> _initWeb() async {
-    try {
-      await initWebStorage();
-      await _initIsar();
-      await _migrateWebFromIndexedDB();
-      await _loadSettingsFromWeb();
-    } catch (_) {}
-  }
-
-  Future<void> _migrateWebFromIndexedDB() async {
-    if (_isar == null) return;
-    final count = await _isar!.isarMemes.count();
-    if (count > 0) return;
-
-    try {
-      final key = _storageMode == 'shared' ? 'mako_memes_shared' : 'mako_memes_${_userId ?? 'default'}';
-      final raw = await webStorageGetJson(key);
-      if (raw != null && raw is String) {
-        final data = jsonDecode(raw) as Map<String, dynamic>;
-        final memes = (data['memes'] as List? ?? [])
-            .cast<Map<String, dynamic>>()
-            .map((m) => Meme.fromMap(m))
-            .toList();
-        final folders = (data['folders'] as List? ?? [])
-            .cast<Map<String, dynamic>>()
-            .map((f) => MemeFolder.fromMap(f))
-            .toList();
-
-        await _isar!.writeTxn(() async {
-          for (final folder in folders) {
-            await _isar!.isarFolders.put(_folderToIsar(folder));
-          }
-          for (final meme in memes) {
-            await _isar!.isarMemes.put(_memeToIsar(meme));
-          }
-        });
-      }
-    } catch (_) {}
   }
 
   // ======================== Utility ========================
@@ -990,13 +971,18 @@ class StorageService {
     final remotePath = webDavService.generateRemotePath(meme.filePath);
     final success = await webDavService.uploadFile(remotePath, bytes);
 
-    if (success && _isar != null) {
-      final isarMeme = _isar!.isarMemes.filter().uuidEqualTo(meme.id).findFirstSync();
-      if (isarMeme != null) {
-        await _isar!.writeTxn(() async {
-          isarMeme.remotePath = remotePath;
-          await _isar!.isarMemes.put(isarMeme);
-        });
+    if (success && _memeBox != null) {
+      final value = _memeBox!.get(meme.id);
+      if (value != null) {
+        Meme m;
+        if (value is Map<String, dynamic>) {
+          m = Meme.fromMap(value);
+        } else if (value is Map) {
+          m = Meme.fromMap(Map<String, dynamic>.from(value as Map));
+        } else {
+          return success;
+        }
+        await _memeBox!.put(meme.id, m.copyWith(remotePath: remotePath).toMap());
       }
     }
 
