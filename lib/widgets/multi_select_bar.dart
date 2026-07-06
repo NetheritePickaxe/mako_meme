@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/meme_provider.dart';
-import '../models/mood.dart';
 
 class MultiSelectBar extends StatelessWidget {
   const MultiSelectBar({super.key});
@@ -32,11 +31,6 @@ class MultiSelectBar extends StatelessWidget {
               onPressed: () => _showMoveDialog(context, prov),
             ),
             IconButton(
-              icon: Icon(Icons.auto_awesome, size: 20, color: Theme.of(context).colorScheme.tertiary),
-              tooltip: '设置场景',
-              onPressed: () => _showMoodDialog(context, prov),
-            ),
-            IconButton(
               icon: const Icon(Icons.ios_share, size: 20),
               tooltip: '导出选中',
               onPressed: () => _exportSelected(context, prov),
@@ -65,29 +59,6 @@ class MultiSelectBar extends StatelessWidget {
           ...prov.folders.map((f) => SimpleDialogOption(
             onPressed: () { prov.moveSelectedToFolder(f.id); Navigator.pop(dCtx); },
             child: Text(f.name),
-          )),
-        ],
-      ),
-    );
-  }
-
-  void _showMoodDialog(BuildContext ctx, MemeProvider prov) {
-    showDialog(
-      context: ctx,
-      builder: (dCtx) => SimpleDialog(
-        title: const Text('批量设置场景'),
-        children: [
-          SimpleDialogOption(
-            onPressed: () { prov.setMoodBatch(prov.selected, null); Navigator.pop(dCtx); },
-            child: const Row(children: [Icon(Icons.block, size: 18, color: Colors.grey), SizedBox(width: 8), Text('清除标记')]),
-          ),
-          ...presetMoods.map((mood) => SimpleDialogOption(
-            onPressed: () { prov.setMoodBatch(prov.selected, mood.id); Navigator.pop(dCtx); },
-            child: Row(children: [
-              Icon(mood.icon, size: 20, color: mood.color),
-              const SizedBox(width: 8),
-              Text(mood.name),
-            ]),
           )),
         ],
       ),

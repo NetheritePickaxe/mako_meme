@@ -38,7 +38,6 @@ class FolderCard extends StatelessWidget {
           onTap: () {
             final prov = context.read<MemeProvider>();
             prov.selectFolder(folder.id);
-            prov.clearMood();
           },
           onSecondaryTapUp: (details) {
             _showFolderContextMenu(details.globalPosition, context, folder, count);

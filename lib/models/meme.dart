@@ -8,7 +8,6 @@ class Meme {
   bool isFavorite;
   final String mimeType;
   final int fileSize;
-  String? mood;
   final String type; // "image" | "emoji" | "text"
   final String? textContent;
   final String? remotePath;
@@ -23,7 +22,6 @@ class Meme {
     this.isFavorite = false,
     this.mimeType = '',
     this.fileSize = 0,
-    this.mood,
     this.type = 'image',
     this.textContent,
     this.remotePath,
@@ -39,7 +37,6 @@ class Meme {
     'isFavorite': isFavorite,
     'mimeType': mimeType,
     'fileSize': fileSize,
-    'mood': mood,
     'type': type,
     'textContent': textContent,
     'remotePath': remotePath,
@@ -55,7 +52,6 @@ class Meme {
     isFavorite: map['isFavorite'] as bool? ?? false,
     mimeType: map['mimeType'] as String? ?? '',
     fileSize: map['fileSize'] as int? ?? 0,
-    mood: map['mood'] as String?,
     type: map['type'] as String? ?? 'image',
     textContent: map['textContent'] as String?,
     remotePath: map['remotePath'] as String?,
@@ -71,7 +67,6 @@ class Meme {
     bool? isFavorite,
     String? mimeType,
     int? fileSize,
-    String? mood,
     String? type,
     String? textContent,
     String? remotePath,
@@ -85,7 +80,6 @@ class Meme {
     isFavorite: isFavorite ?? this.isFavorite,
     mimeType: mimeType ?? this.mimeType,
     fileSize: fileSize ?? this.fileSize,
-    mood: mood ?? this.mood,
     type: type ?? this.type,
     textContent: textContent ?? this.textContent,
     remotePath: remotePath ?? this.remotePath,

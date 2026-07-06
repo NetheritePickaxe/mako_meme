@@ -24,7 +24,6 @@ class MemeProvider with ChangeNotifier {
   bool _multi = false;
   final Set<String> _sel = {};
   final Set<String> _tagFilter = {};
-  String? _moodFilter;
   final Set<String> _folderFilter = {};
 
   Set<String> get folderFilter => _folderFilter;
@@ -41,7 +40,6 @@ class MemeProvider with ChangeNotifier {
   bool get isMulti => _multi;
   Set<String> get selected => _sel;
   Set<String> get tagFilter => _tagFilter;
-  String? get moodFilter => _moodFilter;
 
   List<String> get allTags {
     final s = <String>{};
@@ -106,39 +104,6 @@ class MemeProvider with ChangeNotifier {
     _order = _order == SortOrder.asc ? SortOrder.desc : SortOrder.asc;
     _apply();
     notifyListeners();
-  }
-
-  void selectMood(String? moodId) {
-    _moodFilter = moodId;
-    _apply();
-    notifyListeners();
-  }
-
-  void clearMood() {
-    _moodFilter = null;
-    _apply();
-    notifyListeners();
-  }
-
-  Future<void> setMood(String memeId, String? moodId) async {
-    await _storage.setMood(memeId, moodId);
-    await loadAll();
-  }
-
-  Future<void> setMoodBatch(Set<String> ids, String? moodId) async {
-    await _storage.setMoodBatch(ids.toList(), moodId);
-    _sel.clear();
-    _multi = false;
-    await loadAll();
-  }
-
-  /// 按心情分组统计数量
-  Map<String?, int> get moodCounts {
-    final map = <String?, int>{};
-    for (final m in _all) {
-      map[m.mood] = (map[m.mood] ?? 0) + 1;
-    }
-    return map;
   }
 
   void toggleMulti() {
@@ -221,8 +186,8 @@ class MemeProvider with ChangeNotifier {
     return memes;
   }
 
-  Future<Meme> importText(String text, {String? name, List<String> tags = const [], String? mood}) async {
-    final meme = await _storage.importText(text, name: name, folderId: _folderId, tags: tags, mood: mood);
+  Future<Meme> importText(String text, {String? name, List<String> tags = const []}) async {
+    final meme = await _storage.importText(text, name: name, folderId: _folderId, tags: tags);
     await loadAll();
     return meme;
   }
@@ -273,10 +238,6 @@ class MemeProvider with ChangeNotifier {
     if (_folderId != null) {
       list = list.where((m) => m.folderId == _folderId).toList();
     }
-    if (_moodFilter != null) {
-      list = list.where((m) => m.mood == _moodFilter).toList();
-    }
-
     if (_tagFilter.isNotEmpty) {
       list = list.where((m) => _tagFilter.every((t) => m.tags.any((tag) => _matchWildcard(tag, t)))).toList();
     }

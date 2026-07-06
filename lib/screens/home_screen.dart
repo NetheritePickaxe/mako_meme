@@ -8,7 +8,6 @@ import '../providers/meme_provider.dart';
 import '../providers/locale_provider.dart';
 import '../l10n/l10n.dart';
 import '../models/meme.dart';
-import '../models/mood.dart';
 import '../models/folder.dart';
 import '../widgets/meme_grid.dart';
 import '../widgets/folder_card.dart';
@@ -163,16 +162,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String _getTitle(MemeProvider prov, L10n l10n) {
     if (prov.isMulti) return l10n.tr('selected_count', args: {'count': prov.selected.length.toString()});
-    if (prov.moodFilter != null) {
-      final m = findMoodById(prov.moodFilter);
-      return m != null ? '${m.name} ${l10n.tr('scene')}' : 'Mako Meme';
-    }
     if (prov.folderId == null) return 'Mako Meme';
     return prov.folders.where((f) => f.id == prov.folderId).firstOrNull?.name ?? 'Mako Meme';
   }
 
   Widget _buildMixedGrid(MemeProvider prov) {
-    if (prov.folderId != null || prov.moodFilter != null) {
+    if (prov.folderId != null) {
       return MemeGrid(memes: prov.memes);
     }
 
@@ -284,29 +279,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     icon: Icons.all_inbox,
                     label: l10n.tr('all_memes'),
                     count: prov.allMemesCount,
-                    isActive: prov.folderId == null && prov.moodFilter == null,
-                    onTap: () { prov.selectFolder(null); prov.clearMood(); Navigator.pop(context); },
+                    isActive: prov.folderId == null,
+                    onTap: () { prov.selectFolder(null); Navigator.pop(context); },
                   ),
                   _drawerItem(
                     icon: Icons.favorite,
                     label: l10n.tr('favorites'),
                     count: prov.favorites.length,
                     isActive: false,
-                    onTap: () { prov.selectMood(null); Navigator.pop(context); },
+                    onTap: () { Navigator.pop(context); },
                   ),
-                  const Divider(indent: 16, endIndent: 16),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                    child: Text(l10n.tr('scene'), style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurface.withAlpha(120))),
-                  ),
-                  ...presetMoods.map((m) => _drawerItem(
-                    icon: m.icon,
-                    iconColor: m.color,
-                    label: m.name,
-                    count: prov.moodCounts[m.id] ?? 0,
-                    isActive: prov.moodFilter == m.id,
-                    onTap: () { prov.selectMood(m.id); prov.selectFolder(null); Navigator.pop(context); },
-                  )),
                   const Divider(indent: 16, endIndent: 16),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
@@ -317,7 +299,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     label: f.name,
                     count: prov.countInFolder(f.id),
                     isActive: prov.folderId == f.id,
-                    onTap: () { prov.selectFolder(f.id); prov.clearMood(); Navigator.pop(context); },
+                    onTap: () { prov.selectFolder(f.id); Navigator.pop(context); },
                     onLongPress: () => _showFolderMenu(context, prov, f),
                   )),
                   const Divider(indent: 16, endIndent: 16),

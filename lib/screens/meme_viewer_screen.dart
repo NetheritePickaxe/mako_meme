@@ -4,7 +4,6 @@ import 'package:photo_view/photo_view.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:provider/provider.dart';
 import '../models/meme.dart';
-import '../models/mood.dart';
 import '../providers/meme_provider.dart';
 import '../services/storage_service.dart';
 
@@ -86,8 +85,6 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
             onSelected: (v) {
               if (v == 'rename') {
                 _rename();
-              } else if (v == 'mood') {
-                _showMoodPicker();
               } else if (v == 'delete') {
                 _confirmDelete();
               }
@@ -95,9 +92,6 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
             itemBuilder: (_) => [
               const PopupMenuItem(value: 'rename', child: ListTile(
                 leading: Icon(Icons.edit), title: Text('重命名'), dense: true)),
-              PopupMenuItem(value: 'mood', child: ListTile(
-                leading: Icon(Icons.auto_awesome, color: theme.colorScheme.primary),
-                title: const Text('设置场景'), dense: true)),
               const PopupMenuItem(value: 'delete', child: ListTile(
                 leading: Icon(Icons.delete, color: Colors.red),
                 title: Text('删除', style: TextStyle(color: Colors.red)), dense: true)),
@@ -205,26 +199,6 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
     if (newName != null && newName.isNotEmpty) {
       if (mounted) context.read<MemeProvider>().renameMeme(_meme.id, newName);
     }
-  }
-
-  void _showMoodPicker() {
-    final prov = context.read<MemeProvider>();
-    showDialog(
-      context: context,
-      builder: (dCtx) => SimpleDialog(
-        title: const Text('设置场景'),
-        children: [
-          SimpleDialogOption(
-            onPressed: () { prov.setMood(_meme.id, null); Navigator.pop(dCtx); },
-            child: const Row(children: [Icon(Icons.block, size: 18, color: Colors.grey), SizedBox(width: 8), Text('清除标记')]),
-          ),
-          ...presetMoods.map((m) => SimpleDialogOption(
-            onPressed: () { prov.setMood(_meme.id, m.id); Navigator.pop(dCtx); },
-            child: Row(children: [Icon(m.icon, size: 20, color: m.color), const SizedBox(width: 8), Text(m.name)]),
-          )),
-        ],
-      ),
-    );
   }
 
   void _confirmDelete() async {

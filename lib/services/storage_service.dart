@@ -213,7 +213,7 @@ class StorageService {
     _save();
   }
 
-  Future<Meme> importText(String text, {String? name, String? folderId, List<String> tags = const [], String? mood}) async {
+  Future<Meme> importText(String text, {String? name, String? folderId, List<String> tags = const []}) async {
     final id = _uuid.v4();
     final now = DateTime.now();
     final meme = Meme(
@@ -225,7 +225,6 @@ class StorageService {
       createdAt: now,
       mimeType: '',
       fileSize: text.length,
-      mood: mood,
       type: 'text',
       textContent: text,
     );
@@ -267,20 +266,6 @@ class StorageService {
     if (meme != null) {
       meme.isFavorite = !meme.isFavorite;
       _save();
-    }
-  }
-
-  Future<void> setMood(String memeId, String? moodId) async {
-    final meme = _memes.where((m) => m.id == memeId).firstOrNull;
-    if (meme != null) {
-      meme.mood = moodId;
-      _save();
-    }
-  }
-
-  Future<void> setMoodBatch(List<String> ids, String? moodId) async {
-    for (final id in ids) {
-      await setMood(id, moodId);
     }
   }
 

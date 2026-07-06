@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:file_picker/file_picker.dart';
 import '../models/meme.dart';
-import '../models/mood.dart';
 import '../providers/meme_provider.dart';
 import '../services/storage_service.dart';
 import '../screens/meme_viewer_screen.dart';
@@ -143,19 +142,6 @@ class _MemeCardState extends State<MemeCard> {
                       color: Colors.black87),
                     textAlign: TextAlign.center, overflow: TextOverflow.ellipsis, maxLines: 4,
                   )),
-                ),
-              if (widget.meme.mood != null && !isMulti)
-                Positioned(top: 6, right: widget.meme.isFavorite ? 30 : 6,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                    decoration: BoxDecoration(color: Theme.of(context).colorScheme.tertiaryContainer,
-                      borderRadius: BorderRadius.circular(4)),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(findMoodById(widget.meme.mood)?.icon ?? Icons.help, size: 10, color: Theme.of(context).colorScheme.onTertiaryContainer),
-                      const SizedBox(width: 2),
-                      Text(findMoodById(widget.meme.mood)?.name ?? '', style: TextStyle(color: Theme.of(context).colorScheme.onTertiaryContainer, fontSize: 9, fontWeight: FontWeight.bold)),
-                    ]),
-                  ),
                 ),
               if (widget.meme.isFavorite)
                 Positioned(top: 6, right: 6,
