@@ -37,14 +37,38 @@ class StorageService {
       await _loadFromWeb();
       await _loadSettingsFromWeb();
     } else {
-      final dir = await getApplicationDocumentsDirectory();
-      _basePath = _getPlatformBasePath(dir.path);
+      // 先加载设置以获取存储位置
+      await _loadSettingsEarly();
+      final customPath = _settings['customStoragePath'];
+      final storageLocation = _settings['storageLocation'] ?? 'app';
+
+      if (storageLocation == 'custom' && customPath != null && customPath.isNotEmpty) {
+        _basePath = p.join(customPath, 'mako_meme');
+      } else {
+        final dir = await getApplicationDocumentsDirectory();
+        _basePath = _getPlatformBasePath(dir.path);
+      }
       final storageDir = Directory(_basePath!);
       if (!await storageDir.exists()) {
         await storageDir.create(recursive: true);
       }
       _loadFromFile();
     }
+  }
+
+  Future<void> _loadSettingsEarly() async {
+    if (_settingsLoaded) return;
+    // 尝试从应用默认路径读取设置
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final defaultPath = _getPlatformBasePath(dir.path);
+      final file = File(p.join(defaultPath, 'settings.json'));
+      if (file.existsSync()) {
+        final data = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+        _settings = data.map((k, v) => MapEntry(k, v.toString()));
+      }
+    } catch (_) {}
+    _settingsLoaded = true;
   }
 
   String _getDefaultUserId() {

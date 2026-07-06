@@ -17,6 +17,10 @@ class SettingsProvider extends ChangeNotifier {
   String? _webDavUsername;
   String? _webDavPassword;
 
+  // 存储位置
+  String _storageLocation = 'app'; // 'app' 或 'custom'
+  String? _customStoragePath;
+
   SettingsProvider(this._storage) {
     _themeMode = _toThemeMode(_storage.getSetting('themeMode'));
     final savedIndex = _storage.getSetting('presetIndex');
@@ -43,12 +47,16 @@ class SettingsProvider extends ChangeNotifier {
     _customSecondary = _parseColor(_storage.getSetting('customSecondary')) ?? const Color(0xFF6366F1);
     _customTertiary = _parseColor(_storage.getSetting('customTertiary')) ?? const Color(0xFF6366F1);
     _useMonet = _storage.getSetting('useMonet') != 'false';
-    
+
     // 加载 WebDAV 配置
     _useWebDav = _storage.getSetting('useWebDav') == 'true';
     _webDavBaseUrl = _storage.getSetting('webDavBaseUrl');
     _webDavUsername = _storage.getSetting('webDavUsername');
     _webDavPassword = _storage.getSetting('webDavPassword');
+
+    // 加载存储位置配置
+    _storageLocation = _storage.getSetting('storageLocation') ?? 'app';
+    _customStoragePath = _storage.getSetting('customStoragePath');
   }
 
   // WebDAV getters
@@ -56,6 +64,10 @@ class SettingsProvider extends ChangeNotifier {
   String? get webDavBaseUrl => _webDavBaseUrl;
   String? get webDavUsername => _webDavUsername;
   String? get webDavPassword => _webDavPassword;
+
+  // 存储位置 getters
+  String get storageLocation => _storageLocation;
+  String? get customStoragePath => _customStoragePath;
 
   ThemeMode get themeMode => _themeMode;
   bool get useMonet => _useMonet;
@@ -144,6 +156,19 @@ class SettingsProvider extends ChangeNotifier {
     await _storage.setSetting('webDavBaseUrl', baseUrl);
     await _storage.setSetting('webDavUsername', username);
     await _storage.setSetting('webDavPassword', password);
+    notifyListeners();
+  }
+
+  // 存储位置设置方法
+  Future<void> setStorageLocation(String location) async {
+    _storageLocation = location;
+    await _storage.setSetting('storageLocation', location);
+    notifyListeners();
+  }
+
+  Future<void> setCustomStoragePath(String? path) async {
+    _customStoragePath = path;
+    await _storage.setSetting('customStoragePath', path ?? '');
     notifyListeners();
   }
 }

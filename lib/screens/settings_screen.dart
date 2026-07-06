@@ -50,6 +50,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 16),
 
           _sectionHeader('数据'),
+          if (defaultTargetPlatform == TargetPlatform.android) ...[
+            _storageLocationTile(settings),
+            const Divider(indent: 16, endIndent: 16),
+          ],
           ListTile(
             leading: const Icon(Icons.file_download_outlined),
             title: const Text('批量导入'),
@@ -107,6 +111,92 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: const Text('GitHub'),
             subtitle: const Text('NetheritePickaxe/mako_meme'),
             onTap: () => UpdateService.openUrl('https://github.com/NetheritePickaxe/mako_meme'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _storageLocationTile(SettingsProvider settings) {
+    return Column(
+      children: [
+        ListTile(
+          leading: const Icon(Icons.folder_outlined),
+          title: const Text('存储位置'),
+          subtitle: Text(
+            settings.storageLocation == 'custom' && settings.customStoragePath != null
+                ? settings.customStoragePath!
+                : '应用数据',
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(value: 'app', label: Text('应用数据')),
+              ButtonSegment(value: 'custom', label: Text('自定义文件夹')),
+            ],
+            selected: {settings.storageLocation},
+            onSelectionChanged: (v) async {
+              if (v.first == 'custom') {
+                final path = await FilePicker.platform.getDirectoryPath(
+                  dialogTitle: '选择存储文件夹',
+                );
+                if (path != null) {
+                  await settings.setCustomStoragePath(path);
+                  await settings.setStorageLocation('custom');
+                  if (mounted) {
+                    _showRestartDialog();
+                  }
+                }
+              } else {
+                await settings.setStorageLocation('app');
+                if (mounted) {
+                  _showRestartDialog();
+                }
+              }
+            },
+            showSelectedIcon: false,
+            style: ButtonStyle(
+              visualDensity: VisualDensity.compact,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
+        ),
+        if (settings.storageLocation == 'custom' && settings.customStoragePath != null) ...[
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '数据将存储在：${settings.customStoragePath}',
+                    style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  void _showRestartDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('需要重启'),
+        content: const Text('存储位置已更改，需要重启应用才能生效。'),
+        actions: [
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+            },
+            child: const Text('确定'),
           ),
         ],
       ),
