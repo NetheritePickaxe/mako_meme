@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../models/meme.dart';
 import '../providers/meme_provider.dart';
 import '../services/storage_service.dart';
+import 'character_card_editor_screen.dart';
 
 class MemeViewerScreen extends StatefulWidget {
   final List<Meme> memes;
@@ -86,6 +87,8 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                 _rename();
               } else if (v == 'type') {
                 _showTypeDialog();
+              } else if (v == 'edit_card') {
+                _editCharacterCard();
               } else if (v == 'delete') {
                 _confirmDelete();
               }
@@ -95,6 +98,9 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                 leading: Icon(Icons.edit), title: Text('重命名'), dense: true)),
               const PopupMenuItem(value: 'type', child: ListTile(
                 leading: Icon(Icons.label_outline), title: Text('修改分类'), dense: true)),
+              if (_meme.type == Meme.typeCharacterCard)
+                const PopupMenuItem(value: 'edit_card', child: ListTile(
+                  leading: Icon(Icons.edit_note), title: Text('编辑角色卡'), dense: true)),
               const PopupMenuItem(value: 'delete', child: ListTile(
                 leading: Icon(Icons.delete, color: Colors.red),
                 title: Text('删除', style: TextStyle(color: Colors.red)), dense: true)),
@@ -204,6 +210,15 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
     }
   }
 
+  void _editCharacterCard() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (ctx) => CharacterCardEditorScreen(meme: _meme),
+      ),
+    );
+  }
+
   void _showTypeDialog() {
     final types = [
       {'type': Meme.typeEmoji, 'label': '表情', 'icon': Icons.face},
@@ -212,6 +227,7 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
       {'type': Meme.typeText, 'label': '文字', 'icon': Icons.text_fields},
       {'type': Meme.typePortrait, 'label': '立绘', 'icon': Icons.portrait},
       {'type': Meme.typeCg, 'label': 'CG', 'icon': Icons.photo_library},
+      {'type': Meme.typeCharacterCard, 'label': '角色卡', 'icon': Icons.person_outline},
     ];
 
     showDialog(

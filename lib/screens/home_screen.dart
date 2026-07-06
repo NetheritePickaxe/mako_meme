@@ -355,6 +355,7 @@ class _HomeScreenState extends State<HomeScreen> {
       {'type': Meme.typeText, 'label': '文字', 'icon': Icons.text_fields},
       {'type': Meme.typePortrait, 'label': '立绘', 'icon': Icons.portrait},
       {'type': Meme.typeCg, 'label': 'CG', 'icon': Icons.photo_library},
+      {'type': Meme.typeCharacterCard, 'label': '角色卡', 'icon': Icons.person_outline},
     ];
 
     return SizedBox(

@@ -5,10 +5,11 @@ class Meme {
   static const String typeText = 'text';
   static const String typePortrait = 'portrait';
   static const String typeCg = 'cg';
+  static const String typeCharacterCard = 'character_card';
 
-  static const List<String> allTypes = [typeEmoji, typeGif, typeImage, typeText, typePortrait, typeCg];
+  static const List<String> allTypes = [typeEmoji, typeGif, typeImage, typeText, typePortrait, typeCg, typeCharacterCard];
 
-  bool get isImageType => type == typeImage || type == typeGif || type == typePortrait || type == typeCg;
+  bool get isImageType => type == typeImage || type == typeGif || type == typePortrait || type == typeCg || type == typeCharacterCard;
 
   final String id;
   final String name;
@@ -22,6 +23,7 @@ class Meme {
   final String type;
   final String? textContent;
   final String? remotePath;
+  final Map<String, dynamic>? characterData;
 
   Meme({
     required this.id,
@@ -36,6 +38,7 @@ class Meme {
     this.type = typeImage,
     this.textContent,
     this.remotePath,
+    this.characterData,
   });
 
   Map<String, dynamic> toMap() => {
@@ -51,6 +54,7 @@ class Meme {
     'type': type,
     'textContent': textContent,
     'remotePath': remotePath,
+    'characterData': characterData,
   };
 
   factory Meme.fromMap(Map<String, dynamic> map) => Meme(
@@ -66,6 +70,7 @@ class Meme {
     type: map['type'] as String? ?? 'image',
     textContent: map['textContent'] as String?,
     remotePath: map['remotePath'] as String?,
+    characterData: map['characterData'] as Map<String, dynamic>?,
   );
 
   Meme copyWith({
@@ -81,6 +86,7 @@ class Meme {
     String? type,
     String? textContent,
     String? remotePath,
+    Map<String, dynamic>? characterData,
   }) => Meme(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -94,5 +100,6 @@ class Meme {
     type: type ?? this.type,
     textContent: textContent ?? this.textContent,
     remotePath: remotePath ?? this.remotePath,
+    characterData: characterData ?? this.characterData,
   );
 }

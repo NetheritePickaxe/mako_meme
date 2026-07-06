@@ -190,6 +190,11 @@ class MemeProvider with ChangeNotifier {
     await loadAll();
   }
 
+  Future<void> updateCharacterData(String id, Map<String, dynamic> data) async {
+    await _storage.updateCharacterData(id, data);
+    await loadAll();
+  }
+
   Future<void> moveSelectedToFolder(String? folderId) async {
     await _storage.moveToFolderBatch(_sel.toList(), folderId);
     _sel.clear();

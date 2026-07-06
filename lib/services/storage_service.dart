@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import 'package:archive/archive_io.dart';
 import '../models/meme.dart';
 import '../models/folder.dart';
+import 'character_card_service.dart';
 import 'storage_platform.dart';
 import 'webdav_service.dart';
 import 'admin_service.dart';
@@ -306,14 +307,12 @@ class StorageService {
     String filePath;
 
     if (kIsWeb) {
-      // Web: 存储图片字节到 IndexedDB
       bytes = file.bytes;
       filePath = 'memes/$fileName';
       if (bytes != null) {
         await webStorageSetBinary(filePath, bytes);
       }
     } else {
-      // Native: 复制文件到存储目录
       filePath = 'memes/$fileName';
       final dest = File(p.join(_basePath!, filePath));
       await dest.create(recursive: true);
@@ -324,7 +323,35 @@ class StorageService {
       }
     }
 
-    final memeType = type ?? _guessType(ext);
+    String memeType = type ?? _guessType(ext);
+    Map<String, dynamic>? characterData;
+
+    if (ext == '.png') {
+      if (bytes != null) {
+        characterData = await CharacterCardService.parseFromBytes(bytes);
+      } else if (file.path != null) {
+        characterData = await CharacterCardService.parseFromPath(file.path!);
+      }
+
+      if (CharacterCardService.isValidCharacterCard(characterData)) {
+        memeType = Meme.typeCharacterCard;
+        final cardName = CharacterCardService.getName(characterData!);
+        if (cardName.isNotEmpty && cardName != '未知角色') {
+          return Meme(
+            id: id,
+            name: cardName,
+            filePath: filePath,
+            folderId: folderId,
+            tags: [],
+            createdAt: now,
+            mimeType: _guessMime(ext),
+            fileSize: bytes?.length ?? file.size,
+            type: memeType,
+            characterData: CharacterCardService.sanitizeCard(characterData),
+          );
+        }
+      }
+    }
 
     final meme = Meme(
       id: id,
@@ -336,6 +363,7 @@ class StorageService {
       mimeType: _guessMime(ext),
       fileSize: bytes?.length ?? file.size,
       type: memeType,
+      characterData: characterData != null ? CharacterCardService.sanitizeCard(characterData) : null,
     );
     _memes.insert(0, meme);
     _save();
@@ -443,6 +471,14 @@ class StorageService {
     final idx = _memes.indexWhere((m) => m.id == id);
     if (idx != -1) {
       _memes[idx] = _memes[idx].copyWith(type: type);
+      _save();
+    }
+  }
+
+  Future<void> updateCharacterData(String id, Map<String, dynamic> data) async {
+    final idx = _memes.indexWhere((m) => m.id == id);
+    if (idx != -1) {
+      _memes[idx] = _memes[idx].copyWith(characterData: data);
       _save();
     }
   }
