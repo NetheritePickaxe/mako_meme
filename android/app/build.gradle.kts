@@ -6,7 +6,7 @@ plugins {
 }
 
 val keystoreProperties = Properties().apply {
-    load(File("key.properties").inputStream())
+    load(file("key.properties").inputStream())
 }
 
 android {
