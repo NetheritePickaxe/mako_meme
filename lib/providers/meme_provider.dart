@@ -22,6 +22,7 @@ class MemeProvider with ChangeNotifier {
   SortBy _sortBy = SortBy.date;
   SortOrder _order = SortOrder.desc;
   bool _multi = false;
+  bool _showFoldersView = false;
   final Set<String> _sel = {};
   final Set<String> _selectedFolders = {};
   final Set<String> _tagFilter = {};
@@ -30,6 +31,7 @@ class MemeProvider with ChangeNotifier {
 
   Set<String> get folderFilter => _folderFilter;
   Set<String> get typeFilter => _typeFilter;
+  bool get showFoldersView => _showFoldersView;
 
   MemeProvider(this._storage, this._settings);
 
@@ -64,6 +66,7 @@ class MemeProvider with ChangeNotifier {
 
   void selectFolder(String? id) {
     _folderId = id;
+    if (id != null) _showFoldersView = false;
     _apply();
     notifyListeners();
   }
@@ -140,6 +143,18 @@ class MemeProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  void setShowFoldersView(bool v) {
+    _showFoldersView = v;
+    if (v) {
+      _folderId = null;
+      _typeFilter.clear();
+      _tagFilter.clear();
+      _folderFilter.clear();
+      _apply();
+    }
+    notifyListeners();
+  }
+
   void toggleSelect(String id) {
     _sel.contains(id) ? _sel.remove(id) : _sel.add(id);
     notifyListeners();
@@ -211,7 +226,7 @@ class MemeProvider with ChangeNotifier {
     int emojiCount = 0;
     int imageCount = 0;
     int skipped = 0;
-    for (final meme in List<Meme>.from(_memes)) {
+    for (final meme in List<Meme>.from(_all)) {
       // 只处理图片类和当前归类为表情/图片的
       if (meme.type != Meme.typeImage && meme.type != Meme.typeEmoji) {
         skipped++;
@@ -234,6 +249,11 @@ class MemeProvider with ChangeNotifier {
     }
     await loadAll();
     return {'emoji': emojiCount, 'image': imageCount, 'skipped': skipped};
+  }
+
+  Future<void> updateFolderCover(String folderId, String? coverMemeId) async {
+    await _storage.updateFolderCover(folderId, coverMemeId);
+    await loadAll();
   }
 
   Future<void> updateCharacterData(String id, Map<String, dynamic> data) async {

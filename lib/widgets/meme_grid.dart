@@ -3,6 +3,7 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:provider/provider.dart';
 import '../models/meme.dart';
 import '../providers/settings_provider.dart';
+import '../providers/locale_provider.dart';
 import 'meme_card.dart';
 
 class MemeGrid extends StatelessWidget {
@@ -18,7 +19,7 @@ class MemeGrid extends StatelessWidget {
   });
 
   int _resolveCols(BuildContext context) {
-    final settings = context.read<SettingsProvider>();
+    final settings = context.watch<SettingsProvider>();
     if (settings.gridColumns > 0) return settings.gridColumns;
     // 自动：根据宽度
     final width = MediaQuery.sizeOf(context).width;
@@ -28,15 +29,17 @@ class MemeGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (memes.isEmpty) {
+      final l10n = context.read<LocaleProvider>().l10n;
+      final cs = Theme.of(context).colorScheme;
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.image_outlined, size: 64, color: Colors.grey.shade400),
+            Icon(Icons.image_outlined, size: 64, color: cs.outline),
             const SizedBox(height: 16),
-            Text('还没有表情包', style: TextStyle(fontSize: 18, color: Colors.grey.shade600)),
+            Text(l10n.tr('no_memes'), style: TextStyle(fontSize: 18, color: cs.outline)),
             const SizedBox(height: 8),
-            Text('点击右下角 + 导入', style: TextStyle(fontSize: 14, color: Colors.grey.shade500)),
+            Text(l10n.tr('tap_plus'), style: TextStyle(fontSize: 14, color: cs.outline.withValues(alpha: 0.7))),
           ],
         ),
       );

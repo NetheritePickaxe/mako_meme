@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/meme.dart';
 import '../providers/meme_provider.dart';
+import '../providers/locale_provider.dart';
+import '../l10n/l10n.dart';
 
 class MultiSelectBar extends StatelessWidget {
   const MultiSelectBar({super.key});
@@ -9,6 +11,7 @@ class MultiSelectBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final prov = context.watch<MemeProvider>();
+    final l10n = context.watch<LocaleProvider>().l10n;
     return Container(
       color: Theme.of(context).colorScheme.surfaceContainerHighest,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -16,35 +19,35 @@ class MultiSelectBar extends StatelessWidget {
         children: [
           TextButton.icon(
             icon: const Icon(Icons.select_all, size: 18),
-            label: const Text('全选'),
+            label: Text(l10n.tr('select_all')),
             onPressed: () => prov.selectAll(),
           ),
           TextButton.icon(
             icon: const Icon(Icons.deselect, size: 18),
-            label: const Text('取消'),
+            label: Text(l10n.tr('cancel')),
             onPressed: () => prov.deselectAll(),
           ),
           const Spacer(),
           if (prov.selected.isNotEmpty) ...[
             IconButton(
               icon: const Icon(Icons.folder_open, size: 20),
-              tooltip: '移动到文件夹',
-              onPressed: () => _showMoveDialog(context, prov),
+              tooltip: l10n.tr('move_to_folder'),
+              onPressed: () => _showMoveDialog(context, prov, l10n),
             ),
             IconButton(
               icon: const Icon(Icons.label_outline, size: 20),
-              tooltip: '修改分类',
-              onPressed: () => _showTypeDialog(context, prov),
+              tooltip: l10n.tr('change_category'),
+              onPressed: () => _showTypeDialog(context, prov, l10n),
             ),
             IconButton(
               icon: const Icon(Icons.ios_share, size: 20),
-              tooltip: '导出选中',
-              onPressed: () => _exportSelected(context, prov),
+              tooltip: l10n.tr('export_selected'),
+              onPressed: () => _exportSelected(context, prov, l10n),
             ),
             IconButton(
               icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
-              tooltip: '删除选中',
-              onPressed: () => _confirmDelete(context, prov),
+              tooltip: l10n.tr('delete_selected'),
+              onPressed: () => _confirmDelete(context, prov, l10n),
             ),
           ],
         ],
@@ -52,15 +55,15 @@ class MultiSelectBar extends StatelessWidget {
     );
   }
 
-  void _showMoveDialog(BuildContext ctx, MemeProvider prov) {
+  void _showMoveDialog(BuildContext ctx, MemeProvider prov, L10n l10n) {
     showDialog(
       context: ctx,
       builder: (dCtx) => SimpleDialog(
-        title: const Text('移动到文件夹'),
+        title: Text(l10n.tr('move_to_folder')),
         children: [
           SimpleDialogOption(
             onPressed: () { prov.moveSelectedToFolder(null); Navigator.pop(dCtx); },
-            child: const Text('未分类'),
+            child: Text(l10n.tr('all_folders')),
           ),
           ...prov.folders.map((f) => SimpleDialogOption(
             onPressed: () { prov.moveSelectedToFolder(f.id); Navigator.pop(dCtx); },
@@ -71,21 +74,21 @@ class MultiSelectBar extends StatelessWidget {
     );
   }
 
-  void _showTypeDialog(BuildContext ctx, MemeProvider prov) {
+  void _showTypeDialog(BuildContext ctx, MemeProvider prov, L10n l10n) {
     final types = [
-      {'type': Meme.typeEmoji, 'label': '表情', 'icon': Icons.face},
-      {'type': Meme.typeGif, 'label': 'GIF', 'icon': Icons.gif},
-      {'type': Meme.typeImage, 'label': '图片', 'icon': Icons.image},
-      {'type': Meme.typeText, 'label': '文字', 'icon': Icons.text_fields},
-      {'type': Meme.typePortrait, 'label': '立绘', 'icon': Icons.portrait},
-      {'type': Meme.typeCg, 'label': 'CG', 'icon': Icons.photo_library},
-      {'type': Meme.typeCharacterCard, 'label': '角色卡', 'icon': Icons.person_outline},
+      {'type': Meme.typeEmoji, 'label': l10n.tr('type_emoji'), 'icon': Icons.face},
+      {'type': Meme.typeGif, 'label': l10n.tr('type_gif'), 'icon': Icons.gif},
+      {'type': Meme.typeImage, 'label': l10n.tr('type_image'), 'icon': Icons.image},
+      {'type': Meme.typeText, 'label': l10n.tr('type_text'), 'icon': Icons.text_fields},
+      {'type': Meme.typePortrait, 'label': l10n.tr('type_portrait'), 'icon': Icons.portrait},
+      {'type': Meme.typeCg, 'label': l10n.tr('type_cg'), 'icon': Icons.photo_library},
+      {'type': Meme.typeCharacterCard, 'label': l10n.tr('type_character_card'), 'icon': Icons.person_outline},
     ];
 
     showDialog(
       context: ctx,
       builder: (dCtx) => AlertDialog(
-        title: const Text('设置分类'),
+        title: Text(l10n.tr('change_category')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: types.map((t) {
@@ -103,35 +106,35 @@ class MultiSelectBar extends StatelessWidget {
           }).toList(),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dCtx), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(dCtx), child: Text(l10n.tr('cancel'))),
         ],
       ),
     );
   }
 
-  Future<void> _exportSelected(BuildContext ctx, MemeProvider prov) async {
+  Future<void> _exportSelected(BuildContext ctx, MemeProvider prov, L10n l10n) async {
     try {
       ScaffoldMessenger.of(ctx).showSnackBar(
-        SnackBar(content: Text('已选中 ${prov.selected.length} 个表情')),
+        SnackBar(content: Text(l10n.tr('selected_memes', args: {'count': prov.selected.length.toString()}))),
       );
     } catch (e) {
       if (ctx.mounted) {
         ScaffoldMessenger.of(ctx).showSnackBar(
-          SnackBar(content: Text('操作失败: $e')),
+          SnackBar(content: Text(l10n.tr('operation_failed', args: {'error': e.toString()}))),
         );
       }
     }
   }
 
-  void _confirmDelete(BuildContext ctx, MemeProvider prov) async {
+  void _confirmDelete(BuildContext ctx, MemeProvider prov, L10n l10n) async {
     final confirm = await showDialog<bool>(
       context: ctx,
       builder: (dCtx) => AlertDialog(
-        title: const Text('删除表情'),
-        content: Text('确定删除选中的 ${prov.selected.length} 张表情？'),
+        title: Text(l10n.tr('delete_meme_title')),
+        content: Text(l10n.tr('delete_selected_confirm', args: {'count': prov.selected.length.toString()})),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dCtx, false), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(dCtx, true), child: const Text('删除')),
+          TextButton(onPressed: () => Navigator.pop(dCtx, false), child: Text(l10n.tr('cancel'))),
+          FilledButton(onPressed: () => Navigator.pop(dCtx, true), child: Text(l10n.tr('delete'))),
         ],
       ),
     );

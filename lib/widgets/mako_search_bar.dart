@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/locale_provider.dart';
 
 class MakoSearchBar extends StatefulWidget {
   final ValueChanged<String> onSearch;
@@ -20,12 +22,13 @@ class _MakoSearchBarState extends State<MakoSearchBar> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.watch<LocaleProvider>().l10n;
     return Padding(
       padding: const EdgeInsets.all(12),
       child: TextField(
         controller: _controller,
         decoration: InputDecoration(
-          hintText: '搜索表情（# 标签，@ 文件夹）',
+          hintText: l10n.tr('search_hint'),
           hintStyle: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
           prefixIcon: Icon(Icons.search, color: theme.colorScheme.onSurfaceVariant),
           suffixIcon: _controller.text.isNotEmpty

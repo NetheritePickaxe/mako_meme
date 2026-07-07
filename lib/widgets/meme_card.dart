@@ -8,6 +8,8 @@ import 'package:share_plus/share_plus.dart';
 import 'package:file_picker/file_picker.dart';
 import '../models/meme.dart';
 import '../providers/meme_provider.dart';
+import '../providers/locale_provider.dart';
+import '../l10n/l10n.dart';
 import '../services/storage_service.dart';
 import '../screens/meme_viewer_screen.dart';
 
@@ -134,6 +136,7 @@ class _MemeCardState extends State<MemeCard> {
           opacity: 0.4,
           child: _buildAspectRatioCard(prov, isSelected, isMulti, theme),
         ),
+        onDragStart: () => HapticFeedback.mediumImpact(),
         child: GestureDetector(
           onTap: isMulti ? () => prov.toggleSelect(widget.meme.id) : _copyToClipboard,
           onSecondaryTapUp: (details) => _showContextMenu(details.globalPosition),
@@ -152,6 +155,7 @@ class _MemeCardState extends State<MemeCard> {
           opacity: 0.4,
           child: _buildAspectRatioCard(prov, isSelected, isMulti, theme),
         ),
+        onDragStart: () => HapticFeedback.mediumImpact(),
         child: GestureDetector(
           onTap: () => prov.toggleSelect(widget.meme.id),
           child: inner,
@@ -159,10 +163,15 @@ class _MemeCardState extends State<MemeCard> {
       );
     }
 
-    // 移动端普通模式：点击预览，长按分享
+    // 移动端普通模式：点击预览，长按分享（带触觉反馈）
     return GestureDetector(
       onTap: isMulti ? () => prov.toggleSelect(widget.meme.id) : _openViewer,
-      onLongPress: isMulti ? null : _shareMeme,
+      onLongPress: isMulti
+          ? null
+          : () {
+              HapticFeedback.mediumImpact();
+              _shareMeme();
+            },
       child: _buildInner(prov, isSelected, isMulti, theme),
     );
   }
@@ -340,9 +349,9 @@ class _MemeCardState extends State<MemeCard> {
                 ),
               Positioned(bottom: 6, left: 6,
                 child: Container(padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                  decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.6), borderRadius: BorderRadius.circular(4)),
-                  child: const Text('文字',
-                    style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                  decoration: BoxDecoration(color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.85), borderRadius: BorderRadius.circular(4)),
+                  child: Text(context.read<LocaleProvider>().l10n.tr('text_label'),
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSecondary, fontSize: 10, fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
@@ -377,7 +386,7 @@ class _MemeCardState extends State<MemeCard> {
                       children: [
                         Icon(Icons.cloud_off, size: 24, color: Colors.grey.shade500),
                         const SizedBox(height: 4),
-                        Text('丢失', style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+                        Text(context.read<LocaleProvider>().l10n.tr('lost_label'), style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
                       ],
                     ),
                   ),
@@ -415,9 +424,9 @@ class _MemeCardState extends State<MemeCard> {
               if (widget.meme.type != Meme.typeImage)
                 Positioned(bottom: 6, left: 6,
                   child: Container(padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                    decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.6), borderRadius: BorderRadius.circular(4)),
+                    decoration: BoxDecoration(color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.85), borderRadius: BorderRadius.circular(4)),
                     child: Text(_typeLabel(widget.meme.type),
-                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                      style: TextStyle(color: Theme.of(context).colorScheme.onSecondary, fontSize: 10, fontWeight: FontWeight.bold)),
                   ),
                 ),
             ],
@@ -427,17 +436,18 @@ class _MemeCardState extends State<MemeCard> {
   }
 
   void _copyToClipboard() {
+    final l10n = context.read<LocaleProvider>().l10n;
     final hasData = _bytes != null || _file != null;
     if (widget.meme.isImageType && !hasData) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('图片丢失，无法复制'), duration: Duration(seconds: 1)),
+        SnackBar(content: Text(l10n.tr('lost')), duration: const Duration(seconds: 1)),
       );
       return;
     }
     // Flutter 无原生图片剪贴板支持（需 platform channel），此处简化处理
     Clipboard.setData(ClipboardData(text: widget.meme.name));
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('已复制: ${widget.meme.name}'), duration: const Duration(seconds: 1)),
+      SnackBar(content: Text(l10n.tr('copied', args: {'name': widget.meme.name})), duration: const Duration(seconds: 1)),
     );
   }
 
@@ -458,6 +468,7 @@ class _MemeCardState extends State<MemeCard> {
   }
 
   void _showContextMenu(Offset tapPosition) {
+    final l10n = context.read<LocaleProvider>().l10n;
     showMenu(
       context: context,
       position: RelativeRect.fromRect(
@@ -466,43 +477,43 @@ class _MemeCardState extends State<MemeCard> {
       ),
       items: <PopupMenuEntry<String>>[
         if (_bytes == null && _file == null && !_loading)
-          const PopupMenuItem<String>(
+          PopupMenuItem<String>(
             value: 'reimport',
-            child: ListTile(leading: Icon(Icons.refresh), title: Text('重新导入'), dense: true),
+            child: ListTile(leading: const Icon(Icons.refresh), title: Text(l10n.tr('reimport')), dense: true),
           ),
         if (_bytes != null || _file != null)
-          const PopupMenuItem<String>(
+          PopupMenuItem<String>(
             value: 'preview',
-            child: ListTile(leading: Icon(Icons.zoom_in), title: Text('预览大图'), dense: true),
+            child: ListTile(leading: const Icon(Icons.zoom_in), title: Text(l10n.tr('preview_large')), dense: true),
           ),
-        const PopupMenuItem<String>(
+        PopupMenuItem<String>(
           value: 'rename',
-          child: ListTile(leading: Icon(Icons.edit), title: Text('重命名'), dense: true),
+          child: ListTile(leading: const Icon(Icons.edit), title: Text(l10n.tr('rename')), dense: true),
         ),
-        const PopupMenuItem<String>(
+        PopupMenuItem<String>(
           value: 'type',
-          child: ListTile(leading: Icon(Icons.label_outline), title: Text('修改分类'), dense: true),
+          child: ListTile(leading: const Icon(Icons.label_outline), title: Text(l10n.tr('select_category')), dense: true),
         ),
-        const PopupMenuItem<String>(
+        PopupMenuItem<String>(
           value: 'copy',
-          child: ListTile(leading: Icon(Icons.copy), title: Text('复制'), dense: true),
+          child: ListTile(leading: const Icon(Icons.copy), title: Text(l10n.tr('copy')), dense: true),
         ),
-        const PopupMenuItem<String>(
+        PopupMenuItem<String>(
           value: 'share',
-          child: ListTile(leading: Icon(Icons.share), title: Text('分享'), dense: true),
+          child: ListTile(leading: const Icon(Icons.share), title: Text(l10n.tr('share')), dense: true),
         ),
         PopupMenuItem<String>(
           value: 'favorite',
           child: ListTile(
             leading: Icon(Icons.favorite, color: widget.meme.isFavorite ? Colors.red : null),
-            title: Text(widget.meme.isFavorite ? '取消收藏' : '收藏'),
+            title: Text(widget.meme.isFavorite ? l10n.tr('unfavorite') : l10n.tr('favorite')),
             dense: true,
           ),
         ),
         const PopupMenuDivider(),
-        const PopupMenuItem<String>(
+        PopupMenuItem<String>(
           value: 'delete',
-          child: ListTile(leading: Icon(Icons.delete, color: Colors.red), title: Text('删除', style: TextStyle(color: Colors.red)), dense: true),
+          child: ListTile(leading: const Icon(Icons.delete, color: Colors.red), title: Text(l10n.tr('delete'), style: const TextStyle(color: Colors.red)), dense: true),
         ),
       ],
     ).then((value) {
@@ -523,19 +534,20 @@ class _MemeCardState extends State<MemeCard> {
   }
 
   void _showRenameDialog() async {
+    final l10n = context.read<LocaleProvider>().l10n;
     final ctrl = TextEditingController(text: widget.meme.name);
     final newName = await showDialog<String>(
       context: context,
       builder: (dCtx) => AlertDialog(
-        title: const Text('重命名'),
+        title: Text(l10n.tr('rename_title')),
         content: TextField(
           controller: ctrl,
           autofocus: true,
-          decoration: const InputDecoration(hintText: '新名称'),
+          decoration: InputDecoration(hintText: l10n.tr('new_name_hint')),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dCtx), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(dCtx, ctrl.text.trim()), child: const Text('保存')),
+          TextButton(onPressed: () => Navigator.pop(dCtx), child: Text(l10n.tr('cancel'))),
+          FilledButton(onPressed: () => Navigator.pop(dCtx, ctrl.text.trim()), child: Text(l10n.tr('save'))),
         ],
       ),
     );
@@ -545,20 +557,21 @@ class _MemeCardState extends State<MemeCard> {
   }
 
   void _showTypeDialog() {
+    final l10n = context.read<LocaleProvider>().l10n;
     final types = [
-      {'type': Meme.typeEmoji, 'label': '表情', 'icon': Icons.face},
-      {'type': Meme.typeGif, 'label': 'GIF', 'icon': Icons.gif},
-      {'type': Meme.typeImage, 'label': '图片', 'icon': Icons.image},
-      {'type': Meme.typeText, 'label': '文字', 'icon': Icons.text_fields},
-      {'type': Meme.typePortrait, 'label': '立绘', 'icon': Icons.portrait},
-      {'type': Meme.typeCg, 'label': 'CG', 'icon': Icons.photo_library},
-      {'type': Meme.typeCharacterCard, 'label': '角色卡', 'icon': Icons.person_outline},
+      {'type': Meme.typeEmoji, 'label': l10n.tr('type_emoji'), 'icon': Icons.face},
+      {'type': Meme.typeGif, 'label': l10n.tr('type_gif'), 'icon': Icons.gif},
+      {'type': Meme.typeImage, 'label': l10n.tr('type_image'), 'icon': Icons.image},
+      {'type': Meme.typeText, 'label': l10n.tr('type_text'), 'icon': Icons.text_fields},
+      {'type': Meme.typePortrait, 'label': l10n.tr('type_portrait'), 'icon': Icons.portrait},
+      {'type': Meme.typeCg, 'label': l10n.tr('type_cg'), 'icon': Icons.photo_library},
+      {'type': Meme.typeCharacterCard, 'label': l10n.tr('type_character_card'), 'icon': Icons.person_outline},
     ];
 
     showDialog(
       context: context,
       builder: (dCtx) => AlertDialog(
-        title: const Text('选择分类'),
+        title: Text(l10n.tr('select_category')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: types.map((t) {
@@ -580,22 +593,23 @@ class _MemeCardState extends State<MemeCard> {
           }).toList(),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dCtx), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(dCtx), child: Text(l10n.tr('cancel'))),
         ],
       ),
     );
   }
 
   void _confirmDelete() async {
+    final l10n = context.read<LocaleProvider>().l10n;
     final prov = context.read<MemeProvider>();
     final confirm = await showDialog<bool>(
       context: context,
       builder: (dCtx) => AlertDialog(
-        title: const Text('删除表情'),
-        content: Text('确定删除「${widget.meme.name}」？'),
+        title: Text(l10n.tr('delete_meme_title')),
+        content: Text(l10n.tr('delete_confirm', args: {'name': widget.meme.name})),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dCtx, false), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(dCtx, true), child: const Text('删除')),
+          TextButton(onPressed: () => Navigator.pop(dCtx, false), child: Text(l10n.tr('cancel'))),
+          FilledButton(onPressed: () => Navigator.pop(dCtx, true), child: Text(l10n.tr('delete'))),
         ],
       ),
     );
@@ -610,13 +624,14 @@ class _MemeCardState extends State<MemeCard> {
   );
 
   String _typeLabel(String type) {
+    final l10n = context.read<LocaleProvider>().l10n;
     switch (type) {
-      case Meme.typeEmoji: return '表情';
-      case Meme.typeGif: return 'GIF';
-      case Meme.typeText: return '文字';
-      case Meme.typePortrait: return '立绘';
-      case Meme.typeCg: return 'CG';
-      case Meme.typeCharacterCard: return '角色卡';
+      case Meme.typeEmoji: return l10n.tr('type_emoji');
+      case Meme.typeGif: return l10n.tr('type_gif');
+      case Meme.typeText: return l10n.tr('type_text');
+      case Meme.typePortrait: return l10n.tr('type_portrait');
+      case Meme.typeCg: return l10n.tr('type_cg');
+      case Meme.typeCharacterCard: return l10n.tr('type_character_card');
       default: return '';
     }
   }

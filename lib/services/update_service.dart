@@ -16,6 +16,23 @@ class UpdateInfo {
   });
 }
 
+/// GitHub Release 条目
+class ReleaseEntry {
+  final String version;
+  final String name;
+  final String body;
+  final String htmlUrl;
+  final DateTime publishedAt;
+
+  const ReleaseEntry({
+    required this.version,
+    required this.name,
+    required this.body,
+    required this.htmlUrl,
+    required this.publishedAt,
+  });
+}
+
 class UpdateService {
   static const _repo = 'NetheritePickaxe/mako_meme';
 
@@ -53,6 +70,36 @@ class UpdateService {
       return UpdateInfo(version: version, downloadUrl: downloadUrl, releaseUrl: releaseUrl);
     } catch (_) {
       return null;
+    }
+  }
+
+  /// 从 GitHub Releases 拉取更新日志（默认最近 20 条）
+  Future<List<ReleaseEntry>> fetchChangelog({int limit = 20}) async {
+    try {
+      final uri = Uri.parse(
+        'https://api.github.com/repos/$_repo/releases?per_page=$limit',
+      );
+      final resp = await http.get(uri, headers: {
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'mako_meme',
+      });
+      if (resp.statusCode != 200) return [];
+      final list = jsonDecode(resp.body) as List;
+      return list.map((e) {
+        final m = e as Map<String, dynamic>;
+        final tagName = m['tag_name'] as String? ?? '';
+        final version = tagName.startsWith('v') ? tagName.substring(1) : tagName;
+        final published = m['published_at'] as String? ?? '';
+        return ReleaseEntry(
+          version: version,
+          name: (m['name'] as String?) ?? tagName,
+          body: (m['body'] as String?) ?? '',
+          htmlUrl: (m['html_url'] as String?) ?? '',
+          publishedAt: DateTime.tryParse(published) ?? DateTime.now(),
+        );
+      }).toList();
+    } catch (_) {
+      return [];
     }
   }
 

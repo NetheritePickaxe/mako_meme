@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../models/folder.dart';
 import '../models/meme.dart';
 import '../providers/meme_provider.dart';
+import '../providers/locale_provider.dart';
+import '../l10n/l10n.dart';
 import '../services/storage_service.dart';
 
 /// 文件夹卡片 — 也是一个拖放目标，接收表情包拖入
@@ -24,6 +26,7 @@ class FolderCard extends StatelessWidget {
     final theme = Theme.of(context);
     final color = Color(folder.colorValue);
     final prov = context.watch<MemeProvider>();
+    final l10n = context.watch<LocaleProvider>().l10n;
     final isMulti = prov.isMulti;
     final isFolderSelected = prov.selectedFolders.contains(folder.id);
 
@@ -53,7 +56,7 @@ class FolderCard extends StatelessWidget {
           final p = context.read<MemeProvider>();
           p.moveToFolder(details.data.id, folder.id);
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('已移至「${folder.name}」'), duration: const Duration(seconds: 1)),
+            SnackBar(content: Text(l10n.tr('moved_to_folder_msg', args: {'name': folder.name})), duration: const Duration(seconds: 1)),
           );
         },
         builder: (ctx, candidateData, rejectedData) {
@@ -134,9 +137,33 @@ class FolderCard extends StatelessWidget {
             ),
           ),
 
-          // 文件夹角标（右上角）
+          // 文件夹名称（底部左侧，留出右侧空间给角标）
           Positioned(
-            top: 6,
+            left: 8,
+            right: 48,
+            bottom: 8,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  folder.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // 文件夹角标（右下角）
+          Positioned(
+            bottom: 6,
             right: 6,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -155,30 +182,6 @@ class FolderCard extends StatelessWidget {
                   ),
                 ],
               ),
-            ),
-          ),
-
-          // 文件夹名称（底部）
-          Positioned(
-            left: 8,
-            right: 8,
-            bottom: 8,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  folder.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
-                  ),
-                ),
-              ],
             ),
           ),
 
@@ -267,6 +270,7 @@ class FolderCard extends StatelessWidget {
   }
 
   void _showFolderContextMenu(Offset globalPos, BuildContext context, MemeFolder folder, int count) {
+    final l10n = context.read<LocaleProvider>().l10n;
     final renderBox = context.findRenderObject() as RenderBox;
     final localPosition = renderBox.globalToLocal(globalPos);
     showMenu(
@@ -276,14 +280,14 @@ class FolderCard extends StatelessWidget {
         Offset.zero & renderBox.size,
       ),
       items: <PopupMenuEntry>[
-        const PopupMenuItem<String>(
+        PopupMenuItem<String>(
           value: 'set_cover',
-          child: ListTile(leading: Icon(Icons.photo_library), title: Text('设置封面'), dense: true),
+          child: ListTile(leading: const Icon(Icons.photo_library), title: Text(l10n.tr('set_cover')), dense: true),
         ),
         PopupMenuItem<String>(
           value: 'clear_cover',
           enabled: folder.coverMemeId != null,
-          child: ListTile(leading: Icon(Icons.clear), title: const Text('清除封面'), dense: true),
+          child: ListTile(leading: const Icon(Icons.clear), title: Text(l10n.tr('clear_cover')), dense: true),
         ),
       ],
     ).then((value) {
@@ -292,13 +296,13 @@ class FolderCard extends StatelessWidget {
       if (value == 'set_cover') {
         _showCoverSelector(context, folder);
       } else if (value == 'clear_cover') {
-        final storage = context.read<StorageService>();
-        storage.updateFolderCover(folder.id, null);
+        context.read<MemeProvider>().updateFolderCover(folder.id, null);
       }
     });
   }
 
   void _showCoverSelector(BuildContext context, MemeFolder folder) {
+    final l10n = context.read<LocaleProvider>().l10n;
     final prov = context.read<MemeProvider>();
     final memes = prov.memesInFolder(folder.id);
     if (memes.isEmpty) return;
@@ -306,7 +310,7 @@ class FolderCard extends StatelessWidget {
     showDialog(
       context: context,
       builder: (dCtx) => AlertDialog(
-        title: const Text('设置封面'),
+        title: Text(l10n.tr('set_cover')),
         content: SizedBox(
           width: 300,
           height: 300,
@@ -322,7 +326,7 @@ class FolderCard extends StatelessWidget {
               final meme = memes[i];
               return _CoverThumb(meme: meme, isCover: meme.id == folder.coverMemeId,
                 onTap: () {
-                  context.read<StorageService>().updateFolderCover(folder.id, meme.id);
+                  context.read<MemeProvider>().updateFolderCover(folder.id, meme.id);
                   Navigator.pop(dCtx);
                 });
             },
@@ -331,14 +335,14 @@ class FolderCard extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () {
-              context.read<StorageService>().updateFolderCover(folder.id, null);
+              context.read<MemeProvider>().updateFolderCover(folder.id, null);
               Navigator.pop(dCtx);
             },
-            child: const Text('自动'),
+            child: Text(l10n.tr('auto_cover')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dCtx),
-            child: const Text('取消'),
+            child: Text(l10n.tr('cancel')),
           ),
         ],
       ),

@@ -699,7 +699,20 @@ class StorageService {
   }
 
   Future<void> updateFolderCover(String folderId, String? coverMemeId) async {
-    // coverMemeId 不存储在 folder 表中，保持接口兼容
+    if (_folderBox == null) return;
+    final value = _folderBox!.get(folderId);
+    final map = _castMap(value);
+    if (map == null) return;
+    final folder = MemeFolder.fromMap(map);
+    final updated = coverMemeId == null
+        ? MemeFolder(
+            id: folder.id,
+            name: folder.name,
+            createdAt: folder.createdAt,
+            colorValue: folder.colorValue,
+          )
+        : folder.copyWith(coverMemeId: coverMemeId);
+    await _folderBox!.put(folderId, updated.toMap());
   }
 
   Future<void> deleteFolder(String id) async {
@@ -822,7 +835,6 @@ class StorageService {
       await sink.flush();
       await sink.close();
 
-      final srcMemesDir = Directory(p.join(_basePath!, 'memes'));
       if (kIsWeb) {
         for (final meme in allMemes) {
           if (meme.filePath.isEmpty) continue;
@@ -833,10 +845,13 @@ class StorageService {
             await dest.writeAsBytes(bytes);
           }
         }
-      } else if (await srcMemesDir.exists()) {
-        await for (final f in srcMemesDir.list()) {
-          if (f is File) {
-            await f.copy(p.join(memesDir.path, p.basename(f.path)));
+      } else {
+        final srcMemesDir = Directory(p.join(_basePath!, 'memes'));
+        if (await srcMemesDir.exists()) {
+          await for (final f in srcMemesDir.list()) {
+            if (f is File) {
+              await f.copy(p.join(memesDir.path, p.basename(f.path)));
+            }
           }
         }
       }
@@ -844,12 +859,18 @@ class StorageService {
       final zipPath = p.join(tempDir.path, 'mako_meme_backup.zip');
       final encoder = ZipFileEncoder();
       encoder.create(zipPath);
-      await encoder.addDirectory(exportDir, includeDirName: false);
+      // 逐个添加文件，避免 addDirectory API 差异
+      await for (final entity in exportDir.list(recursive: true, followLinks: false)) {
+        if (entity is File) {
+          final relPath = p.relative(entity.path, from: exportDir.path);
+          await encoder.addFile(entity, filename: relPath);
+        }
+      }
       await encoder.close();
 
       await exportDir.delete(recursive: true);
       return zipPath;
-    } catch (_) {
+    } catch (e) {
       return null;
     }
   }

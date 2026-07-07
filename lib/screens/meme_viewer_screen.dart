@@ -7,6 +7,8 @@ import 'package:share_plus/share_plus.dart';
 import 'package:provider/provider.dart';
 import '../models/meme.dart';
 import '../providers/meme_provider.dart';
+import '../providers/locale_provider.dart';
+import '../l10n/l10n.dart';
 import '../services/storage_service.dart';
 import 'character_card_editor_screen.dart';
 
@@ -66,6 +68,7 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final prov = context.watch<MemeProvider>();
+    final l10n = context.watch<LocaleProvider>().l10n;
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
@@ -74,7 +77,7 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
         foregroundColor: theme.colorScheme.onSurface,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          tooltip: '返回',
+          tooltip: l10n.tr('back'),
           onPressed: () => Navigator.pop(context),
         ),
         title: Column(
@@ -105,7 +108,7 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
           return Column(
             children: [
               Expanded(child: _buildImageArea(m, i)),
-              _buildDraggableDetailPanel(theme, prov, m),
+              _buildDraggableDetailPanel(theme, prov, m, l10n),
             ],
           );
         },
@@ -172,7 +175,7 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
   }
 
   /// 底部详情面板：可拖动展开/收起
-  Widget _buildDraggableDetailPanel(ThemeData theme, MemeProvider prov, Meme m) {
+  Widget _buildDraggableDetailPanel(ThemeData theme, MemeProvider prov, Meme m, L10n l10n) {
     final isMobile = _isMobilePlatform();
     return DraggableScrollableSheet(
       initialChildSize: 0.35,
@@ -233,7 +236,7 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                   spacing: 12,
                   runSpacing: 4,
                   children: [
-                    _infoChip(theme, _typeLabel(m.type), icon: _typeIcon(m.type)),
+                    _infoChip(theme, _typeLabel(m.type, l10n), icon: _typeIcon(m.type), accent: theme.colorScheme.secondary),
                     _infoChip(theme, _formatFileSize(m.fileSize), icon: Icons.data_usage),
                     _infoChip(theme, _formatDate(m.createdAt), icon: Icons.access_time),
                   ],
@@ -261,18 +264,18 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                   runSpacing: 4,
                   children: [
                     if (!(isMobile && m.isImageType))
-                      _actionButton(theme, '复制', Icons.copy, _copy),
-                    _actionButton(theme, '分享', Icons.ios_share, _share),
+                      _actionButton(theme, l10n.tr('copy'), Icons.copy, _copy),
+                    _actionButton(theme, l10n.tr('share'), Icons.ios_share, _share),
                     _actionButton(
                       theme,
-                      m.isFavorite ? '已收藏' : '收藏',
+                      m.isFavorite ? l10n.tr('unfavorite') : l10n.tr('favorite'),
                       m.isFavorite ? Icons.favorite : Icons.favorite_border,
                       () => prov.toggleFavorite(m.id),
                       color: m.isFavorite ? Colors.red : null,
                     ),
-                    _actionButton(theme, '分类', Icons.label_outline, _showTypeDialog),
-                    _actionButton(theme, '重命名', Icons.edit, _rename),
-                    _actionButton(theme, '删除', Icons.delete_outline, _confirmDelete, color: Colors.red),
+                    _actionButton(theme, l10n.tr('select_category'), Icons.label_outline, _showTypeDialog),
+                    _actionButton(theme, l10n.tr('rename'), Icons.edit, _rename),
+                    _actionButton(theme, l10n.tr('delete'), Icons.delete_outline, _confirmDelete, color: Colors.red),
                   ],
                 ),
                 if (m.type == Meme.typeCharacterCard) ...[
@@ -282,7 +285,7 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                     child: FilledButton.tonalIcon(
                       onPressed: _editCharacterCard,
                       icon: const Icon(Icons.edit_note),
-                      label: const Text('编辑角色卡'),
+                      label: Text(l10n.tr('edit_character_card')),
                     ),
                   ),
                 ],
@@ -294,18 +297,19 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
     );
   }
 
-  Widget _infoChip(ThemeData theme, String text, {IconData? icon}) {
+  Widget _infoChip(ThemeData theme, String text, {IconData? icon, Color? accent}) {
+    final iconColor = accent ?? theme.colorScheme.onSurface.withValues(alpha: 0.5);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (icon != null) ...[
-          Icon(icon, size: 14, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
+          Icon(icon, size: 14, color: iconColor),
           const SizedBox(width: 4),
         ],
         Text(
           text,
           style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+            color: accent ?? theme.colorScheme.onSurface.withValues(alpha: 0.6),
           ),
         ),
       ],
@@ -340,22 +344,22 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
     );
   }
 
-  String _typeLabel(String type) {
+  String _typeLabel(String type, L10n l10n) {
     switch (type) {
       case Meme.typeEmoji:
-        return '表情';
+        return l10n.tr('type_emoji');
       case Meme.typeGif:
-        return 'GIF';
+        return l10n.tr('type_gif');
       case Meme.typeText:
-        return '文字';
+        return l10n.tr('type_text');
       case Meme.typePortrait:
-        return '立绘';
+        return l10n.tr('type_portrait');
       case Meme.typeCg:
-        return 'CG';
+        return l10n.tr('type_cg');
       case Meme.typeCharacterCard:
-        return '角色卡';
+        return l10n.tr('type_character_card');
       default:
-        return '图片';
+        return l10n.tr('type_image');
     }
   }
 
@@ -396,19 +400,20 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
   }
 
   void _copy() {
+    final l10n = context.read<LocaleProvider>().l10n;
     final m = _meme;
     // 文字类型：复制文字内容到剪贴板
     if (m.type == Meme.typeText) {
       final text = m.textContent ?? '';
       if (text.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('无文字内容'), duration: Duration(seconds: 1)),
+          SnackBar(content: Text(l10n.tr('no_text_content')), duration: const Duration(seconds: 1)),
         );
         return;
       }
       Clipboard.setData(ClipboardData(text: text));
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已复制文字到剪贴板'), duration: Duration(seconds: 1)),
+        SnackBar(content: Text(l10n.tr('copied_text')), duration: const Duration(seconds: 1)),
       );
       return;
     }
@@ -417,14 +422,14 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
       final text = m.textContent ?? m.name;
       Clipboard.setData(ClipboardData(text: text));
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已复制到剪贴板'), duration: Duration(seconds: 1)),
+        SnackBar(content: Text(l10n.tr('copied_to_clipboard')), duration: const Duration(seconds: 1)),
       );
       return;
     }
     // 图片类型：复制文件名（Flutter 无原生图片剪贴板支持）
     Clipboard.setData(ClipboardData(text: m.name));
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('已复制名称: ${m.name}'), duration: const Duration(seconds: 1)),
+      SnackBar(content: Text(l10n.tr('copied_name', args: {'name': m.name})), duration: const Duration(seconds: 1)),
     );
   }
 
@@ -433,15 +438,16 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
   }
 
   void _rename() async {
+    final l10n = context.read<LocaleProvider>().l10n;
     final ctrl = TextEditingController(text: _meme.name);
     final newName = await showDialog<String>(
       context: context,
       builder: (dCtx) => AlertDialog(
-        title: const Text('重命名'),
-        content: TextField(controller: ctrl, autofocus: true, decoration: const InputDecoration(hintText: '新名称')),
+        title: Text(l10n.tr('rename_title')),
+        content: TextField(controller: ctrl, autofocus: true, decoration: InputDecoration(hintText: l10n.tr('new_name_hint'))),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dCtx), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(dCtx, ctrl.text.trim()), child: const Text('保存')),
+          TextButton(onPressed: () => Navigator.pop(dCtx), child: Text(l10n.tr('cancel'))),
+          FilledButton(onPressed: () => Navigator.pop(dCtx, ctrl.text.trim()), child: Text(l10n.tr('save'))),
         ],
       ),
     );
@@ -460,20 +466,21 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
   }
 
   void _showTypeDialog() {
+    final l10n = context.read<LocaleProvider>().l10n;
     final types = [
-      {'type': Meme.typeEmoji, 'label': '表情', 'icon': Icons.face},
-      {'type': Meme.typeGif, 'label': 'GIF', 'icon': Icons.gif},
-      {'type': Meme.typeImage, 'label': '图片', 'icon': Icons.image},
-      {'type': Meme.typeText, 'label': '文字', 'icon': Icons.text_fields},
-      {'type': Meme.typePortrait, 'label': '立绘', 'icon': Icons.portrait},
-      {'type': Meme.typeCg, 'label': 'CG', 'icon': Icons.photo_library},
-      {'type': Meme.typeCharacterCard, 'label': '角色卡', 'icon': Icons.person_outline},
+      {'type': Meme.typeEmoji, 'label': l10n.tr('type_emoji'), 'icon': Icons.face},
+      {'type': Meme.typeGif, 'label': l10n.tr('type_gif'), 'icon': Icons.gif},
+      {'type': Meme.typeImage, 'label': l10n.tr('type_image'), 'icon': Icons.image},
+      {'type': Meme.typeText, 'label': l10n.tr('type_text'), 'icon': Icons.text_fields},
+      {'type': Meme.typePortrait, 'label': l10n.tr('type_portrait'), 'icon': Icons.portrait},
+      {'type': Meme.typeCg, 'label': l10n.tr('type_cg'), 'icon': Icons.photo_library},
+      {'type': Meme.typeCharacterCard, 'label': l10n.tr('type_character_card'), 'icon': Icons.person_outline},
     ];
 
     showDialog(
       context: context,
       builder: (dCtx) => AlertDialog(
-        title: const Text('选择分类'),
+        title: Text(l10n.tr('select_category')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: types.map((t) {
@@ -495,21 +502,22 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
           }).toList(),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dCtx), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(dCtx), child: Text(l10n.tr('cancel'))),
         ],
       ),
     );
   }
 
   void _confirmDelete() async {
+    final l10n = context.read<LocaleProvider>().l10n;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (dCtx) => AlertDialog(
-        title: const Text('删除表情'),
-        content: Text('确定删除「${_meme.name}」？'),
+        title: Text(l10n.tr('delete_meme_title')),
+        content: Text(l10n.tr('delete_confirm', args: {'name': _meme.name})),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dCtx, false), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(dCtx, true), child: const Text('删除')),
+          TextButton(onPressed: () => Navigator.pop(dCtx, false), child: Text(l10n.tr('cancel'))),
+          FilledButton(onPressed: () => Navigator.pop(dCtx, true), child: Text(l10n.tr('delete'))),
         ],
       ),
     );

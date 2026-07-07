@@ -4,11 +4,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import '../providers/settings_provider.dart';
 import '../providers/meme_provider.dart';
 import '../providers/locale_provider.dart';
+import '../l10n/l10n.dart';
 import '../services/storage_service.dart';
 import '../services/update_service.dart';
 import '../services/webdav_service.dart';
@@ -22,95 +24,120 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _checking = false;
+  String _version = '';
+  String _buildNumber = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    if (mounted) {
+      setState(() {
+        _version = info.version;
+        _buildNumber = info.buildNumber;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
+    final l10n = context.watch<LocaleProvider>().l10n;
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('设置')),
+      appBar: AppBar(title: Text(l10n.tr('settings'))),
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
-          _sectionHeader('外观'),
-          _languageTile(context),
+          _sectionHeader(l10n.tr('appearance'), cs),
+          _languageTile(context, l10n),
           const Divider(indent: 16, endIndent: 16),
-          _themeModeTile(settings),
+          _themeModeTile(settings, l10n),
           const Divider(indent: 16, endIndent: 16),
-          _gridColumnsTile(settings),
+          _gridColumnsTile(settings, l10n),
           const Divider(indent: 16, endIndent: 16),
           if (defaultTargetPlatform == TargetPlatform.android) ...[
-            _monetTile(settings),
+            _monetTile(settings, l10n),
             if (!settings.useMonet) ...[
               const SizedBox(height: 8),
-              _presetPicker(settings, cs),
+              _presetPicker(settings, cs, l10n),
             ],
           ] else ...[
             const SizedBox(height: 8),
-            _presetPicker(settings, cs),
+            _presetPicker(settings, cs, l10n),
           ],
           const SizedBox(height: 16),
 
-          _sectionHeader('数据'),
+          _sectionHeader(l10n.tr('data'), cs),
           if (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.windows) ...[
-            _storageLocationTile(settings),
+            _storageLocationTile(settings, l10n),
             const Divider(indent: 16, endIndent: 16),
           ],
-          _autoClassifyTile(settings),
+          _autoClassifyTile(settings, l10n),
           const Divider(indent: 16, endIndent: 16),
           ListTile(
             leading: const Icon(Icons.file_download_outlined),
-            title: const Text('批量导入'),
-            subtitle: const Text('从 ZIP 恢复数据或导入图片'),
-            onTap: () => _importZip(context),
+            title: Text(l10n.tr('import_data')),
+            subtitle: Text(l10n.tr('import_data_desc')),
+            onTap: () => _importZip(context, l10n),
           ),
           ListTile(
             leading: const Icon(Icons.file_upload_outlined),
-            title: const Text('导出数据'),
-            subtitle: const Text('导出为 ZIP 或保存到系统相册'),
-            onTap: () => _showExportOptions(context),
+            title: Text(l10n.tr('export_data')),
+            subtitle: Text(l10n.tr('export_data_desc')),
+            onTap: () => _showExportOptions(context, l10n),
           ),
           const SizedBox(height: 16),
 
-          _sectionHeader('云同步'),
+          _sectionHeader(l10n.tr('cloud_sync'), cs),
           SwitchListTile(
             secondary: const Icon(Icons.cloud_outlined),
-            title: const Text('启用 WebDAV 同步'),
-            subtitle: const Text('将表情包上传到 WebDAV 服务器'),
+            title: Text(l10n.tr('enable_webdav')),
+            subtitle: Text(l10n.tr('webdav_desc')),
             value: settings.useWebDav,
             onChanged: (v) => settings.setUseWebDav(v),
           ),
           if (settings.useWebDav) ...[
             ListTile(
               leading: const Icon(Icons.cloud_outlined),
-              title: const Text('WebDAV 配置'),
-              subtitle: Text(settings.webDavBaseUrl != null ? '已配置' : '未配置'),
-              onTap: () => _showWebDavConfigDialog(context),
+              title: Text(l10n.tr('webdav_config_title')),
+              subtitle: Text(settings.webDavBaseUrl != null ? l10n.tr('webdav_configured') : l10n.tr('webdav_not_configured')),
+              onTap: () => _showWebDavConfigDialog(context, l10n),
             ),
             ListTile(
               leading: const Icon(Icons.sync),
-              title: const Text('同步所有数据'),
-              subtitle: const Text('将所有本地表情包上传到 WebDAV'),
-              onTap: () => _syncAllToWebDav(context),
+              title: Text(l10n.tr('sync_all_data')),
+              subtitle: Text(l10n.tr('sync_all_desc')),
+              onTap: () => _syncAllToWebDav(context, l10n),
             ),
           ],
           const SizedBox(height: 16),
 
           const SizedBox(height: 16),
 
-          _sectionHeader('关于'),
+          _sectionHeader(l10n.tr('about'), cs),
           ListTile(
             leading: const Icon(Icons.info_outline),
-            title: const Text('版本'),
-            subtitle: const Text('1.0.0+1'),
+            title: Text(l10n.tr('version')),
+            subtitle: Text(_version.isEmpty ? '0.0.1-dev+$_buildNumber' : '$_version+$_buildNumber'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.history),
+            title: Text(l10n.tr('view_changelog')),
+            subtitle: Text(l10n.tr('changelog')),
+            onTap: () => _showChangelog(context, l10n),
           ),
           ListTile(
             leading: Icon(_checking ? Icons.hourglass_top : Icons.system_update_outlined),
-            title: const Text('检查更新'),
-            subtitle: const Text('查看 GitHub 最新版本'),
-            onTap: _checking ? null : () => _checkUpdate(context),
+            title: Text(l10n.tr('check_update')),
+            subtitle: Text(l10n.tr('check_update_desc')),
+            onTap: _checking ? null : () => _checkUpdate(context, l10n),
           ),
           ListTile(
             leading: const Icon(Icons.open_in_new),
@@ -123,24 +150,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _storageLocationTile(SettingsProvider settings) {
+  Widget _storageLocationTile(SettingsProvider settings, L10n l10n) {
     return Column(
       children: [
         ListTile(
           leading: const Icon(Icons.folder_outlined),
-          title: const Text('存储位置'),
+          title: Text(l10n.tr('storage_location')),
           subtitle: Text(
             settings.storageLocation == 'custom' && settings.customStoragePath != null
                 ? settings.customStoragePath!
-                : '应用数据',
+                : l10n.tr('app_data'),
           ),
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: SegmentedButton<String>(
-            segments: const [
-              ButtonSegment(value: 'app', label: Text('应用数据')),
-              ButtonSegment(value: 'custom', label: Text('自定义文件夹')),
+            segments: [
+              ButtonSegment(value: 'app', label: Text(l10n.tr('app_data'))),
+              ButtonSegment(value: 'custom', label: Text(l10n.tr('custom_folder'))),
             ],
             selected: {settings.storageLocation},
             onSelectionChanged: (v) async {
@@ -149,7 +176,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                    defaultTargetPlatform == TargetPlatform.iOS);
               if (v.first == 'custom') {
                 final path = await FilePicker.platform.getDirectoryPath(
-                  dialogTitle: '选择存储文件夹',
+                  dialogTitle: l10n.tr('custom_folder'),
                 );
                 if (path != null) {
                   if (isMobile) {
@@ -158,7 +185,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   await settings.setCustomStoragePath(path);
                   await settings.setStorageLocation('custom');
                   if (mounted) {
-                    _showRestartDialog();
+                    _showRestartDialog(l10n);
                   }
                 }
               } else {
@@ -167,7 +194,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 }
                 await settings.setStorageLocation('app');
                 if (mounted) {
-                  _showRestartDialog();
+                  _showRestartDialog(l10n);
                 }
               }
             },
@@ -188,7 +215,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '数据将存储在：${settings.customStoragePath}',
+                    l10n.tr('data_stored_at', args: {'path': settings.customStoragePath ?? ''}),
                     style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
                   ),
                 ),
@@ -200,18 +227,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _showRestartDialog() {
+  void _showRestartDialog(L10n l10n) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('需要重启'),
-        content: const Text('存储位置已更改，需要重启应用才能生效。'),
+        title: Text(l10n.tr('restart_needed')),
+        content: Text(l10n.tr('restart_msg')),
         actions: [
           FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
             },
-            child: const Text('确定'),
+            child: Text(l10n.tr('confirm')),
           ),
         ],
       ),
@@ -238,42 +265,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (_) {}
   }
 
-  Widget _sectionHeader(String text) {
+  Widget _sectionHeader(String text, ColorScheme cs) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
       child: Text(text,
         style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w600,
-          color: Theme.of(context).colorScheme.primary,
+          color: cs.primary,
         ),
       ),
     );
   }
 
-  Widget _languageTile(BuildContext context) {
+  Widget _languageTile(BuildContext context, L10n l10n) {
     final localeProv = context.watch<LocaleProvider>();
-    final currentLang = localeProv.locale.languageCode;
+    // 使用完整 locale code（带国家码）作为下拉值，确保与 supportedLocales 匹配
+    final currentValue = localeProv.locale.countryCode != null
+        ? '${localeProv.locale.languageCode}_${localeProv.locale.countryCode}'
+        : localeProv.locale.languageCode;
     return ListTile(
       leading: const Icon(Icons.language),
-      title: const Text('语言'),
+      title: Text(l10n.tr('language')),
       trailing: DropdownButton<String>(
-        value: currentLang,
+        value: currentValue,
         underline: const SizedBox(),
         items: const [
-          DropdownMenuItem(value: 'zh', child: Text('简体中文')),
-          DropdownMenuItem(value: 'en', child: Text('English')),
+          DropdownMenuItem(value: 'zh_cn', child: Text('简体中文')),
+          DropdownMenuItem(value: 'en_us', child: Text('English')),
         ],
         onChanged: (val) {
-          if (val != null) {
-            localeProv.setLocale(Locale(val));
-          }
+          if (val == null) return;
+          final parts = val.split('_');
+          final locale = parts.length == 2
+              ? Locale(parts[0], parts[1])
+              : Locale(parts[0]);
+          localeProv.setLocale(locale);
         },
       ),
     );
   }
 
-  Widget _themeModeTile(SettingsProvider settings) {
+  Widget _themeModeTile(SettingsProvider settings, L10n l10n) {
     final showPureBlack = settings.themeMode == ThemeMode.dark ||
         (settings.themeMode == ThemeMode.system &&
             WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark);
@@ -281,12 +314,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       children: [
         ListTile(
           leading: const Icon(Icons.brightness_6),
-          title: const Text('主题模式'),
+          title: Text(l10n.tr('theme_mode')),
           trailing: SegmentedButton<ThemeMode>(
-            segments: const [
-              ButtonSegment(value: ThemeMode.system, label: Text('系统')),
-              ButtonSegment(value: ThemeMode.light, label: Text('浅色')),
-              ButtonSegment(value: ThemeMode.dark, label: Text('深色')),
+            segments: [
+              ButtonSegment(value: ThemeMode.system, label: Text(l10n.tr('system'))),
+              ButtonSegment(value: ThemeMode.light, label: Text(l10n.tr('light'))),
+              ButtonSegment(value: ThemeMode.dark, label: Text(l10n.tr('dark'))),
             ],
             selected: {settings.themeMode},
             onSelectionChanged: (v) => settings.setThemeMode(v.first),
@@ -300,8 +333,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         if (showPureBlack)
           SwitchListTile(
             secondary: const Icon(Icons.contrast),
-            title: const Text('纯黑模式'),
-            subtitle: const Text('AMOLED 纯黑背景，更省电'),
+            title: Text(l10n.tr('pure_black')),
+            subtitle: Text(l10n.tr('pure_black_desc')),
             value: settings.pureBlack,
             onChanged: (v) => settings.setPureBlack(v),
           ),
@@ -309,37 +342,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _gridColumnsTile(SettingsProvider settings) {
+  Widget _gridColumnsTile(SettingsProvider settings, L10n l10n) {
     final options = [0, 2, 3, 4, 5, 6, 7, 8];
-    final labels = ['自动', '2', '3', '4', '5', '6', '7', '8'];
     return ListTile(
       leading: const Icon(Icons.grid_view_outlined),
-      title: const Text('每行列数'),
-      subtitle: Text(settings.gridColumns == 0 ? '自动' : '${settings.gridColumns} 列'),
+      title: Text(l10n.tr('grid_columns')),
+      subtitle: Text(settings.gridColumns == 0
+          ? l10n.tr('auto_col')
+          : l10n.tr('n_columns', args: {'count': settings.gridColumns.toString()})),
       trailing: DropdownButton<int>(
         value: settings.gridColumns,
-        items: List.generate(options.length, (i) =>
-          DropdownMenuItem(value: options[i], child: Text(labels[i]))),
+        items: List.generate(options.length, (i) {
+          final v = options[i];
+          return DropdownMenuItem(
+            value: v,
+            child: Text(v == 0 ? l10n.tr('auto_col') : '$v'),
+          );
+        }),
         onChanged: (v) { if (v != null) settings.setGridColumns(v); },
       ),
     );
   }
 
-  Widget _autoClassifyTile(SettingsProvider settings) {
+  Widget _autoClassifyTile(SettingsProvider settings, L10n l10n) {
     return Column(
       children: [
         SwitchListTile(
           secondary: const Icon(Icons.auto_awesome_outlined),
-          title: const Text('导入时按画幅自动归类'),
-          subtitle: const Text('正方形→表情，长方形→图片'),
+          title: Text(l10n.tr('auto_classify')),
+          subtitle: Text(l10n.tr('auto_classify_desc')),
           value: settings.autoClassify,
           onChanged: (v) => settings.setAutoClassify(v),
         ),
         if (settings.autoClassify) ...[
           ListTile(
             leading: const Icon(Icons.straighten_outlined),
-            title: const Text('归类阈值（宽高比）'),
-            subtitle: Text('≤ ${settings.classifyRatio.toStringAsFixed(1)} 视为正方形'),
+            title: Text(l10n.tr('classify_threshold')),
+            subtitle: Text(l10n.tr('square_threshold', args: {'ratio': settings.classifyRatio.toStringAsFixed(1)})),
             trailing: SizedBox(
               width: 160,
               child: Slider(
@@ -354,25 +393,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           ListTile(
             leading: const Icon(Icons.refresh),
-            title: const Text('重新归类全部'),
-            subtitle: const Text('按当前阈值重新分类已有图片'),
-            onTap: () => _reclassifyAll(context, settings),
+            title: Text(l10n.tr('reclassify_all')),
+            subtitle: Text(l10n.tr('reclassify_desc')),
+            onTap: () => _reclassifyAll(context, settings, l10n),
           ),
         ],
       ],
     );
   }
 
-  Future<void> _reclassifyAll(BuildContext context, SettingsProvider settings) async {
+  Future<void> _reclassifyAll(BuildContext context, SettingsProvider settings, L10n l10n) async {
     final prov = context.read<MemeProvider>();
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('重新归类全部'),
-        content: const Text('将按当前阈值重新分类所有图片类表情包（表情/图片），不影响角色卡、GIF 和文字。是否继续？'),
+        title: Text(l10n.tr('reclassify_title')),
+        content: Text(l10n.tr('reclassify_confirm')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('继续')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.tr('cancel'))),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(l10n.tr('continue'))),
         ],
       ),
     );
@@ -382,14 +421,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => const PopScope(
+      builder: (ctx) => PopScope(
         canPop: false,
         child: AlertDialog(
           content: Row(
             children: [
-              CircularProgressIndicator(),
-              SizedBox(width: 20),
-              Expanded(child: Text('正在重新归类…')),
+              const CircularProgressIndicator(),
+              const SizedBox(width: 20),
+              Expanded(child: Text(l10n.tr('reclassifying'))),
             ],
           ),
         ),
@@ -404,24 +443,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final i = result['image'] ?? 0;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('归类完成：$e 张改为表情，$i 张改为图片'),
+          content: Text(l10n.tr('reclassify_done', args: {'emoji': e.toString(), 'image': i.toString()})),
           duration: const Duration(seconds: 3),
         ),
       );
     }
   }
 
-  Widget _monetTile(SettingsProvider settings) {
+  Widget _monetTile(SettingsProvider settings, L10n l10n) {
     return SwitchListTile(
       secondary: const Icon(Icons.palette_outlined),
-      title: const Text('使用莫奈取色'),
-      subtitle: const Text('Android 12+ 系统取色；其他平台自动使用配色方案'),
+      title: Text(l10n.tr('monet_title')),
+      subtitle: Text(l10n.tr('monet_desc')),
       value: settings.useMonet,
       onChanged: (v) => settings.setUseMonet(v),
     );
   }
 
-  Widget _presetPicker(SettingsProvider settings, ColorScheme cs) {
+  Widget _presetPicker(SettingsProvider settings, ColorScheme cs, L10n l10n) {
     final presets = AppTheme.presets;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -429,7 +468,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '配色方案',
+            l10n.tr('color_scheme'),
             style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: cs.primary),
           ),
           const SizedBox(height: 8),
@@ -440,7 +479,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             return _presetCard(preset, selected, cs, () => settings.setPreset(idx));
           }),
           const SizedBox(height: 4),
-          _customPresetCard(settings, cs),
+          _customPresetCard(settings, cs, l10n),
         ],
       ),
     );
@@ -497,10 +536,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _customPresetCard(SettingsProvider settings, ColorScheme cs) {
+  Widget _customPresetCard(SettingsProvider settings, ColorScheme cs, L10n l10n) {
     final selected = settings.presetIndex >= AppTheme.presets.length;
     return InkWell(
-      onTap: () => _showCustomColorPicker(context, settings, cs),
+      onTap: () => _showCustomColorPicker(context, settings, cs, l10n),
       borderRadius: BorderRadius.circular(10),
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
@@ -514,7 +553,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             Icon(Icons.edit, size: 18, color: cs.primary),
             const SizedBox(width: 12),
-            Expanded(child: Text(selected ? '自定义 (已保存)' : '自定义配色方案', style: const TextStyle(fontSize: 14))),
+            Expanded(child: Text(selected ? l10n.tr('custom_saved') : l10n.tr('custom_color_scheme'), style: const TextStyle(fontSize: 14))),
             if (selected) Icon(Icons.check_circle, color: cs.primary, size: 20),
           ],
         ),
@@ -522,7 +561,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _showCustomColorPicker(BuildContext context, SettingsProvider settings, ColorScheme cs) {
+  void _showCustomColorPicker(BuildContext context, SettingsProvider settings, ColorScheme cs, L10n l10n) {
     final primaryCtrl = TextEditingController(
       text: '#${settings.customPrimary.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase()}',
     );
@@ -560,7 +599,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Row(
                 children: [
                   Expanded(
-                    child: _colorTab('主色', editingIndex == 0, () {
+                    child: _colorTab(l10n.tr('primary_color'), editingIndex == 0, () {
                       setModalState(() => setColor(currentColor));
                       setModalState(() => editingIndex = 0);
                       setModalState(() => currentColor = settings.customPrimary);
@@ -568,14 +607,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: _colorTab('辅助色', editingIndex == 1, () {
+                    child: _colorTab(l10n.tr('secondary_color'), editingIndex == 1, () {
                       setModalState(() => editingIndex = 1);
                       setModalState(() => currentColor = settings.customSecondary);
                     }),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: _colorTab('强调色', editingIndex == 2, () {
+                    child: _colorTab(l10n.tr('tertiary_color'), editingIndex == 2, () {
                       setModalState(() => editingIndex = 2);
                       setModalState(() => currentColor = settings.customTertiary);
                     }),
@@ -596,7 +635,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 16),
               Row(
                 children: [
-                  Text('明度', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+                  Text(l10n.tr('lightness'), style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Slider(
@@ -646,7 +685,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () => Navigator.pop(bCtx),
-                      child: const Text('取消'),
+                      child: Text(l10n.tr('cancel')),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -660,7 +699,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         );
                         Navigator.pop(bCtx);
                       },
-                      child: const Text('保存'),
+                      child: Text(l10n.tr('save')),
                     ),
                   ),
                 ],
@@ -696,7 +735,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _showExportOptions(BuildContext context) {
+  void _showExportOptions(BuildContext context, L10n l10n) {
     final canSaveToGallery = !kIsWeb;
     showModalBottomSheet(
       context: context,
@@ -707,21 +746,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             ListTile(
               leading: const Icon(Icons.folder_zip_outlined),
-              title: const Text('导出为 ZIP'),
-              subtitle: const Text('包含所有表情包和元数据，可恢复'),
+              title: Text(l10n.tr('export_zip')),
+              subtitle: Text(l10n.tr('export_zip_desc')),
               onTap: () {
                 Navigator.pop(ctx);
-                _exportData(context);
+                _exportData(context, l10n);
               },
             ),
             if (canSaveToGallery)
               ListTile(
                 leading: const Icon(Icons.photo_library_outlined),
-                title: const Text('保存到系统相册'),
-                subtitle: const Text('将所有表情包图片保存到图片文件夹'),
+                title: Text(l10n.tr('save_to_gallery')),
+                subtitle: Text(l10n.tr('save_to_gallery_desc')),
                 onTap: () {
                   Navigator.pop(ctx);
-                  _saveToGallery(context);
+                  _saveToGallery(context, l10n);
                 },
               ),
           ],
@@ -730,13 +769,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Future<void> _saveToGallery(BuildContext context) async {
+  Future<void> _saveToGallery(BuildContext context, L10n l10n) async {
     final storage = context.read<StorageService>();
     final memes = storage.getAllMemes();
     if (memes.isEmpty) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('没有可导出的表情包')),
+          SnackBar(content: Text(l10n.tr('no_exportable'))),
         );
       }
       return;
@@ -787,7 +826,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (targetDir == null) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('无法确定保存目录')),
+          SnackBar(content: Text(l10n.tr('cannot_determine_dir'))),
         );
       }
       return;
@@ -815,7 +854,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 const CircularProgressIndicator(),
                 const SizedBox(width: 20),
-                Expanded(child: Text('正在保存… $done/$total')),
+                Expanded(child: Text(l10n.tr('saving_progress', args: {'done': done.toString(), 'total': total.toString()}))),
               ],
             ),
           ),
@@ -855,20 +894,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
       Navigator.of(context).pop(); // 关闭进度对话框
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('已保存 $done 张到：${targetDir.path}${failed > 0 ? '（$failed 张失败）' : ''}'),
+          content: Text(l10n.tr('saved_n_to', args: {'done': done.toString(), 'path': targetDir.path}) + (failed > 0 ? ' ($failed)' : '')),
           duration: const Duration(seconds: 4),
         ),
       );
     }
   }
 
-  Future<void> _exportData(BuildContext context) async {
+  Future<void> _exportData(BuildContext context, L10n l10n) async {
     final storage = context.read<StorageService>();
     final path = await storage.exportData();
     if (path == null) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('导出失败')),
+          SnackBar(content: Text(l10n.tr('export_failed_msg'))),
         );
       }
       return;
@@ -877,7 +916,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (kIsWeb) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Web 端不支持导出')),
+          SnackBar(content: Text(l10n.tr('export_not_supported_web'))),
         );
       }
       return;
@@ -885,7 +924,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     final file = File(path);
     final saved = await FilePicker.platform.saveFile(
-      dialogTitle: '保存备份',
+      dialogTitle: l10n.tr('save_backup'),
       fileName: 'mako_meme_backup.zip',
       type: FileType.any,
     );
@@ -893,14 +932,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await file.copy(saved);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('导出成功')),
+          SnackBar(content: Text(l10n.tr('export_success_msg'))),
         );
       }
     }
     await file.delete();
   }
 
-  Future<void> _importZip(BuildContext ctx) async {
+  Future<void> _importZip(BuildContext ctx, L10n l10n) async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['zip'],
@@ -917,11 +956,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final confirmed = await showDialog<bool>(
       context: ctx,
       builder: (c) => AlertDialog(
-        title: const Text('导入数据'),
-        content: Text('是否从 ${zipFile.name} 导入？\n\n如果 ZIP 包含 memes.json，将覆盖当前所有数据。'),
+        title: Text(l10n.tr('import_data_title')),
+        content: Text(l10n.tr('import_confirm_msg', args: {'filename': zipFile.name})),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('导入')),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(l10n.tr('cancel'))),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(l10n.tr('import'))),
         ],
       ),
     );
@@ -934,17 +973,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (ctx.mounted) {
       String msg;
       if (count == 0) {
-        msg = '备份导入成功';
+        msg = l10n.tr('import_success_msg');
       } else if (count > 0) {
-        msg = '导入了 $count 张图片';
+        msg = l10n.tr('imported_n_images', args: {'count': count.toString()});
       } else {
-        msg = '导入失败：无法识别的 ZIP 文件';
+        msg = l10n.tr('import_failed_msg');
       }
       ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(msg)));
     }
   }
 
-  Future<void> _checkUpdate(BuildContext ctx) async {
+  Future<void> _checkUpdate(BuildContext ctx, L10n l10n) async {
     setState(() => _checking = true);
     final service = UpdateService();
     final info = await service.check();
@@ -954,7 +993,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (info == null) {
       if (!ctx.mounted) return;
       ScaffoldMessenger.of(ctx).showSnackBar(
-        const SnackBar(content: Text('已是最新版本')),
+        SnackBar(content: Text(l10n.tr('already_latest'))),
       );
       return;
     }
@@ -963,11 +1002,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final result = await showDialog<bool>(
       context: ctx,
       builder: (ctx) => AlertDialog(
-        title: const Text('发现新版本'),
-        content: Text('版本 $info.version 可用，是否下载？'),
+        title: Text(l10n.tr('new_version_available')),
+        content: Text(l10n.tr('version_available', args: {'version': info.version})),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('稍后')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('下载')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.tr('later'))),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(l10n.tr('download'))),
         ],
       ),
     );
@@ -976,42 +1015,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  void _showWebDavConfigDialog(BuildContext context) {
+  void _showWebDavConfigDialog(BuildContext context, L10n l10n) {
     final settings = context.read<SettingsProvider>();
     final baseUrlCtrl = TextEditingController(text: settings.webDavBaseUrl ?? '');
     final usernameCtrl = TextEditingController(text: settings.webDavUsername ?? '');
     final passwordCtrl = TextEditingController(text: settings.webDavPassword ?? '');
-    
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('WebDAV 配置'),
+        title: Text(l10n.tr('webdav_config_title')),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
                 controller: baseUrlCtrl,
-                decoration: const InputDecoration(
-                  labelText: '服务器地址',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n.tr('server_url_label'),
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: usernameCtrl,
-                decoration: const InputDecoration(
-                  labelText: '用户名',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n.tr('username_label'),
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: passwordCtrl,
                 obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: '密码',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n.tr('password_label'),
+                  border: const OutlineInputBorder(),
                 ),
               ),
             ],
@@ -1020,7 +1059,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
+            child: Text(l10n.tr('cancel')),
           ),
           FilledButton(
             onPressed: () async {
@@ -1029,7 +1068,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 username: usernameCtrl.text,
                 password: passwordCtrl.text,
               );
-              
+
               final connected = await webDavService.testConnection();
               if (connected) {
                 await settings.setWebDavConfig(
@@ -1040,64 +1079,142 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 if (ctx.mounted) {
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(content: Text('WebDAV 配置保存成功')),
+                    SnackBar(content: Text(l10n.tr('webdav_saved'))),
                   );
                 }
               } else {
                 if (ctx.mounted) {
                   ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(content: Text('连接失败，请检查配置')),
+                    SnackBar(content: Text(l10n.tr('webdav_connect_failed'))),
                   );
                 }
               }
             },
-            child: const Text('保存'),
+            child: Text(l10n.tr('save')),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _syncAllToWebDav(BuildContext context) async {
+  Future<void> _syncAllToWebDav(BuildContext context, L10n l10n) async {
     final settings = context.read<SettingsProvider>();
     final prov = context.read<MemeProvider>();
-    
+
     if (settings.webDavBaseUrl == null || settings.webDavUsername == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先配置 WebDAV')),
+        SnackBar(content: Text(l10n.tr('webdav_not_configured'))),
       );
       return;
     }
-    
+
     // 显示同步进度
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => const Center(
+      builder: (ctx) => Center(
         child: Card(
           child: Padding(
-            padding: EdgeInsets.all(24),
+            padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 16),
-                Text('正在同步到 WebDAV...'),
+                const CircularProgressIndicator(),
+                const SizedBox(height: 16),
+                Text(l10n.tr('syncing')),
               ],
             ),
           ),
         ),
       ),
     );
-    
+
     await prov.syncAllToWebDav();
-    
+
     if (context.mounted) {
       Navigator.pop(context); // 关闭对话框
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('同步完成')),
+        SnackBar(content: Text(l10n.tr('sync_complete'))),
       );
     }
+  }
+
+  /// 查看更新日志：从 GitHub Releases 拉取并展示
+  Future<void> _showChangelog(BuildContext context, L10n l10n) async {
+    // 先弹出加载对话框
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        content: Row(
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(width: 16),
+            Text(l10n.tr('loading')),
+          ],
+        ),
+      ),
+    );
+
+    final releases = await UpdateService().fetchChangelog();
+
+    if (!mounted) return;
+    Navigator.of(context).pop(); // 关闭加载对话框
+
+    if (releases.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.tr('changelog_load_failed'))),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    await showDialog(
+      context: context,
+      builder: (dCtx) => AlertDialog(
+        title: Text(l10n.tr('changelog')),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.separated(
+            shrinkWrap: true,
+            itemCount: releases.length,
+            separatorBuilder: (_, __) => const Divider(),
+            itemBuilder: (c, i) {
+              final r = releases[i];
+              return ExpansionTile(
+                initiallyExpanded: i == 0,
+                title: Text('v${r.version}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: Text(_formatDate(r.publishedAt), style: const TextStyle(fontSize: 11)),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: SelectableText(
+                        r.body.isEmpty ? r.name : r.body,
+                        style: const TextStyle(fontSize: 13, height: 1.4),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dCtx),
+            child: Text(l10n.tr('confirm')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime dt) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${dt.year}-${two(dt.month)}-${two(dt.day)}';
   }
 }
 

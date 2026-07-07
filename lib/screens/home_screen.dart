@@ -37,11 +37,17 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         leading: Builder(
           builder: (ctx) {
-            if (prov.folderId != null) {
+            if (prov.folderId != null || prov.showFoldersView) {
               return IconButton(
                 icon: const Icon(Icons.arrow_back),
-                tooltip: '返回',
-                onPressed: () => prov.selectFolder(null),
+                tooltip: l10n.tr('back'),
+                onPressed: () {
+                  if (prov.folderId != null) {
+                    prov.selectFolder(null);
+                  } else {
+                    prov.setShowFoldersView(false);
+                  }
+                },
               );
             }
             return IconButton(
@@ -53,11 +59,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         title: Text(_getTitle(prov, l10n)),
         actions: [
-          IconButton(
-            icon: Icon(prov.isMulti ? Icons.close : Icons.checklist),
-            tooltip: prov.isMulti ? l10n.tr('exit_multi_select') : l10n.tr('multi_select'),
-            onPressed: () => prov.toggleMulti(),
-          ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.sort),
             tooltip: l10n.tr('sort'),
@@ -76,6 +77,11 @@ class _HomeScreenState extends State<HomeScreen> {
               const PopupMenuDivider(),
               PopupMenuItem(value: 'order', child: Text(prov.order == SortOrder.asc ? '↑ ${l10n.tr('asc')}' : '↓ ${l10n.tr('desc')}')),
             ],
+          ),
+          IconButton(
+            icon: Icon(prov.isMulti ? Icons.close : Icons.checklist),
+            tooltip: prov.isMulti ? l10n.tr('exit_multi_select') : l10n.tr('multi_select'),
+            onPressed: () => prov.toggleMulti(),
           ),
         ],
         bottom: prov.isMulti ? const PreferredSize(
@@ -169,52 +175,72 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String _getTitle(MemeProvider prov, L10n l10n) {
     if (prov.isMulti) return l10n.tr('selected_count', args: {'count': prov.selected.length.toString()});
+    if (prov.showFoldersView) return l10n.tr('browse_folders');
     if (prov.folderId == null) return 'Mako Meme';
     return prov.folders.where((f) => f.id == prov.folderId).firstOrNull?.name ?? 'Mako Meme';
   }
 
   Widget _buildMixedGrid(MemeProvider prov) {
+    // 进入文件夹：显示该文件夹内的 meme
     if (prov.folderId != null) {
       return MemeGrid(memes: prov.memes);
     }
 
-    // 根视图：如果选择了类型/标签/文件夹过滤器，则显示所有匹配的 meme（不显示文件夹卡片）
+    // 浏览文件夹视图：显示文件夹卡片
+    if (prov.showFoldersView) {
+      return _buildFoldersGrid(prov);
+    }
+
+    // 根视图：如果选择了类型/标签/文件夹过滤器，则显示所有匹配的 meme（无视文件夹）
     if (prov.typeFilter.isNotEmpty ||
         prov.tagFilter.isNotEmpty ||
         prov.folderFilter.isNotEmpty) {
       return MemeGrid(memes: prov.memes);
     }
 
-    final folders = prov.folders;
+    // 默认根视图：只显示未分类的 meme（不显示文件夹卡片）
     final uncategorized = prov.memes.where((m) => m.folderId == null).toList();
+    return MemeGrid(memes: uncategorized);
+  }
 
-    final settings = context.read<SettingsProvider>();
+  Widget _buildFoldersGrid(MemeProvider prov) {
+    final settings = context.watch<SettingsProvider>();
     final width = MediaQuery.sizeOf(context).width;
     final cols = settings.gridColumns > 0
         ? settings.gridColumns
         : width > 1200 ? 6 : width > 900 ? 5 : width > 600 ? 4 : width > 400 ? 3 : 2;
 
-    // 统一使用瀑布流布局
+    if (prov.folders.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.folder_open, size: 64, color: Theme.of(context).colorScheme.outline),
+            const SizedBox(height: 16),
+            Text(l10nForContext().tr('no_memes'), style: TextStyle(fontSize: 18, color: Theme.of(context).colorScheme.outline)),
+          ],
+        ),
+      );
+    }
+
     return MasonryGridView.count(
       crossAxisCount: cols,
       mainAxisSpacing: 8,
       crossAxisSpacing: 8,
       padding: const EdgeInsets.all(8),
-      itemCount: folders.length + uncategorized.length,
+      itemCount: prov.folders.length,
       itemBuilder: (ctx, i) {
-        if (i < folders.length) {
-          final f = folders[i];
-          return FolderCard(
-            folder: f,
-            count: prov.countInFolder(f.id),
-            isActive: prov.folderId == f.id,
-          );
-        }
-        final meme = uncategorized[i - folders.length];
-        return MemeCard(meme: meme);
+        final f = prov.folders[i];
+        return FolderCard(
+          folder: f,
+          count: prov.countInFolder(f.id),
+          isActive: prov.folderId == f.id,
+        );
       },
     );
   }
+
+  L10n l10nForContext() => context.read<LocaleProvider>().l10n;
 
   Widget _buildDrawer(BuildContext context, MemeProvider prov) {
     final theme = Theme.of(context);
@@ -245,8 +271,15 @@ class _HomeScreenState extends State<HomeScreen> {
                     icon: Icons.all_inbox,
                     label: l10n.tr('all_memes'),
                     count: prov.allMemesCount,
-                    isActive: prov.folderId == null,
-                    onTap: () { prov.selectFolder(null); Navigator.pop(context); },
+                    isActive: prov.folderId == null && !prov.showFoldersView,
+                    onTap: () { prov.selectFolder(null); prov.setShowFoldersView(false); Navigator.pop(context); },
+                  ),
+                  _drawerItem(
+                    icon: Icons.folder_outlined,
+                    label: l10n.tr('browse_folders'),
+                    count: prov.folders.length,
+                    isActive: prov.showFoldersView,
+                    onTap: () { prov.setShowFoldersView(true); Navigator.pop(context); },
                   ),
                   _drawerItem(
                     icon: Icons.favorite,
@@ -313,14 +346,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildCategoryChips(MemeProvider prov) {
+    final l10n = context.read<LocaleProvider>().l10n;
     final categories = [
-      {'type': Meme.typeEmoji, 'label': '表情', 'icon': Icons.face},
-      {'type': Meme.typeGif, 'label': 'GIF', 'icon': Icons.gif},
-      {'type': Meme.typeImage, 'label': '图片', 'icon': Icons.image},
-      {'type': Meme.typeText, 'label': '文字', 'icon': Icons.text_fields},
-      {'type': Meme.typePortrait, 'label': '立绘', 'icon': Icons.portrait},
-      {'type': Meme.typeCg, 'label': 'CG', 'icon': Icons.photo_library},
-      {'type': Meme.typeCharacterCard, 'label': '角色卡', 'icon': Icons.person_outline},
+      {'type': Meme.typeEmoji, 'label': l10n.tr('cat_emoji'), 'icon': Icons.face},
+      {'type': Meme.typeGif, 'label': l10n.tr('cat_gif'), 'icon': Icons.gif},
+      {'type': Meme.typeImage, 'label': l10n.tr('cat_image'), 'icon': Icons.image},
+      {'type': Meme.typeText, 'label': l10n.tr('cat_text'), 'icon': Icons.text_fields},
+      {'type': Meme.typePortrait, 'label': l10n.tr('cat_portrait'), 'icon': Icons.portrait},
+      {'type': Meme.typeCg, 'label': l10n.tr('cat_cg'), 'icon': Icons.photo_library},
+      {'type': Meme.typeCharacterCard, 'label': l10n.tr('cat_character_card'), 'icon': Icons.person_outline},
     ];
 
     return SizedBox(
@@ -339,7 +373,7 @@ class _HomeScreenState extends State<HomeScreen> {
             return _buildRoundedChip(
               context: ctx,
               icon: Icons.grid_view_rounded,
-              label: '全部',
+              label: l10n.tr('cat_all'),
               selected: selected,
               colorScheme: cs,
               onTap: () => prov.clearTypeFilter(),
@@ -458,18 +492,16 @@ class _HomeScreenState extends State<HomeScreen> {
               subtitle: const Text('Plain text or Emoji'),
               onTap: () { Navigator.pop(bCtx); _importText(ctx, prov); },
             ),
-            if (prov.folderId == null) ...[
-              ListTile(
-                leading: const Icon(Icons.create_new_folder),
-                title: Text(l10n.tr('new_folder')),
-                onTap: () { Navigator.pop(bCtx); _showCreateFolderDialog(ctx, prov); },
-              ),
-            ],
+            ListTile(
+              leading: const Icon(Icons.create_new_folder),
+              title: Text(l10n.tr('new_folder')),
+              onTap: () { Navigator.pop(bCtx); _showCreateFolderDialog(ctx, prov); },
+            ),
             const Divider(),
             ListTile(
               leading: const Icon(Icons.file_download_outlined),
               title: Text(l10n.tr('import_backup')),
-              subtitle: const Text('从 ZIP 恢复数据或导入图片'),
+              subtitle: Text(l10n.tr('import_data_desc')),
               onTap: () { Navigator.pop(bCtx); _importZip(ctx); },
             ),
           ],
@@ -506,7 +538,7 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.paste),
-            tooltip: '粘贴',
+            tooltip: l10n.tr('paste'),
             onPressed: () async {
               final data = await Clipboard.getData(Clipboard.kTextPlain);
               if (data?.text != null && data!.text!.isNotEmpty) {
