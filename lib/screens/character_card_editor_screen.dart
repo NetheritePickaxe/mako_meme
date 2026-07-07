@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/meme.dart';
 import '../providers/meme_provider.dart';
+import '../providers/locale_provider.dart';
+import '../l10n/l10n.dart';
 import '../services/character_card_service.dart';
 
 class CharacterCardEditorScreen extends StatefulWidget {
@@ -93,14 +95,15 @@ class _CharacterCardEditorScreenState extends State<CharacterCardEditorScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final l10n = context.watch<LocaleProvider>().l10n;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('角色卡编辑器'),
+        title: Text(l10n.tr('character_card_editor')),
         actions: [
           TextButton(
             onPressed: _save,
-            child: const Text('保存'),
+            child: Text(l10n.tr('save')),
           ),
         ],
       ),
@@ -108,12 +111,12 @@ class _CharacterCardEditorScreenState extends State<CharacterCardEditorScreen> {
         padding: const EdgeInsets.symmetric(vertical: 16),
         child: Column(
           children: [
-            _section('角色名称', _textField('角色名称', _nameCtrl, maxLines: 1)),
-            _section('外貌描述', _textField('描述角色的外貌特征、背景故事等', _descCtrl, maxLines: 5)),
-            _section('性格设定', _textField('描述角色的性格、行为模式、语言风格', _personalityCtrl, maxLines: 5)),
-            _section('场景设定', _textField('对话开始的场景和情境', _scenarioCtrl, maxLines: 5)),
-            _section('开场白', _textField('角色的第一句话', _firstMesCtrl, maxLines: 3)),
-            _section('对话示例', _textField('示例对话，使用 {{user}} 和 {{char}} 作为占位符', _mesExampleCtrl, maxLines: 8)),
+            _section(l10n.tr('char_name'), _textField(l10n.tr('char_name'), _nameCtrl, maxLines: 1)),
+            _section(l10n.tr('char_description'), _textField(l10n.tr('char_description_hint'), _descCtrl, maxLines: 5)),
+            _section(l10n.tr('char_personality'), _textField(l10n.tr('char_personality_hint'), _personalityCtrl, maxLines: 5)),
+            _section(l10n.tr('char_scenario'), _textField(l10n.tr('char_scenario_hint'), _scenarioCtrl, maxLines: 5)),
+            _section(l10n.tr('char_first_mes'), _textField(l10n.tr('char_first_mes_hint'), _firstMesCtrl, maxLines: 3)),
+            _section(l10n.tr('char_mes_example'), _textField(l10n.tr('char_mes_example_hint'), _mesExampleCtrl, maxLines: 8)),
             const SizedBox(height: 40),
           ],
         ),

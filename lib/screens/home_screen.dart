@@ -489,7 +489,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ListTile(
               leading: const Icon(Icons.text_fields),
               title: Text(l10n.tr('import_text')),
-              subtitle: const Text('Plain text or Emoji'),
+              subtitle: Text(l10n.tr('plain_text_or_emoji')),
               onTap: () { Navigator.pop(bCtx); _importText(ctx, prov); },
             ),
             ListTile(
