@@ -12,6 +12,8 @@ class SettingsProvider extends ChangeNotifier {
   bool _useMonet = true;
   bool _pureBlack = false;
   int _gridColumns = 0; // 0 = 自动
+  bool _autoClassify = true; // 导入时按画幅自动归类
+  double _classifyRatio = 1.1; // 宽高比阈值，<=此值视为正方形(表情)
 
   // WebDAV 配置
   bool _useWebDav = false;
@@ -52,6 +54,9 @@ class SettingsProvider extends ChangeNotifier {
     _pureBlack = _storage.getSetting('pureBlack') == 'true';
     final savedCols = int.tryParse(_storage.getSetting('gridColumns') ?? '');
     if (savedCols != null && savedCols >= 0 && savedCols <= 10) _gridColumns = savedCols;
+    _autoClassify = _storage.getSetting('autoClassify') != 'false';
+    final savedRatio = double.tryParse(_storage.getSetting('classifyRatio') ?? '');
+    if (savedRatio != null && savedRatio > 0.5 && savedRatio < 3.0) _classifyRatio = savedRatio;
 
     // 加载 WebDAV 配置
     _useWebDav = _storage.getSetting('useWebDav') == 'true';
@@ -78,6 +83,8 @@ class SettingsProvider extends ChangeNotifier {
   bool get useMonet => _useMonet;
   bool get pureBlack => _pureBlack;
   int get gridColumns => _gridColumns;
+  bool get autoClassify => _autoClassify;
+  double get classifyRatio => _classifyRatio;
   Color get customPrimary => _customPrimary;
   Color get customSecondary => _customSecondary;
   Color get customTertiary => _customTertiary;
@@ -133,6 +140,19 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setGridColumns(int v) async {
     _gridColumns = v;
     await _storage.setSetting('gridColumns', v.toString());
+    notifyListeners();
+  }
+
+  Future<void> setAutoClassify(bool v) async {
+    _autoClassify = v;
+    await _storage.setSetting('autoClassify', v.toString());
+    notifyListeners();
+  }
+
+  Future<void> setClassifyRatio(double v) async {
+    if (v < 0.5 || v > 3.0) return;
+    _classifyRatio = v;
+    await _storage.setSetting('classifyRatio', v.toString());
     notifyListeners();
   }
 

@@ -90,13 +90,18 @@ class _HomeScreenState extends State<HomeScreen> {
           }).toList();
           if (files.isNotEmpty) {
             final storage = context.read<StorageService>();
+            final settings = context.read<SettingsProvider>();
             for (final f in files) {
               // 直接用 path 流式拷贝，避免一次性读取超大文件导致 OOM
-              await storage.importFile(PlatformFile(
-                name: f.name,
-                size: await f.length(),
-                path: f.path,
-              ));
+              await storage.importFile(
+                PlatformFile(
+                  name: f.name,
+                  size: await f.length(),
+                  path: f.path,
+                ),
+                autoClassify: settings.autoClassify,
+                classifyRatio: settings.classifyRatio,
+              );
             }
             await prov.loadAll();
             if (context.mounted) {
@@ -312,56 +317,86 @@ class _HomeScreenState extends State<HomeScreen> {
     ];
 
     return SizedBox(
-      height: 44,
+      height: 40,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12),
-        itemCount: categories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 6),
+        itemCount: categories.length + 1,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (ctx, i) {
-          final cat = categories[i];
+          final cs = Theme.of(ctx).colorScheme;
+
+          // 第一个是"全部"
+          if (i == 0) {
+            final selected = prov.typeFilter.isEmpty;
+            return _buildRoundedChip(
+              context: ctx,
+              icon: Icons.grid_view_rounded,
+              label: '全部',
+              selected: selected,
+              colorScheme: cs,
+              onTap: () => prov.clearTypeFilter(),
+            );
+          }
+
+          final cat = categories[i - 1];
           final type = cat['type'] as String;
           final label = cat['label'] as String;
           final icon = cat['icon'] as IconData;
           final selected = prov.typeFilter.contains(type);
-          final theme = Theme.of(ctx);
-          final cs = theme.colorScheme;
 
-          return FilterChip(
-            label: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 16, color: selected ? cs.onSecondaryContainer : cs.onSurfaceVariant),
-                const SizedBox(width: 4),
-                Text(label, style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-                  color: selected ? cs.onSecondaryContainer : cs.onSurface,
-                )),
-              ],
-            ),
+          return _buildRoundedChip(
+            context: ctx,
+            icon: icon,
+            label: label,
             selected: selected,
-            onSelected: (v) {
-              if (v) {
-                prov.setTypeFilter(type);
-              } else {
+            colorScheme: cs,
+            onTap: () {
+              if (selected) {
                 prov.clearTypeFilter();
+              } else {
+                prov.setTypeFilter(type);
               }
             },
-            showCheckmark: false,
-            selectedColor: cs.secondaryContainer,
-            backgroundColor: cs.surfaceContainerHighest.withValues(alpha: 0.4),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-              side: BorderSide(
-                color: selected ? cs.secondary : cs.outline.withValues(alpha: 0.3),
-                width: selected ? 1.5 : 0.5,
-              ),
-            ),
-            visualDensity: VisualDensity.compact,
-            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           );
         },
+      ),
+    );
+  }
+
+  /// 圆角矩形分类按钮
+  Widget _buildRoundedChip({
+    required BuildContext context,
+    required IconData icon,
+    required String label,
+    required bool selected,
+    required ColorScheme colorScheme,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: selected
+          ? colorScheme.primary
+          : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 15,
+                color: selected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant),
+              const SizedBox(width: 4),
+              Text(label, style: TextStyle(
+                fontSize: 13,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                color: selected ? colorScheme.onPrimary : colorScheme.onSurface,
+              )),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -440,7 +475,12 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _importFiles(BuildContext ctx, MemeProvider prov) async {
     final result = await FilePicker.platform.pickFiles(allowMultiple: true, type: FileType.image);
     if (result != null && result.files.isNotEmpty) {
-      await prov.importFiles(result.files);
+      final settings = context.read<SettingsProvider>();
+      await prov.importFiles(
+        result.files,
+        autoClassify: settings.autoClassify,
+        classifyRatio: settings.classifyRatio,
+      );
     }
   }
 

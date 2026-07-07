@@ -275,7 +275,7 @@ class StorageService {
     return Meme.fromMap(map);
   }
 
-  Future<Meme> importFile(PlatformFile file, {String? folderId, String? type}) async {
+  Future<Meme> importFile(PlatformFile file, {String? folderId, String? type, bool autoClassify = false, double classifyRatio = 1.1}) async {
     final id = _uuid.v4();
     final ext = _guessExt(file.name);
     final fileName = '$id$ext';
@@ -369,6 +369,25 @@ class StorageService {
       characterData: characterData != null ? CharacterCardService.sanitizeCard(characterData) : null,
     );
     await _saveMeme(meme, fileHash);
+
+    // 自动按画幅归类：正方形→表情，长方形→图片
+    if (autoClassify && type == null && memeType != Meme.typeCharacterCard && ext != '.gif') {
+      double? ratio;
+      if (!kIsWeb) {
+        ratio = await getImageAspectRatio(filePath);
+      } else if (bytes != null) {
+        ratio = _parseImageRatioFromHeader(bytes);
+      }
+      if (ratio != null && ratio > 0) {
+        // 宽高比 <= 阈值 → 正方形 → 表情；否则 → 图片
+        final autoType = (ratio <= classifyRatio) ? Meme.typeEmoji : Meme.typeImage;
+        if (autoType != memeType) {
+          await setMemeType(id, autoType);
+          return meme.copyWith(type: autoType);
+        }
+      }
+    }
+
     return meme;
   }
 
@@ -509,10 +528,10 @@ class StorageService {
     return null;
   }
 
-  Future<List<Meme>> importFiles(List<PlatformFile> files, {String? folderId}) async {
+  Future<List<Meme>> importFiles(List<PlatformFile> files, {String? folderId, bool autoClassify = false, double classifyRatio = 1.1}) async {
     final results = <Meme>[];
     for (final file in files) {
-      results.add(await importFile(file, folderId: folderId));
+      results.add(await importFile(file, folderId: folderId, autoClassify: autoClassify, classifyRatio: classifyRatio));
     }
     return results;
   }

@@ -205,6 +205,37 @@ class MemeProvider with ChangeNotifier {
     await loadAll();
   }
 
+  /// 按画幅重新归类所有图片类表情包（不动角色卡/GIF/文字）
+  /// 返回归类后的统计
+  Future<Map<String, int>> reclassifyAllByAspectRatio(double ratioThreshold) async {
+    int emojiCount = 0;
+    int imageCount = 0;
+    int skipped = 0;
+    for (final meme in List<Meme>.from(_memes)) {
+      // 只处理图片类和当前归类为表情/图片的
+      if (meme.type != Meme.typeImage && meme.type != Meme.typeEmoji) {
+        skipped++;
+        continue;
+      }
+      if (meme.filePath.isEmpty) {
+        skipped++;
+        continue;
+      }
+      final ratio = await _storage.getImageAspectRatio(meme.filePath);
+      if (ratio == null || ratio <= 0) {
+        skipped++;
+        continue;
+      }
+      final newType = (ratio <= ratioThreshold) ? Meme.typeEmoji : Meme.typeImage;
+      if (newType != meme.type) {
+        await _storage.setMemeType(meme.id, newType);
+        if (newType == Meme.typeEmoji) emojiCount++; else imageCount++;
+      }
+    }
+    await loadAll();
+    return {'emoji': emojiCount, 'image': imageCount, 'skipped': skipped};
+  }
+
   Future<void> updateCharacterData(String id, Map<String, dynamic> data) async {
     await _storage.updateCharacterData(id, data);
     await loadAll();
@@ -235,8 +266,8 @@ class MemeProvider with ChangeNotifier {
     await loadAll();
   }
 
-  Future<List<Meme>> importFiles(List<PlatformFile> files, {String? folderId}) async {
-    final memes = await _storage.importFiles(files, folderId: folderId ?? _folderId);
+  Future<List<Meme>> importFiles(List<PlatformFile> files, {String? folderId, bool autoClassify = false, double classifyRatio = 1.1}) async {
+    final memes = await _storage.importFiles(files, folderId: folderId ?? _folderId, autoClassify: autoClassify, classifyRatio: classifyRatio);
     await loadAll();
     return memes;
   }

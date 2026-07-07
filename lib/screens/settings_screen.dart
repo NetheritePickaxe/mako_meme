@@ -58,6 +58,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _storageLocationTile(settings),
             const Divider(indent: 16, endIndent: 16),
           ],
+          _autoClassifyTile(settings),
+          const Divider(indent: 16, endIndent: 16),
           ListTile(
             leading: const Icon(Icons.file_download_outlined),
             title: const Text('批量导入'),
@@ -321,6 +323,92 @@ class _SettingsScreenState extends State<SettingsScreen> {
         onChanged: (v) { if (v != null) settings.setGridColumns(v); },
       ),
     );
+  }
+
+  Widget _autoClassifyTile(SettingsProvider settings) {
+    return Column(
+      children: [
+        SwitchListTile(
+          secondary: const Icon(Icons.auto_awesome_outlined),
+          title: const Text('导入时按画幅自动归类'),
+          subtitle: const Text('正方形→表情，长方形→图片'),
+          value: settings.autoClassify,
+          onChanged: (v) => settings.setAutoClassify(v),
+        ),
+        if (settings.autoClassify) ...[
+          ListTile(
+            leading: const Icon(Icons.straighten_outlined),
+            title: const Text('归类阈值（宽高比）'),
+            subtitle: Text('≤ ${settings.classifyRatio.toStringAsFixed(1)} 视为正方形'),
+            trailing: SizedBox(
+              width: 160,
+              child: Slider(
+                value: settings.classifyRatio,
+                min: 0.8,
+                max: 2.0,
+                divisions: 12,
+                label: settings.classifyRatio.toStringAsFixed(1),
+                onChanged: (v) => settings.setClassifyRatio(v),
+              ),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.refresh),
+            title: const Text('重新归类全部'),
+            subtitle: const Text('按当前阈值重新分类已有图片'),
+            onTap: () => _reclassifyAll(context, settings),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _reclassifyAll(BuildContext context, SettingsProvider settings) async {
+    final prov = context.read<MemeProvider>();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('重新归类全部'),
+        content: const Text('将按当前阈值重新分类所有图片类表情包（表情/图片），不影响角色卡、GIF 和文字。是否继续？'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('继续')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    if (!context.mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const PopScope(
+        canPop: false,
+        child: AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 20),
+              Expanded(child: Text('正在重新归类…')),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final result = await prov.reclassifyAllByAspectRatio(settings.classifyRatio);
+
+    if (context.mounted) {
+      Navigator.of(context).pop(); // 关闭进度对话框
+      final e = result['emoji'] ?? 0;
+      final i = result['image'] ?? 0;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('归类完成：$e 张改为表情，$i 张改为图片'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
   }
 
   Widget _monetTile(SettingsProvider settings) {
