@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
@@ -6,15 +5,16 @@ import 'package:file_picker/file_picker.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import '../providers/meme_provider.dart';
 import '../providers/locale_provider.dart';
+import '../providers/settings_provider.dart';
 import '../l10n/l10n.dart';
 import '../models/meme.dart';
 import '../models/folder.dart';
 import '../widgets/meme_grid.dart';
+import '../widgets/meme_card.dart';
 import '../widgets/folder_card.dart';
 import '../widgets/mako_search_bar.dart' as custom;
 import '../widgets/multi_select_bar.dart';
 import '../services/storage_service.dart';
-import '../screens/meme_viewer_screen.dart';
 import '../screens/settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -175,78 +175,32 @@ class _HomeScreenState extends State<HomeScreen> {
     final folders = prov.folders;
     final uncategorized = prov.memes.where((m) => m.folderId == null).toList();
 
-    return LayoutBuilder(
-      builder: (ctx, constraints) {
-        final w = constraints.maxWidth;
-        final cols = w > 1200 ? 6 : w > 900 ? 5 : w > 600 ? 4 : w > 400 ? 3 : 2;
-        return GridView.builder(
-          padding: const EdgeInsets.all(8),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: cols,
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 8,
-            childAspectRatio: 1,
-          ),
-          itemCount: folders.length + uncategorized.length,
-          itemBuilder: (ctx, i) {
-            if (i < folders.length) {
-              final f = folders[i];
-              return FolderCard(
-                folder: f,
-                count: prov.countInFolder(f.id),
-                isActive: prov.folderId == f.id,
-              );
-            }
-            final meme = uncategorized[i - folders.length];
-            return _buildMemeCardInGrid(meme);
-          },
-        );
-      },
-    );
-  }
+    final settings = context.read<SettingsProvider>();
+    final width = MediaQuery.sizeOf(context).width;
+    final cols = settings.gridColumns > 0
+        ? settings.gridColumns
+        : width > 1200 ? 6 : width > 900 ? 5 : width > 600 ? 4 : width > 400 ? 3 : 2;
 
-  Widget _buildMemeCardInGrid(Meme meme) {
-    return FutureBuilder<Uint8List?>(
-      future: context.read<StorageService>().readMemeBytes(meme.filePath),
-      builder: (ctx, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              color: Colors.grey.shade200,
-            ),
-            child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+    return GridView.builder(
+      padding: const EdgeInsets.all(8),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: cols,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+        childAspectRatio: 1,
+      ),
+      itemCount: folders.length + uncategorized.length,
+      itemBuilder: (ctx, i) {
+        if (i < folders.length) {
+          final f = folders[i];
+          return FolderCard(
+            folder: f,
+            count: prov.countInFolder(f.id),
+            isActive: prov.folderId == f.id,
           );
         }
-        final bytes = snapshot.data;
-        if (bytes == null) {
-          final l10n = context.read<LocaleProvider>().l10n;
-          return Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              color: Colors.grey.shade200,
-            ),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.cloud_off, size: 24, color: Colors.grey.shade500),
-                  const SizedBox(height: 4),
-                  Text(l10n.tr('lost'), style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
-                ],
-              ),
-            ),
-          );
-        }
-        return GestureDetector(
-          onTap: () => Navigator.push(ctx, MaterialPageRoute(
-            builder: (_) => MemeViewerScreen(memes: [meme], initialIndex: 0),
-          )),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.memory(snapshot.data!, fit: BoxFit.cover),
-          ),
-        );
+        final meme = uncategorized[i - folders.length];
+        return MemeCard(meme: meme);
       },
     );
   }

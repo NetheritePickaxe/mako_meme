@@ -32,6 +32,7 @@ class FolderCard extends StatelessWidget {
       return GestureDetector(
         onTap: () => prov.toggleFolderSelect(folder.id),
         child: _buildCard(
+          context,
           theme,
           color,
           isDragOver: false,
@@ -61,6 +62,7 @@ class FolderCard extends StatelessWidget {
             _showFolderContextMenu(details.globalPosition, context, folder, count);
           },
           child: _buildCard(
+            context,
             theme,
             color,
             isDragOver: isDragOver,
@@ -73,21 +75,25 @@ class FolderCard extends StatelessWidget {
   }
 
   Widget _buildCard(
+    BuildContext context,
     ThemeData theme,
     Color color, {
     required bool isDragOver,
     required bool isSelected,
     required bool showCheckbox,
   }) {
+    final prov = context.read<MemeProvider>();
+    // 获取封面 meme：用户自选 > 文件夹内第一个
+    final coverMemeId = folder.coverMemeId ?? prov.memesInFolder(folder.id).firstOrNull?.id;
+    final coverMeme = coverMemeId != null
+        ? prov.memes.where((m) => m.id == coverMemeId).firstOrNull
+        : null;
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        color: isDragOver
-            ? color.withValues(alpha: 0.2)
-            : isActive
-                ? color.withValues(alpha: 0.15)
-                : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isSelected
               ? theme.colorScheme.primary
@@ -100,38 +106,90 @@ class FolderCard extends StatelessWidget {
         ),
       ),
       child: Stack(
+        fit: StackFit.expand,
         children: [
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.folder, size: 48, color: isActive ? theme.colorScheme.tertiary : color),
-              const SizedBox(height: 8),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Text(
+          // 背景层：封面图片或纯色
+          if (coverMeme != null)
+            FutureBuilder<Uint8List?>(
+              future: context.read<StorageService>().readMemeBytes(coverMeme.filePath),
+              builder: (ctx, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done || snapshot.data == null) {
+                  return _buildFallback(theme, color);
+                }
+                return Image.memory(
+                  snapshot.data!,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  height: double.infinity,
+                );
+              },
+            )
+          else
+            _buildFallback(theme, color),
+
+          // 渐变遮罩，让文字可读
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withValues(alpha: 0.1),
+                  Colors.black.withValues(alpha: 0.5),
+                ],
+              ),
+            ),
+          ),
+
+          // 文件夹角标（右上角）
+          Positioned(
+            top: 6,
+            right: 6,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.folder, size: 12, color: color.withValues(alpha: 0.9)),
+                  const SizedBox(width: 2),
+                  Text(
+                    '$count',
+                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // 文件夹名称（底部）
+          Positioned(
+            left: 8,
+            right: 8,
+            bottom: 8,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
                   folder.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
                   ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '$count 个表情',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                ),
-              ),
-              const SizedBox(height: 4),
-              _CoverThumbnail(
-                folder: folder,
-                count: count,
-                theme: theme,
-              ),
-            ],
+              ],
+            ),
           ),
+
+          // 多选复选框
           if (showCheckbox)
             Positioned(
               top: 6,
@@ -158,8 +216,20 @@ class FolderCard extends StatelessWidget {
     );
   }
 
+  Widget _buildFallback(ThemeData theme, Color color) {
+    return Container(
+      color: isDragOver
+          ? color.withValues(alpha: 0.2)
+          : isActive
+              ? color.withValues(alpha: 0.15)
+              : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+      child: Center(
+        child: Icon(Icons.folder, size: 40, color: color.withValues(alpha: 0.6)),
+      ),
+    );
+  }
+
   void _showFolderContextMenu(Offset globalPos, BuildContext context, MemeFolder folder, int count) {
-    if (count == 0) return;
     final renderBox = context.findRenderObject() as RenderBox;
     final localPosition = renderBox.globalToLocal(globalPos);
     showMenu(
@@ -169,7 +239,6 @@ class FolderCard extends StatelessWidget {
         Offset.zero & renderBox.size,
       ),
       items: <PopupMenuEntry>[
-        const PopupMenuDivider(),
         const PopupMenuItem<String>(
           value: 'set_cover',
           child: ListTile(leading: Icon(Icons.photo_library), title: Text('设置封面'), dense: true),
@@ -226,27 +295,33 @@ class FolderCard extends StatelessWidget {
                       child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
                     );
                   }
-                  final isSelected = meme.id == folder.coverMemeId;
-                  return Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.memory(snapshot.data!, fit: BoxFit.cover),
-                      ),
-                      if (isSelected)
-                        Positioned(
-                          top: 2,
-                          right: 2,
-                          child: Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: const BoxDecoration(
-                              color: Colors.green,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.check, size: 12, color: Colors.white),
-                          ),
+                  final isCover = meme.id == folder.coverMemeId;
+                  return GestureDetector(
+                    onTap: () {
+                      context.read<StorageService>().updateFolderCover(folder.id, meme.id);
+                      Navigator.pop(dCtx);
+                    },
+                    child: Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.memory(snapshot.data!, fit: BoxFit.cover),
                         ),
-                    ],
+                        if (isCover)
+                          Positioned(
+                            top: 2,
+                            right: 2,
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: const BoxDecoration(
+                                color: Colors.green,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.check, size: 12, color: Colors.white),
+                            ),
+                          ),
+                      ],
+                    ),
                   );
                 },
               );
@@ -256,8 +331,7 @@ class FolderCard extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () {
-              final storage = context.read<StorageService>();
-              storage.updateFolderCover(folder.id, null);
+              context.read<StorageService>().updateFolderCover(folder.id, null);
               Navigator.pop(dCtx);
             },
             child: const Text('自动'),
@@ -268,59 +342,6 @@ class FolderCard extends StatelessWidget {
           ),
         ],
       ),
-    ).then((_) {
-      // Dialog dismissed, nothing to do
-    });
-  }
-}
-
-class _CoverThumbnail extends StatelessWidget {
-  final MemeFolder folder;
-  final int count;
-  final ThemeData theme;
-
-  const _CoverThumbnail({
-    required this.folder,
-    required this.count,
-    required this.theme,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    if (count == 0) return const SizedBox.shrink();
-
-    final prov = context.read<MemeProvider>();
-    final memeId = folder.coverMemeId ?? prov.memesInFolder(folder.id).firstOrNull?.id;
-
-    if (memeId == null) return const SizedBox.shrink();
-
-    return FutureBuilder<Uint8List?>(
-      future: context.read<StorageService>().readMemeBytes(
-        prov.memes.firstWhere((m) => m.id == memeId).filePath,
-      ),
-      builder: (ctx, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done || snapshot.data == null) {
-          return const SizedBox.shrink();
-        }
-        return Positioned(
-          bottom: 8,
-          right: 8,
-          child: ClipOval(
-            child: Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: theme.colorScheme.surface, width: 2),
-              ),
-              child: Image.memory(
-                snapshot.data!,
-                width: 34,
-                height: 34,
-                fit: BoxFit.cover,
-              ),
-            ),
-          ),
-        );
-      },
     );
   }
 }

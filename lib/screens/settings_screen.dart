@@ -37,6 +37,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const Divider(indent: 16, endIndent: 16),
           _themeModeTile(settings),
           const Divider(indent: 16, endIndent: 16),
+          _gridColumnsTile(settings),
+          const Divider(indent: 16, endIndent: 16),
           if (defaultTargetPlatform == TargetPlatform.android) ...[
             _monetTile(settings),
             if (!settings.useMonet) ...[
@@ -271,6 +273,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onChanged: (v) => settings.setPureBlack(v),
           ),
       ],
+    );
+  }
+
+  Widget _gridColumnsTile(SettingsProvider settings) {
+    final options = [0, 2, 3, 4, 5, 6, 7, 8];
+    final labels = ['自动', '2', '3', '4', '5', '6', '7', '8'];
+    return ListTile(
+      leading: const Icon(Icons.grid_view_outlined),
+      title: const Text('每行列数'),
+      subtitle: Text(settings.gridColumns == 0 ? '自动' : '${settings.gridColumns} 列'),
+      trailing: DropdownButton<int>(
+        value: settings.gridColumns,
+        items: List.generate(options.length, (i) =>
+          DropdownMenuItem(value: options[i], child: Text(labels[i]))),
+        onChanged: (v) { if (v != null) settings.setGridColumns(v); },
+      ),
     );
   }
 
