@@ -112,7 +112,7 @@ class FolderCard extends StatelessWidget {
         children: [
           // 背景层：封面图片或纯色
           if (coverMeme != null)
-            _buildCover(theme, color, coverMeme, isDragOver: isDragOver, isActive: isActive)
+            _buildCover(context, theme, color, coverMeme, isDragOver: isDragOver, isActive: isActive)
           else
             _buildFallback(theme, color, isDragOver: isDragOver, isActive: isActive),
 
@@ -206,7 +206,7 @@ class FolderCard extends StatelessWidget {
   }
 
   /// 封面图：原生端用 Image.file 流式加载，Web 端读 bytes
-  Widget _buildCover(ThemeData theme, Color color, Meme coverMeme,
+  Widget _buildCover(BuildContext context, ThemeData theme, Color color, Meme coverMeme,
       {required bool isDragOver, required bool isActive}) {
     final storage = context.read<StorageService>();
     if (!kIsWeb) {

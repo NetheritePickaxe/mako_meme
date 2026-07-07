@@ -122,17 +122,17 @@ class CharacterCardService {
         if (type == 'iTXt' || type == 'tEXt') {
           if (length > 0 && length <= maxChunkSize) {
             final data = await raf.read(length);
-            // 跳过 CRC
-            await raf.skip(4);
+            // 跳过 4 字节 CRC
+            await raf.setPosition(await raf.position() + 4);
             final result = _parseTextChunk(type, data);
             if (result != null) return result;
           } else {
             // 超大或空 chunk，跳过 data + CRC
-            await raf.skip(length + 4);
+            await raf.setPosition(await raf.position() + length + 4);
           }
         } else {
           // 跳过 chunk 数据 + 4 字节 CRC
-          await raf.skip(length + 4);
+          await raf.setPosition(await raf.position() + length + 4);
         }
       }
     } catch (_) {} finally {

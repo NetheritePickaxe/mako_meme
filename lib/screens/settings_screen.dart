@@ -660,9 +660,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (defaultTargetPlatform == TargetPlatform.windows ||
           defaultTargetPlatform == TargetPlatform.linux ||
           defaultTargetPlatform == TargetPlatform.macOS) {
-        // 桌面：保存到 Pictures 文件夹
-        final pictures = await getPicturesDirectory();
-        targetDir = Directory(p.join(pictures.path, 'Mako Meme'));
+        // 桌面：保存到用户主目录下的 Pictures
+        final home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
+        String picturesPath;
+        if (defaultTargetPlatform == TargetPlatform.windows) {
+          picturesPath = p.join(home ?? 'C:\\Users', 'Pictures', 'Mako Meme');
+        } else if (defaultTargetPlatform == TargetPlatform.macOS) {
+          picturesPath = p.join(home ?? '/Users', 'Pictures', 'Mako Meme');
+        } else {
+          // Linux
+          picturesPath = p.join(home ?? '/home', 'Pictures', 'Mako Meme');
+        }
+        targetDir = Directory(picturesPath);
       } else if (defaultTargetPlatform == TargetPlatform.android) {
         // Android：优先尝试公共 Pictures 目录（会被相册扫描）
         final publicDir = Directory('/storage/emulated/0/Pictures/Mako Meme');
@@ -737,7 +746,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         // 用唯一文件名避免覆盖
         final ext = p.extension(meme.filePath);
         final destName = '${meme.name}$ext';
-        final destFile = File(p.join(targetDir!.path, destName));
+        final destFile = File(p.join(targetDir.path, destName));
         // 若重名，加序号
         var finalPath = destFile.path;
         var counter = 1;
