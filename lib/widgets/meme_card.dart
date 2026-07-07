@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,7 +12,9 @@ import '../screens/meme_viewer_screen.dart';
 
 class MemeCard extends StatefulWidget {
   final Meme meme;
-  const MemeCard({super.key, required this.meme});
+  final void Function(Meme dragged, Meme target)? onReorder;
+
+  const MemeCard({super.key, required this.meme, this.onReorder});
 
   @override
   State<MemeCard> createState() => _MemeCardState();
@@ -20,6 +23,7 @@ class MemeCard extends StatefulWidget {
 class _MemeCardState extends State<MemeCard> {
   Uint8List? _bytes;
   bool _loading = true;
+  double _aspectRatio = 1.0;
 
   @override
   void didChangeDependencies() {
@@ -37,6 +41,7 @@ class _MemeCardState extends State<MemeCard> {
             _bytes = b;
             _loading = false;
           });
+          if (b != null) _loadAspectRatio(b);
         }
       }, onError: (_) {
         if (mounted) setState(() => _loading = false);
@@ -46,10 +51,33 @@ class _MemeCardState extends State<MemeCard> {
     }
   }
 
+  Future<void> _loadAspectRatio(Uint8List bytes) async {
+    try {
+      final codec = await ui.instantiateImageCodec(bytes);
+      final frame = await codec.getNextFrame();
+      final w = frame.image.width;
+      final h = frame.image.height;
+      if (mounted && w > 0 && h > 0) {
+        setState(() => _aspectRatio = w / h);
+      }
+    } catch (_) {
+      // keep default 1.0
+    }
+  }
+
   bool get _isDesktop {
     if (kIsWeb) return true;
     final p = Theme.of(context).platform;
     return p == TargetPlatform.windows || p == TargetPlatform.linux || p == TargetPlatform.macOS;
+  }
+
+  bool get _isSquare =>
+      widget.meme.type == Meme.typeEmoji || widget.meme.type == Meme.typeText;
+
+  double get _effectiveAspectRatio {
+    if (_isSquare) return 1.0;
+    if (_aspectRatio.isNaN || _aspectRatio.isInfinite || _aspectRatio <= 0) return 1.0;
+    return _aspectRatio;
   }
 
   @override
@@ -58,42 +86,107 @@ class _MemeCardState extends State<MemeCard> {
     final isSelected = prov.selected.contains(widget.meme.id);
     final isMulti = prov.isMulti;
     final theme = Theme.of(context);
+    final canReorder = widget.onReorder != null;
 
+    // 桌面端：长按拖拽（用于排序或拖入文件夹），左键复制，右键菜单
     if (_isDesktop) {
-      // 桌面端：LongPressDraggable 用于拖入文件夹，左键复制，右键菜单
       return LongPressDraggable<Meme>(
         data: widget.meme,
-        feedback: Material(
-          elevation: 4,
-          borderRadius: BorderRadius.circular(12),
-          child: SizedBox(
-            width: 100,
-            height: 100,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: _bytes != null
-                  ? Image.memory(_bytes!, fit: BoxFit.cover)
-                  : Container(color: Colors.grey.shade300),
-            ),
-          ),
-        ),
+        feedback: _buildFeedback(),
         childWhenDragging: Opacity(
           opacity: 0.4,
-          child: _buildCard(context, prov, isSelected, isMulti, theme),
+          child: _buildAspectRatioCard(prov, isSelected, isMulti, theme),
         ),
         child: GestureDetector(
           onTap: isMulti ? () => prov.toggleSelect(widget.meme.id) : _copyToClipboard,
           onSecondaryTapUp: (details) => _showContextMenu(details.globalPosition),
-          child: _buildCard(context, prov, isSelected, isMulti, theme),
+          child: _buildInner(prov, isSelected, isMulti, theme),
         ),
       );
     }
 
-    // 移动端：点击预览，长按分享
+    // 移动端：多选模式下长按拖拽排序
+    if (isMulti && canReorder) {
+      final inner = _buildInner(prov, isSelected, isMulti, theme);
+      return LongPressDraggable<Meme>(
+        data: widget.meme,
+        feedback: _buildFeedback(),
+        childWhenDragging: Opacity(
+          opacity: 0.4,
+          child: _buildAspectRatioCard(prov, isSelected, isMulti, theme),
+        ),
+        child: GestureDetector(
+          onTap: () => prov.toggleSelect(widget.meme.id),
+          child: inner,
+        ),
+      );
+    }
+
+    // 移动端普通模式：点击预览，长按分享
     return GestureDetector(
       onTap: isMulti ? () => prov.toggleSelect(widget.meme.id) : _openViewer,
       onLongPress: isMulti ? null : _shareMeme,
+      child: _buildInner(prov, isSelected, isMulti, theme),
+    );
+  }
+
+  /// 包裹拖放目标，用于排序：拖入另一张卡片时触发 onReorder
+  Widget _buildInner(MemeProvider prov, bool isSelected, bool isMulti, ThemeData theme) {
+    final card = _buildAspectRatioCard(prov, isSelected, isMulti, theme);
+    if (widget.onReorder == null) return card;
+    return DragTarget<Meme>(
+      onAcceptWithDetails: (details) {
+        if (details.data.id != widget.meme.id) {
+          widget.onReorder!(details.data, widget.meme);
+        }
+      },
+      builder: (ctx, candidate, rejected) {
+        if (candidate.isEmpty) return card;
+        return Stack(
+          children: [
+            card,
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.primary,
+                      width: 3,
+                    ),
+                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// 方形卡片（表情/文字）固定 1:1，图片卡片按真实宽高比
+  Widget _buildAspectRatioCard(MemeProvider prov, bool isSelected, bool isMulti, ThemeData theme) {
+    return AspectRatio(
+      aspectRatio: _effectiveAspectRatio,
       child: _buildCard(context, prov, isSelected, isMulti, theme),
+    );
+  }
+
+  Widget _buildFeedback() {
+    return Material(
+      elevation: 4,
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        width: 100,
+        height: 100,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: _bytes != null
+              ? Image.memory(_bytes!, fit: BoxFit.cover)
+              : Container(color: Colors.grey.shade300),
+        ),
+      ),
     );
   }
 
@@ -176,21 +269,27 @@ class _MemeCardState extends State<MemeCard> {
   }
 
   void _copyToClipboard() {
-    if (_bytes != null) {
-      Clipboard.setData(ClipboardData(text: ''));
-      // 对于图片复制需要特殊处理，这里复制文件名作为 fallback
+    if (widget.meme.isImageType && _bytes == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已复制: ${widget.meme.name}'), duration: const Duration(seconds: 1)),
+        const SnackBar(content: Text('图片丢失，无法复制'), duration: Duration(seconds: 1)),
       );
+      return;
     }
-    // 实际图片复制需要 platform channel，简化处理
+    // Flutter 无原生图片剪贴板支持（需 platform channel），此处简化处理
+    Clipboard.setData(ClipboardData(text: widget.meme.name));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('已复制: ${widget.meme.name}'), duration: const Duration(seconds: 1)),
+    );
   }
 
   void _openViewer() {
+    final prov = context.read<MemeProvider>();
+    final memes = prov.memes;
+    final index = memes.indexWhere((m) => m.id == widget.meme.id);
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => MemeViewerScreen(
-        memes: [widget.meme],
-        initialIndex: 0,
+        memes: memes,
+        initialIndex: index >= 0 ? index : 0,
       ),
     ));
   }
@@ -376,6 +475,7 @@ class _MemeCardState extends State<MemeCard> {
             _bytes = file.bytes;
             _loading = false;
           });
+          _loadAspectRatio(file.bytes!);
         }
       }
     }

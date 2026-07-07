@@ -47,125 +47,248 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final prov = context.watch<MemeProvider>();
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: Colors.black87,
-        foregroundColor: Colors.white,
-        title: Text(_meme.name, style: const TextStyle(fontSize: 14)),
+        backgroundColor: theme.colorScheme.surface,
+        foregroundColor: theme.colorScheme.onSurface,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           tooltip: '返回',
           onPressed: () => Navigator.pop(context),
         ),
-        actions: [
-          // 复制
-          IconButton(
-            icon: const Icon(Icons.copy),
-            tooltip: '复制',
-            onPressed: _copy,
-          ),
-          // 分享
-          IconButton(
-            icon: const Icon(Icons.ios_share),
-            tooltip: '分享',
-            onPressed: _share,
-          ),
-          // 收藏
-          IconButton(
-            icon: Icon(_meme.isFavorite ? Icons.favorite : Icons.favorite_border,
-              color: _meme.isFavorite ? Colors.red : Colors.white),
-            onPressed: () => prov.toggleFavorite(_meme.id),
-          ),
-          // 更多
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            onSelected: (v) {
-              if (v == 'rename') {
-                _rename();
-              } else if (v == 'type') {
-                _showTypeDialog();
-              } else if (v == 'edit_card') {
-                _editCharacterCard();
-              } else if (v == 'delete') {
-                _confirmDelete();
-              }
-            },
-            itemBuilder: (_) => [
-              const PopupMenuItem(value: 'rename', child: ListTile(
-                leading: Icon(Icons.edit), title: Text('重命名'), dense: true)),
-              const PopupMenuItem(value: 'type', child: ListTile(
-                leading: Icon(Icons.label_outline), title: Text('修改分类'), dense: true)),
-              if (_meme.type == Meme.typeCharacterCard)
-                const PopupMenuItem(value: 'edit_card', child: ListTile(
-                  leading: Icon(Icons.edit_note), title: Text('编辑角色卡'), dense: true)),
-              const PopupMenuItem(value: 'delete', child: ListTile(
-                leading: Icon(Icons.delete, color: Colors.red),
-                title: Text('删除', style: TextStyle(color: Colors.red)), dense: true)),
-            ],
-          ),
-        ],
-      ),
-      body: GestureDetector(
-        onTap: () => _toggleUI(),
-        child: Stack(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            PageView.builder(
-              physics: const BouncingScrollPhysics(),
-              itemBuilder: (ctx, i) {
-                _ensureBytes(i);
-                final m = widget.memes[i];
-                final bytes = _bytesCache[i];
-                if (bytes == null) {
-                  return const Center(child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white));
-                }
-                if (m.isImageType) {
-                  // GIF 用普通 Image.memory（支持动画），非 GIF 用 PhotoView（支持缩放）
-                  if (m.type == Meme.typeGif) {
-                    return Center(
-                      child: InteractiveViewer(
-                        child: Image.memory(bytes, fit: BoxFit.contain),
-                      ),
-                    );
-                  }
-                  return PhotoView(
-                    imageProvider: MemoryImage(bytes),
-                    minScale: PhotoViewComputedScale.contained,
-                    maxScale: PhotoViewComputedScale.covered * 2,
-                    heroAttributes: PhotoViewHeroAttributes(tag: m.id),
-                    backgroundDecoration: const BoxDecoration(color: Colors.black),
-                  );
-                }
-                return Center(
-                  child: Text(
-                    m.textContent ?? '',
-                    style: const TextStyle(color: Colors.white, fontSize: 48),
-                    textAlign: TextAlign.center,
-                  ),
-                );
-              },
-              itemCount: widget.memes.length,
-              controller: _controller,
-              onPageChanged: (i) => setState(() => _currentIndex = i),
+            Text(
+              _meme.name,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            // 底部页码
-            Positioned(
-              bottom: 20, left: 0, right: 0,
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.black54,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
+            Text(
+              '${_currentIndex + 1} / ${widget.memes.length}',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
+            ),
+          ],
+        ),
+      ),
+      body: PageView.builder(
+        physics: const BouncingScrollPhysics(),
+        controller: _controller,
+        itemCount: widget.memes.length,
+        onPageChanged: (i) => setState(() => _currentIndex = i),
+        itemBuilder: (ctx, i) {
+          final m = widget.memes[i];
+          return Column(
+            children: [
+              Expanded(child: _buildImageArea(m, i)),
+              _buildDetailPanel(theme, prov, m),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  /// 图片展示区：图片用 PhotoView 缩放，GIF 用 Image.memory，文字居中显示
+  Widget _buildImageArea(Meme m, int i) {
+    final theme = Theme.of(context);
+    _ensureBytes(i);
+    final bytes = _bytesCache[i];
+
+    if (m.isImageType) {
+      if (bytes == null) {
+        return Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: theme.colorScheme.primary,
+          ),
+        );
+      }
+      if (m.type == Meme.typeGif) {
+        return Center(
+          child: InteractiveViewer(
+            child: Image.memory(bytes, fit: BoxFit.contain),
+          ),
+        );
+      }
+      return PhotoView(
+        imageProvider: MemoryImage(bytes),
+        minScale: PhotoViewComputedScale.contained,
+        maxScale: PhotoViewComputedScale.covered * 2,
+        heroAttributes: PhotoViewHeroAttributes(tag: m.id),
+        backgroundDecoration: BoxDecoration(color: theme.colorScheme.surface),
+      );
+    }
+
+    // 文字表情居中显示
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(
+          m.textContent ?? '',
+          style: theme.textTheme.headlineMedium,
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
+
+  /// 底部详情面板：名称 + 文件信息 + 标签 + 操作按钮
+  Widget _buildDetailPanel(ThemeData theme, MemeProvider prov, Meme m) {
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 10),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          // 名称（点击可编辑）
+          GestureDetector(
+            onTap: _rename,
+            behavior: HitTestBehavior.opaque,
+            child: Row(
+              children: [
+                Expanded(
                   child: Text(
-                    '${_currentIndex + 1} / ${widget.memes.length}',
-                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                    m.name,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                Icon(
+                  Icons.edit,
+                  size: 16,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          // 文件信息
+          Wrap(
+            spacing: 12,
+            runSpacing: 4,
+            children: [
+              _infoChip(theme, _typeLabel(m.type), icon: _typeIcon(m.type)),
+              _infoChip(theme, _formatFileSize(m.fileSize), icon: Icons.data_usage),
+              _infoChip(theme, _formatDate(m.createdAt), icon: Icons.access_time),
+            ],
+          ),
+          if (m.tags.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: m.tags
+                  .map((t) => Chip(
+                        label: Text(t, style: const TextStyle(fontSize: 11)),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                      ))
+                  .toList(),
+            ),
+          ],
+          const SizedBox(height: 12),
+          // 操作按钮
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 4,
+            runSpacing: 4,
+            children: [
+              _actionButton(theme, '复制', Icons.copy, _copy),
+              _actionButton(theme, '分享', Icons.ios_share, _share),
+              _actionButton(
+                theme,
+                m.isFavorite ? '已收藏' : '收藏',
+                m.isFavorite ? Icons.favorite : Icons.favorite_border,
+                () => prov.toggleFavorite(m.id),
+                color: m.isFavorite ? Colors.red : null,
               ),
+              _actionButton(theme, '分类', Icons.label_outline, _showTypeDialog),
+              _actionButton(theme, '重命名', Icons.edit, _rename),
+              _actionButton(theme, '删除', Icons.delete_outline, _confirmDelete, color: Colors.red),
+            ],
+          ),
+          if (m.type == Meme.typeCharacterCard) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.tonalIcon(
+                onPressed: _editCharacterCard,
+                icon: const Icon(Icons.edit_note),
+                label: const Text('编辑角色卡'),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _infoChip(ThemeData theme, String text, {IconData? icon}) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (icon != null) ...[
+          Icon(icon, size: 14, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
+          const SizedBox(width: 4),
+        ],
+        Text(
+          text,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _actionButton(
+    ThemeData theme,
+    String label,
+    IconData icon,
+    VoidCallback onTap, {
+    Color? color,
+  }) {
+    final c = color ?? theme.colorScheme.onSurface.withValues(alpha: 0.8);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 20, color: c),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: theme.textTheme.bodySmall?.copyWith(color: c, fontSize: 11),
             ),
           ],
         ),
@@ -173,9 +296,59 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
     );
   }
 
-  bool _uiVisible = true;
-  void _toggleUI() {
-    setState(() => _uiVisible = !_uiVisible);
+  String _typeLabel(String type) {
+    switch (type) {
+      case Meme.typeEmoji:
+        return '表情';
+      case Meme.typeGif:
+        return 'GIF';
+      case Meme.typeText:
+        return '文字';
+      case Meme.typePortrait:
+        return '立绘';
+      case Meme.typeCg:
+        return 'CG';
+      case Meme.typeCharacterCard:
+        return '角色卡';
+      default:
+        return '图片';
+    }
+  }
+
+  IconData _typeIcon(String type) {
+    switch (type) {
+      case Meme.typeEmoji:
+        return Icons.face;
+      case Meme.typeGif:
+        return Icons.gif;
+      case Meme.typeText:
+        return Icons.text_fields;
+      case Meme.typePortrait:
+        return Icons.portrait;
+      case Meme.typeCg:
+        return Icons.photo_library;
+      case Meme.typeCharacterCard:
+        return Icons.person_outline;
+      default:
+        return Icons.image;
+    }
+  }
+
+  String _formatFileSize(int bytes) {
+    if (bytes <= 0) return '-';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    int i = 0;
+    double size = bytes.toDouble();
+    while (size >= 1024 && i < units.length - 1) {
+      size /= 1024;
+      i++;
+    }
+    return '${size.toStringAsFixed(i == 0 ? 0 : 1)} ${units[i]}';
+  }
+
+  String _formatDate(DateTime dt) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${dt.year}-${two(dt.month)}-${two(dt.day)} ${two(dt.hour)}:${two(dt.minute)}';
   }
 
   void _copy() {

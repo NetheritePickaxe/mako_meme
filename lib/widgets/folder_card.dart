@@ -23,11 +23,29 @@ class FolderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final color = Color(folder.colorValue);
+    final prov = context.watch<MemeProvider>();
+    final isMulti = prov.isMulti;
+    final isFolderSelected = prov.selectedFolders.contains(folder.id);
 
+    // 多选模式：点击切换选中，显示复选框，禁用拖放
+    if (isMulti) {
+      return GestureDetector(
+        onTap: () => prov.toggleFolderSelect(folder.id),
+        child: _buildCard(
+          theme,
+          color,
+          isDragOver: false,
+          isSelected: isFolderSelected,
+          showCheckbox: true,
+        ),
+      );
+    }
+
+    // 普通模式：点击进入文件夹，右键菜单，支持拖入表情包
     return DragTarget<Meme>(
       onAcceptWithDetails: (details) {
-        final prov = context.read<MemeProvider>();
-        prov.moveToFolder(details.data.id, folder.id);
+        final p = context.read<MemeProvider>();
+        p.moveToFolder(details.data.id, folder.id);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('已移至「${folder.name}」'), duration: const Duration(seconds: 1)),
         );
@@ -36,64 +54,107 @@ class FolderCard extends StatelessWidget {
         final isDragOver = candidateData.isNotEmpty;
         return GestureDetector(
           onTap: () {
-            final prov = context.read<MemeProvider>();
-            prov.selectFolder(folder.id);
+            final p = context.read<MemeProvider>();
+            p.selectFolder(folder.id);
           },
           onSecondaryTapUp: (details) {
             _showFolderContextMenu(details.globalPosition, context, folder, count);
           },
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              color: isDragOver
-                  ? color.withValues(alpha: 0.2)
-                  : isActive
-                      ? color.withValues(alpha: 0.15)
-                      : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-              border: Border.all(
-                color: isDragOver
-                    ? color
-                    : isActive
-                        ? color.withValues(alpha: 0.6)
-                        : Colors.transparent,
-                width: 2,
-              ),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.folder, size: 48, color: isActive ? Theme.of(context).colorScheme.tertiary : color),
-                const SizedBox(height: 8),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Text(
-                    folder.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '$count 个表情',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                _CoverThumbnail(
-                  folder: folder,
-                  count: count,
-                  theme: theme,
-                ),
-              ],
-            ),
+          child: _buildCard(
+            theme,
+            color,
+            isDragOver: isDragOver,
+            isSelected: false,
+            showCheckbox: false,
           ),
         );
       },
+    );
+  }
+
+  Widget _buildCard(
+    ThemeData theme,
+    Color color, {
+    required bool isDragOver,
+    required bool isSelected,
+    required bool showCheckbox,
+  }) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: isDragOver
+            ? color.withValues(alpha: 0.2)
+            : isActive
+                ? color.withValues(alpha: 0.15)
+                : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        border: Border.all(
+          color: isSelected
+              ? theme.colorScheme.primary
+              : isDragOver
+                  ? color
+                  : isActive
+                      ? color.withValues(alpha: 0.6)
+                      : Colors.transparent,
+          width: isSelected ? 3 : 2,
+        ),
+      ),
+      child: Stack(
+        children: [
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.folder, size: 48, color: isActive ? theme.colorScheme.tertiary : color),
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text(
+                  folder.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '$count 个表情',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+              ),
+              const SizedBox(height: 4),
+              _CoverThumbnail(
+                folder: folder,
+                count: count,
+                theme: theme,
+              ),
+            ],
+          ),
+          if (showCheckbox)
+            Positioned(
+              top: 6,
+              left: 6,
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? theme.colorScheme.primary
+                      : Colors.white.withValues(alpha: 0.8),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isSelected ? theme.colorScheme.primary : Colors.grey.shade400,
+                    width: 2,
+                  ),
+                ),
+                child: isSelected
+                    ? const Icon(Icons.check, size: 14, color: Colors.white)
+                    : const SizedBox(width: 14, height: 14),
+              ),
+            ),
+        ],
+      ),
     );
   }
 

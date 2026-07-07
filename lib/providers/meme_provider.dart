@@ -23,6 +23,7 @@ class MemeProvider with ChangeNotifier {
   SortOrder _order = SortOrder.desc;
   bool _multi = false;
   final Set<String> _sel = {};
+  final Set<String> _selectedFolders = {};
   final Set<String> _tagFilter = {};
   final Set<String> _folderFilter = {};
   final Set<String> _typeFilter = {};
@@ -41,6 +42,7 @@ class MemeProvider with ChangeNotifier {
   SortOrder get order => _order;
   bool get isMulti => _multi;
   Set<String> get selected => _sel;
+  Set<String> get selectedFolders => _selectedFolders;
   Set<String> get tagFilter => _tagFilter;
 
   List<String> get allTags {
@@ -131,12 +133,25 @@ class MemeProvider with ChangeNotifier {
 
   void toggleMulti() {
     _multi = !_multi;
-    if (!_multi) _sel.clear();
+    if (!_multi) {
+      _sel.clear();
+      _selectedFolders.clear();
+    }
     notifyListeners();
   }
 
   void toggleSelect(String id) {
     _sel.contains(id) ? _sel.remove(id) : _sel.add(id);
+    notifyListeners();
+  }
+
+  void toggleFolderSelect(String id) {
+    _selectedFolders.contains(id) ? _selectedFolders.remove(id) : _selectedFolders.add(id);
+    notifyListeners();
+  }
+
+  void clearFolderSelection() {
+    _selectedFolders.clear();
     notifyListeners();
   }
 
