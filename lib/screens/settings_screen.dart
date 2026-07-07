@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:path/path.dart' as p;
 import '../providers/settings_provider.dart';
 import '../providers/meme_provider.dart';
 import '../providers/locale_provider.dart';
@@ -140,11 +141,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
             selected: {settings.storageLocation},
             onSelectionChanged: (v) async {
+              final isMobile = !kIsWeb &&
+                  (defaultTargetPlatform == TargetPlatform.android ||
+                   defaultTargetPlatform == TargetPlatform.iOS);
               if (v.first == 'custom') {
                 final path = await FilePicker.platform.getDirectoryPath(
                   dialogTitle: '选择存储文件夹',
                 );
                 if (path != null) {
+                  if (isMobile) {
+                    await _ensureNomedia(path);
+                  }
                   await settings.setCustomStoragePath(path);
                   await settings.setStorageLocation('custom');
                   if (mounted) {
@@ -152,6 +159,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   }
                 }
               } else {
+                if (isMobile && settings.customStoragePath != null) {
+                  await _removeNomedia(settings.customStoragePath!);
+                }
                 await settings.setStorageLocation('app');
                 if (mounted) {
                   _showRestartDialog();
@@ -203,6 +213,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  /// 在自定义路径根目录生成 .nomedia，避免相册扫描表情包
+  Future<void> _ensureNomedia(String rootPath) async {
+    try {
+      final file = File(p.join(rootPath, '.nomedia'));
+      if (!await file.exists()) {
+        await file.create(recursive: true);
+      }
+    } catch (_) {}
+  }
+
+  /// 切回应用存储时移除 .nomedia
+  Future<void> _removeNomedia(String rootPath) async {
+    try {
+      final file = File(p.join(rootPath, '.nomedia'));
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (_) {}
   }
 
   Widget _sectionHeader(String text) {
