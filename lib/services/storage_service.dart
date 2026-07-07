@@ -298,9 +298,10 @@ class StorageService {
         await File(file.path!).copy(dest.path);
         fileHash = await _computeFileHash(dest.path);
       } else if (file.bytes != null) {
-        bytes = file.bytes;
-        fileHash = _computeHash(bytes);
-        await dest.writeAsBytes(bytes);
+        final b = file.bytes!;
+        bytes = b;
+        fileHash = _computeHash(b);
+        await dest.writeAsBytes(b);
       }
     }
 
@@ -426,9 +427,10 @@ class StorageService {
         await File(file.path!).copy(dest.path);
         newHash = await _computeFileHash(dest.path);
       } else if (file.bytes != null) {
-        bytes = file.bytes;
-        newHash = _computeHash(bytes);
-        await dest.writeAsBytes(bytes);
+        final b = file.bytes!;
+        bytes = b;
+        newHash = _computeHash(b);
+        await dest.writeAsBytes(b);
       }
     }
 
