@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:gal/gal.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import '../providers/settings_provider.dart';
 import '../providers/meme_provider.dart';
@@ -609,9 +609,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showExportOptions(BuildContext context) {
-    final canSaveToGallery = !kIsWeb &&
-        (defaultTargetPlatform == TargetPlatform.android ||
-         defaultTargetPlatform == TargetPlatform.iOS);
+    final canSaveToGallery = !kIsWeb;
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
@@ -632,7 +630,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ListTile(
                 leading: const Icon(Icons.photo_library_outlined),
                 title: const Text('保存到系统相册'),
-                subtitle: const Text('将所有表情包图片保存到相册'),
+                subtitle: const Text('将所有表情包图片保存到图片文件夹'),
                 onTap: () {
                   Navigator.pop(ctx);
                   _saveToGallery(context);
@@ -656,18 +654,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return;
     }
 
-    // 检查相册权限
-    final hasAccess = await Gal.hasAccess(toAlbum: true);
-    if (!hasAccess) {
-      final granted = await Gal.requestAccess(toAlbum: true);
-      if (!granted) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('需要相册权限才能保存')),
-          );
+    // 确定目标目录
+    Directory? targetDir;
+    try {
+      if (defaultTargetPlatform == TargetPlatform.windows ||
+          defaultTargetPlatform == TargetPlatform.linux ||
+          defaultTargetPlatform == TargetPlatform.macOS) {
+        // 桌面：保存到 Pictures 文件夹
+        final pictures = await getPicturesDirectory();
+        targetDir = Directory(p.join(pictures.path, 'Mako Meme'));
+      } else if (defaultTargetPlatform == TargetPlatform.android) {
+        // Android：优先尝试公共 Pictures 目录（会被相册扫描）
+        final publicDir = Directory('/storage/emulated/0/Pictures/Mako Meme');
+        try {
+          if (!await publicDir.exists()) await publicDir.create(recursive: true);
+          // 测试写入权限
+          final testFile = File(p.join(publicDir.path, '.mako_test'));
+          await testFile.writeAsString('test');
+          await testFile.delete();
+          targetDir = publicDir;
+        } catch (_) {
+          // 回退到应用专属外部存储（不会被相册自动扫描）
+          final ext = await getExternalStorageDirectory();
+          if (ext != null) {
+            targetDir = Directory(p.join(ext.path, 'Pictures', 'Mako Meme'));
+          }
         }
-        return;
+      } else if (defaultTargetPlatform == TargetPlatform.iOS) {
+        // iOS：保存到文档目录
+        final docs = await getApplicationDocumentsDirectory();
+        targetDir = Directory(p.join(docs.path, 'Mako Meme'));
       }
+    } catch (_) {}
+
+    if (targetDir == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('无法确定保存目录')),
+        );
+      }
+      return;
+    }
+
+    if (!await targetDir.exists()) {
+      await targetDir.create(recursive: true);
     }
 
     if (!context.mounted) return;
@@ -688,7 +718,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 const CircularProgressIndicator(),
                 const SizedBox(width: 20),
-                Expanded(child: Text('正在保存到相册… $done/$total')),
+                Expanded(child: Text('正在保存… $done/$total')),
               ],
             ),
           ),
@@ -700,19 +730,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
     int failed = 0;
     for (final meme in memes) {
       try {
-        if (!kIsWeb) {
-          // 原生端：直接用文件路径保存，避免一次性读字节导致 OOM
-          final abs = storage.getMemeAbsolutePath(meme.filePath);
-          if (abs == null) { failed++; continue; }
-          final f = File(abs);
-          if (!await f.exists()) { failed++; continue; }
-          await Gal.putImage(abs, album: 'Mako Meme');
-        } else {
-          // Web：必须用字节
-          final bytes = await storage.readMemeBytes(meme.filePath);
-          if (bytes == null) { failed++; continue; }
-          await Gal.putImageBytes(bytes, name: meme.name, album: 'Mako Meme');
+        final abs = storage.getMemeAbsolutePath(meme.filePath);
+        if (abs == null) { failed++; continue; }
+        final srcFile = File(abs);
+        if (!await srcFile.exists()) { failed++; continue; }
+        // 用唯一文件名避免覆盖
+        final ext = p.extension(meme.filePath);
+        final destName = '${meme.name}$ext';
+        final destFile = File(p.join(targetDir!.path, destName));
+        // 若重名，加序号
+        var finalPath = destFile.path;
+        var counter = 1;
+        while (await File(finalPath).exists()) {
+          finalPath = p.join(targetDir.path, '${meme.name} ($counter)$ext');
+          counter++;
         }
+        await srcFile.copy(finalPath);
         done++;
       } catch (_) {
         failed++;
@@ -724,7 +757,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (context.mounted) {
       Navigator.of(context).pop(); // 关闭进度对话框
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已保存 $done 张到相册${failed > 0 ? '，$failed 张失败' : ''}')),
+        SnackBar(
+          content: Text('已保存 $done 张到：${targetDir.path}${failed > 0 ? '（$failed 张失败）' : ''}'),
+          duration: const Duration(seconds: 4),
+        ),
       );
     }
   }
