@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:photo_view/photo_view.dart';
@@ -21,6 +23,7 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
   late PageController _controller;
   late int _currentIndex;
   final Map<int, Uint8List?> _bytesCache = {};
+  final Map<int, File?> _fileCache = {};
 
   @override
   void initState() {
@@ -32,7 +35,7 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
   Meme get _meme => widget.memes[_currentIndex];
 
   Future<void> _ensureBytes(int index) async {
-    if (_bytesCache.containsKey(index)) return;
+    if (_bytesCache.containsKey(index) || _fileCache.containsKey(index)) return;
     final m = widget.memes[index];
     if (!m.isImageType || m.filePath.isEmpty) {
       _bytesCache[index] = null;
@@ -40,8 +43,15 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
     }
     try {
       final storage = context.read<StorageService>();
-      final b = await storage.readMemeBytes(m.filePath);
-      if (mounted) setState(() => _bytesCache[index] = b);
+      if (kIsWeb) {
+        final b = await storage.readMemeBytes(m.filePath);
+        if (mounted) setState(() => _bytesCache[index] = b);
+      } else {
+        // 原生端：直接拿 File，不读字节，避免大文件 OOM
+        final f = storage.getMemeFile(m.filePath);
+        final exists = f != null && await f.exists();
+        if (mounted) setState(() => _fileCache[index] = exists ? f : null);
+      }
     } catch (_) {}
   }
 
@@ -101,9 +111,11 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
     final theme = Theme.of(context);
     _ensureBytes(i);
     final bytes = _bytesCache[i];
+    final file = _fileCache[i];
+    final hasData = bytes != null || file != null;
 
     if (m.isImageType) {
-      if (bytes == null) {
+      if (!hasData) {
         return Center(
           child: CircularProgressIndicator(
             strokeWidth: 2,
@@ -114,16 +126,28 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
       if (m.type == Meme.typeGif) {
         return Center(
           child: InteractiveViewer(
-            child: Image.memory(bytes, fit: BoxFit.contain),
+            child: file != null
+                ? Image.file(file, fit: BoxFit.contain)
+                : Image.memory(bytes!, fit: BoxFit.contain),
           ),
         );
       }
       return PhotoView(
-        imageProvider: MemoryImage(bytes),
+        imageProvider: file != null
+            ? FileImage(file)
+            : MemoryImage(bytes!),
         minScale: PhotoViewComputedScale.contained,
         maxScale: PhotoViewComputedScale.covered * 2,
         heroAttributes: PhotoViewHeroAttributes(tag: m.id),
         backgroundDecoration: BoxDecoration(color: theme.colorScheme.surface),
+        loadingBuilder: (_, event) => Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: theme.colorScheme.primary,
+            value: event == null ? null : event.cumulativeBytesLoaded /
+                (event.expectedTotalBytes ?? 1),
+          ),
+        ),
       );
     }
 
@@ -353,7 +377,8 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
 
   void _copy() {
     final bytes = _bytesCache[_currentIndex];
-    if (bytes != null) {
+    final file = _fileCache[_currentIndex];
+    if (bytes != null || file != null) {
       Clipboard.setData(ClipboardData(text: ''));
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('已复制到剪贴板'), duration: Duration(seconds: 1)),

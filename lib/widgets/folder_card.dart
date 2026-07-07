@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/folder.dart';
@@ -110,20 +112,7 @@ class FolderCard extends StatelessWidget {
         children: [
           // 背景层：封面图片或纯色
           if (coverMeme != null)
-            FutureBuilder<Uint8List?>(
-              future: context.read<StorageService>().readMemeBytes(coverMeme.filePath),
-              builder: (ctx, snapshot) {
-                if (snapshot.connectionState != ConnectionState.done || snapshot.data == null) {
-                  return _buildFallback(theme, color, isDragOver: isDragOver, isActive: isActive);
-                }
-                return Image.memory(
-                  snapshot.data!,
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                  height: double.infinity,
-                );
-              },
-            )
+            _buildCover(theme, color, coverMeme, isDragOver: isDragOver, isActive: isActive)
           else
             _buildFallback(theme, color, isDragOver: isDragOver, isActive: isActive),
 
@@ -216,6 +205,50 @@ class FolderCard extends StatelessWidget {
     );
   }
 
+  /// 封面图：原生端用 Image.file 流式加载，Web 端读 bytes
+  Widget _buildCover(ThemeData theme, Color color, Meme coverMeme,
+      {required bool isDragOver, required bool isActive}) {
+    final storage = context.read<StorageService>();
+    if (!kIsWeb) {
+      // 原生端：用 File 流式加载，避免一次性读字节
+      final f = storage.getMemeFile(coverMeme.filePath);
+      if (f == null) {
+        return _buildFallback(theme, color, isDragOver: isDragOver, isActive: isActive);
+      }
+      return FutureBuilder<bool>(
+        future: f.exists(),
+        builder: (ctx, snap) {
+          if (snap.connectionState != ConnectionState.done || snap.data != true) {
+            return _buildFallback(theme, color, isDragOver: isDragOver, isActive: isActive);
+          }
+          return Image.file(
+            f,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+            cacheWidth: 512,
+            errorBuilder: (_, _, _) => _buildFallback(theme, color, isDragOver: isDragOver, isActive: isActive),
+          );
+        },
+      );
+    }
+    // Web：读 bytes
+    return FutureBuilder<Uint8List?>(
+      future: storage.readMemeBytes(coverMeme.filePath),
+      builder: (ctx, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done || snapshot.data == null) {
+          return _buildFallback(theme, color, isDragOver: isDragOver, isActive: isActive);
+        }
+        return Image.memory(
+          snapshot.data!,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: double.infinity,
+        );
+      },
+    );
+  }
+
   Widget _buildFallback(ThemeData theme, Color color, {required bool isDragOver, required bool isActive}) {
     return Container(
       color: isDragOver
@@ -283,48 +316,11 @@ class FolderCard extends StatelessWidget {
             itemCount: memes.length,
             itemBuilder: (ctx, i) {
               final meme = memes[i];
-              return FutureBuilder<Uint8List?>(
-                future: context.read<StorageService>().readMemeBytes(meme.filePath),
-                builder: (ctx, snapshot) {
-                  if (snapshot.connectionState != ConnectionState.done || snapshot.data == null) {
-                    return Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                        color: Colors.grey.shade200,
-                      ),
-                      child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                    );
-                  }
-                  final isCover = meme.id == folder.coverMemeId;
-                  return GestureDetector(
-                    onTap: () {
-                      context.read<StorageService>().updateFolderCover(folder.id, meme.id);
-                      Navigator.pop(dCtx);
-                    },
-                    child: Stack(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.memory(snapshot.data!, fit: BoxFit.cover),
-                        ),
-                        if (isCover)
-                          Positioned(
-                            top: 2,
-                            right: 2,
-                            child: Container(
-                              padding: const EdgeInsets.all(2),
-                              decoration: const BoxDecoration(
-                                color: Colors.green,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.check, size: 12, color: Colors.white),
-                            ),
-                          ),
-                      ],
-                    ),
-                  );
-                },
-              );
+              return _CoverThumb(meme: meme, isCover: meme.id == folder.coverMemeId,
+                onTap: () {
+                  context.read<StorageService>().updateFolderCover(folder.id, meme.id);
+                  Navigator.pop(dCtx);
+                });
             },
           ),
         ),
@@ -344,4 +340,73 @@ class FolderCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 封面选择对话框的缩略图：原生端用 Image.file，Web 用 Image.memory
+class _CoverThumb extends StatelessWidget {
+  final Meme meme;
+  final bool isCover;
+  final VoidCallback onTap;
+
+  const _CoverThumb({required this.meme, required this.isCover, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final storage = context.read<StorageService>();
+    return GestureDetector(
+      onTap: onTap,
+      child: Stack(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: _buildImage(storage),
+          ),
+          if (isCover)
+            Positioned(
+              top: 2,
+              right: 2,
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: const BoxDecoration(
+                  color: Colors.green,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.check, size: 12, color: Colors.white),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImage(StorageService storage) {
+    if (!kIsWeb) {
+      final f = storage.getMemeFile(meme.filePath);
+      if (f == null) return _loading();
+      return FutureBuilder<bool>(
+        future: f.exists(),
+        builder: (_, snap) {
+          if (snap.connectionState != ConnectionState.done || snap.data != true) {
+            return _loading();
+          }
+          return Image.file(f, fit: BoxFit.cover, cacheWidth: 256,
+            errorBuilder: (_, _, _) => _loading());
+        },
+      );
+    }
+    return FutureBuilder<Uint8List?>(
+      future: storage.readMemeBytes(meme.filePath),
+      builder: (_, snap) {
+        if (snap.connectionState != ConnectionState.done || snap.data == null) {
+          return _loading();
+        }
+        return Image.memory(snap.data!, fit: BoxFit.cover);
+      },
+    );
+  }
+
+  Widget _loading() => Container(
+    color: Colors.grey.shade200,
+    child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+  );
 }

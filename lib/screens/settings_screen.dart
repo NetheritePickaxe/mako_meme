@@ -699,13 +699,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     int done = 0;
     int failed = 0;
     for (final meme in memes) {
-      final bytes = await storage.readMemeBytes(meme.filePath);
-      if (bytes == null) {
-        failed++;
-        continue;
-      }
       try {
-        await Gal.putImageBytes(bytes, name: meme.name, album: 'Mako Meme');
+        if (!kIsWeb) {
+          // 原生端：直接用文件路径保存，避免一次性读字节导致 OOM
+          final abs = storage.getMemeAbsolutePath(meme.filePath);
+          if (abs == null) { failed++; continue; }
+          final f = File(abs);
+          if (!await f.exists()) { failed++; continue; }
+          await Gal.putImage(abs, album: 'Mako Meme');
+        } else {
+          // Web：必须用字节
+          final bytes = await storage.readMemeBytes(meme.filePath);
+          if (bytes == null) { failed++; continue; }
+          await Gal.putImageBytes(bytes, name: meme.name, album: 'Mako Meme');
+        }
         done++;
       } catch (_) {
         failed++;

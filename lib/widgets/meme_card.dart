@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -21,7 +22,8 @@ class MemeCard extends StatefulWidget {
 }
 
 class _MemeCardState extends State<MemeCard> {
-  Uint8List? _bytes;
+  Uint8List? _bytes;       // Web 端使用
+  File? _file;             // 原生端使用
   bool _loading = true;
   double _aspectRatio = 1.0;
 
@@ -35,23 +37,45 @@ class _MemeCardState extends State<MemeCard> {
     if (!_loading) return;
     final storage = context.read<StorageService>();
     if (widget.meme.isImageType && widget.meme.filePath.isNotEmpty) {
-      storage.readMemeBytes(widget.meme.filePath).then((b) {
-        if (mounted) {
-          setState(() {
-            _bytes = b;
-            _loading = false;
-          });
-          if (b != null) _loadAspectRatio(b);
+      if (kIsWeb) {
+        // Web：读 bytes
+        storage.readMemeBytes(widget.meme.filePath).then((b) {
+          if (mounted) {
+            setState(() {
+              _bytes = b;
+              _loading = false;
+            });
+            if (b != null) _loadAspectRatioFromBytes(b);
+          }
+        }, onError: (_) {
+          if (mounted) setState(() { _loading = false; });
+        });
+      } else {
+        // 原生：用 File 直接显示，避免一次性载入大文件字节
+        final f = storage.getMemeFile(widget.meme.filePath);
+        if (f == null) {
+          if (mounted) setState(() { _loading = false; });
+          return;
         }
-      }, onError: (_) {
-        if (mounted) setState(() => _loading = false);
-      });
+        f.exists().then((exists) {
+          if (mounted) {
+            setState(() {
+              _file = exists ? f : null;
+              _loading = false;
+            });
+            if (exists) _loadAspectRatioFromFile();
+          }
+        }, onError: (_) {
+          if (mounted) setState(() { _loading = false; });
+        });
+      }
     } else {
       _loading = false;
     }
   }
 
-  Future<void> _loadAspectRatio(Uint8List bytes) async {
+  Future<void> _loadAspectRatioFromBytes(Uint8List bytes) async {
+    // Web 上仍用 codec 解码，Web 文件通常不大
     try {
       final codec = await ui.instantiateImageCodec(bytes);
       final frame = await codec.getNextFrame();
@@ -60,9 +84,18 @@ class _MemeCardState extends State<MemeCard> {
       if (mounted && w > 0 && h > 0) {
         setState(() => _aspectRatio = w / h);
       }
-    } catch (_) {
-      // keep default 1.0
-    }
+    } catch (_) {}
+  }
+
+  Future<void> _loadAspectRatioFromFile() async {
+    // 原生端只读 64KB 头部解析宽高，不解码整图
+    try {
+      final storage = context.read<StorageService>();
+      final ratio = await storage.getImageAspectRatio(widget.meme.filePath);
+      if (mounted && ratio != null && ratio > 0 && ratio.isFinite) {
+        setState(() => _aspectRatio = ratio);
+      }
+    } catch (_) {}
   }
 
   bool get _isDesktop {
@@ -182,12 +215,27 @@ class _MemeCardState extends State<MemeCard> {
         height: 100,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: _bytes != null
-              ? Image.memory(_bytes!, fit: BoxFit.cover)
-              : Container(color: Colors.grey.shade300),
+          child: _buildThumbnail(fit: BoxFit.cover),
         ),
       ),
     );
+  }
+
+  /// 统一的缩略图渲染：原生端用 Image.file（不读字节），Web 端用 Image.memory
+  Widget _buildThumbnail({required BoxFit fit}) {
+    if (_file != null) {
+      return Image.file(
+        _file!,
+        fit: fit,
+        // 限制缓存尺寸，避免超大图片全分辨率缓存
+        cacheWidth: 512,
+        errorBuilder: (_, _, _) => _placeholder(),
+      );
+    }
+    if (_bytes != null) {
+      return Image.memory(_bytes!, fit: fit, errorBuilder: (_, _, _) => _placeholder());
+    }
+    return Container(color: Colors.grey.shade300);
   }
 
   Widget _buildCard(BuildContext context, MemeProvider prov, bool isSelected, bool isMulti, ThemeData theme) {
@@ -205,12 +253,10 @@ class _MemeCardState extends State<MemeCard> {
             children: [
               if (widget.meme.isImageType && _loading)
                 const Center(child: CircularProgressIndicator(strokeWidth: 2))
-              else if (widget.meme.isImageType && _bytes != null)
-                Image.memory(_bytes!, fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => _placeholder(),
-                )
+              else if (widget.meme.isImageType && (_file != null || _bytes != null))
+                _buildThumbnail(fit: BoxFit.cover)
               else if (widget.meme.isImageType)
-                // 图片丢失（Web 刷新后）
+                // 图片丢失（Web 刷新后或文件不存在）
                 Container(
                   color: Colors.grey.shade200,
                   child: Center(
@@ -269,7 +315,8 @@ class _MemeCardState extends State<MemeCard> {
   }
 
   void _copyToClipboard() {
-    if (widget.meme.isImageType && _bytes == null) {
+    final hasData = _bytes != null || _file != null;
+    if (widget.meme.isImageType && !hasData) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('图片丢失，无法复制'), duration: Duration(seconds: 1)),
       );
@@ -306,12 +353,12 @@ class _MemeCardState extends State<MemeCard> {
         Offset.zero & MediaQuery.of(context).size,
       ),
       items: <PopupMenuEntry<String>>[
-        if (_bytes == null && !_loading)
+        if (_bytes == null && _file == null && !_loading)
           const PopupMenuItem<String>(
             value: 'reimport',
             child: ListTile(leading: Icon(Icons.refresh), title: Text('重新导入'), dense: true),
           ),
-        if (_bytes != null)
+        if (_bytes != null || _file != null)
           const PopupMenuItem<String>(
             value: 'preview',
             child: ListTile(leading: Icon(Icons.zoom_in), title: Text('预览大图'), dense: true),
@@ -466,16 +513,19 @@ class _MemeCardState extends State<MemeCard> {
     final result = await FilePicker.platform.pickFiles(type: FileType.image);
     if (result != null && result.files.isNotEmpty && mounted) {
       final file = result.files.first;
-      if (file.bytes != null) {
-        final storage = context.read<StorageService>();
-        // 用新文件覆盖旧字节
-        await storage.reimportMeme(widget.meme.id, file);
-        if (mounted) {
-          setState(() {
-            _bytes = file.bytes;
-            _loading = false;
-          });
-          _loadAspectRatio(file.bytes!);
+      final storage = context.read<StorageService>();
+      // 用新文件覆盖旧字节
+      await storage.reimportMeme(widget.meme.id, file);
+      if (mounted) {
+        setState(() {
+          _bytes = file.bytes;
+          _file = (!kIsWeb && file.path != null) ? File(file.path!) : null;
+          _loading = false;
+        });
+        if (file.bytes != null) {
+          _loadAspectRatioFromBytes(file.bytes!);
+        } else if (_file != null) {
+          _loadAspectRatioFromFile();
         }
       }
     }

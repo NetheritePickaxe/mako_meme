@@ -253,11 +253,13 @@ class StorageService {
     return md5.convert(bytes).toString();
   }
 
+  /// 流式计算文件 MD5，避免一次性载入超大文件导致 OOM
   Future<String?> _computeFileHash(String path) async {
     try {
       final file = File(path);
-      final bytes = await file.readAsBytes();
-      return _computeHash(bytes);
+      if (!await file.exists()) return null;
+      final digest = await md5.bind(file.openRead()).first;
+      return digest.toString();
     } catch (_) {
       return null;
     }
@@ -325,10 +327,11 @@ class StorageService {
       if (bytes != null) {
         characterData = await CharacterCardService.parseFromBytes(bytes);
       } else if (file.path != null) {
-        try {
-          final fileBytes = await File(file.path!).readAsBytes();
-          characterData = await CharacterCardService.parseFromBytes(fileBytes);
-        } catch (_) {}
+        // 用流式读取，避免一次性载入超大文件导致 OOM
+        final sourcePath = kIsWeb ? null : (file.path ?? p.join(_basePath!, filePath));
+        if (sourcePath != null) {
+          characterData = await CharacterCardService.parseFromPath(sourcePath);
+        }
       }
 
       if (CharacterCardService.isValidCharacterCard(characterData)) {
@@ -387,6 +390,122 @@ class StorageService {
         return await file.readAsBytes();
       }
     } catch (_) {}
+    return null;
+  }
+
+  /// 获取 meme 文件的绝对路径（仅原生端有效）
+  String? getMemeAbsolutePath(String filePath) {
+    if (kIsWeb) return null;
+    if (filePath.isEmpty) return null;
+    return p.join(_basePath!, filePath);
+  }
+
+  /// 获取 meme 文件对象（仅原生端有效）
+  File? getMemeFile(String filePath) {
+    final abs = getMemeAbsolutePath(filePath);
+    return abs == null ? null : File(abs);
+  }
+
+  /// 流式获取图片宽高比，不解码整图，超大图片安全
+  /// 仅原生端有效；Web 端返回 null
+  Future<double?> getImageAspectRatio(String filePath) async {
+    if (kIsWeb) return null;
+    final abs = getMemeAbsolutePath(filePath);
+    if (abs == null) return null;
+    try {
+      final file = File(abs);
+      if (!await file.exists()) return null;
+      // 只读取前 64KB 用于解析 PNG/JPEG/GIF 头部
+      final raf = await file.open();
+      try {
+        final header = await raf.read(64 * 1024);
+        final ratio = _parseImageRatioFromHeader(header);
+        return ratio;
+      } finally {
+        await raf.close();
+      }
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 从文件头字节解析图片宽高比（支持 PNG/JPEG/GIF/BMP/WEBP）
+  static double? _parseImageRatioFromHeader(Uint8List bytes) {
+    if (bytes.length < 12) return null;
+    // PNG: 89 50 4E 47 0D 0A 1A 0A
+    if (bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47) {
+      if (bytes.length < 24) return null;
+      final w = (bytes[16] << 24) | (bytes[17] << 16) | (bytes[18] << 8) | bytes[19];
+      final h = (bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) | bytes[23];
+      if (w > 0 && h > 0) return w / h;
+      return null;
+    }
+    // JPEG: FF D8
+    if (bytes[0] == 0xFF && bytes[1] == 0xD8) {
+      return _parseJpegRatio(bytes);
+    }
+    // GIF: 47 49 46 38
+    if (bytes[0] == 0x47 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x38) {
+      if (bytes.length < 10) return null;
+      final w = bytes[6] | (bytes[7] << 8);
+      final h = bytes[8] | (bytes[9] << 8);
+      if (w > 0 && h > 0) return w / h;
+      return null;
+    }
+    // BMP: 42 4D
+    if (bytes[0] == 0x42 && bytes[1] == 0x4D) {
+      if (bytes.length < 26) return null;
+      final w = (bytes[18]) | (bytes[19] << 8) | (bytes[20] << 16) | (bytes[21] << 24);
+      final h = (bytes[22]) | (bytes[23] << 8) | (bytes[24] << 16) | (bytes[25] << 24);
+      if (w > 0 && h > 0) return w / h.abs();
+      return null;
+    }
+    // WEBP: 52 49 46 46 ?? ?? ?? ?? 57 45 42 50
+    if (bytes.length >= 12 &&
+        bytes[0] == 0x52 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x46 &&
+        bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50) {
+      // RIFF .... WEBP
+      if (bytes.length < 30) return null;
+      final fourcc = String.fromCharCodes(bytes.sublist(12, 16));
+      if (fourcc == 'VP8 ') {
+        final w = (bytes[26] | (bytes[27] << 8)) & 0x3FFF;
+        final h = (bytes[28] | (bytes[29] << 8)) & 0x3FFF;
+        if (w > 0 && h > 0) return w / h;
+      } else if (fourcc == 'VP8L') {
+        final b0 = bytes[21];
+        final b1 = bytes[22];
+        final b2 = bytes[23];
+        final b3 = bytes[24];
+        final w = 1 + ((b1 & 0x3F) << 8 | b0);
+        final h = 1 + ((b3 & 0x0F) << 10 | b2 << 2 | (b1 & 0xC0) >> 6);
+        if (w > 0 && h > 0) return w / h;
+      } else if (fourcc == 'VP8X') {
+        final w = 1 + (bytes[24] | (bytes[25] << 8) | (bytes[26] << 16));
+        final h = 1 + (bytes[27] | (bytes[28] << 8) | (bytes[29] << 16));
+        if (w > 0 && h > 0) return w / h;
+      }
+      return null;
+    }
+    return null;
+  }
+
+  static double? _parseJpegRatio(Uint8List bytes) {
+    var i = 2;
+    while (i + 9 < bytes.length) {
+      if (bytes[i] != 0xFF) return null;
+      final marker = bytes[i + 1];
+      // SOFn markers: C0-CF (except C4, C8, CC)
+      if (marker >= 0xC0 && marker <= 0xCF &&
+          marker != 0xC4 && marker != 0xC8 && marker != 0xCC) {
+        final h = (bytes[i + 5] << 8) | bytes[i + 6];
+        final w = (bytes[i + 7] << 8) | bytes[i + 8];
+        if (w > 0 && h > 0) return w / h;
+        return null;
+      }
+      // 其它 marker 跳过
+      final segLen = (bytes[i + 2] << 8) | bytes[i + 3];
+      i += 2 + segLen;
+    }
     return null;
   }
 
@@ -752,12 +871,11 @@ class StorageService {
           if (f is File) {
             final ext = p.extension(f.path).toLowerCase();
             if (['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'].contains(ext)) {
-              final bytes = await f.readAsBytes();
+              // 直接用 path 流式拷贝，避免一次性读取超大文件导致 OOM
               final platformFile = PlatformFile(
                 name: p.basename(f.path),
                 size: await f.length(),
                 path: f.path,
-                bytes: bytes,
               );
               await importFile(platformFile);
               count++;

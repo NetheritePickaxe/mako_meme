@@ -91,11 +91,10 @@ class _HomeScreenState extends State<HomeScreen> {
           if (files.isNotEmpty) {
             final storage = context.read<StorageService>();
             for (final f in files) {
-              final bytes = await f.readAsBytes();
+              // 直接用 path 流式拷贝，避免一次性读取超大文件导致 OOM
               await storage.importFile(PlatformFile(
                 name: f.name,
-                size: bytes.length,
-                bytes: bytes,
+                size: await f.length(),
                 path: f.path,
               ));
             }
