@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:desktop_drop/desktop_drop.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import '../providers/meme_provider.dart';
 import '../providers/locale_provider.dart';
 import '../providers/settings_provider.dart';
@@ -176,6 +178,13 @@ class _HomeScreenState extends State<HomeScreen> {
       return MemeGrid(memes: prov.memes);
     }
 
+    // 根视图：如果选择了类型/标签/文件夹过滤器，则显示所有匹配的 meme（不显示文件夹卡片）
+    if (prov.typeFilter.isNotEmpty ||
+        prov.tagFilter.isNotEmpty ||
+        prov.folderFilter.isNotEmpty) {
+      return MemeGrid(memes: prov.memes);
+    }
+
     final folders = prov.folders;
     final uncategorized = prov.memes.where((m) => m.folderId == null).toList();
 
@@ -185,14 +194,12 @@ class _HomeScreenState extends State<HomeScreen> {
         ? settings.gridColumns
         : width > 1200 ? 6 : width > 900 ? 5 : width > 600 ? 4 : width > 400 ? 3 : 2;
 
-    return GridView.builder(
+    // 统一使用瀑布流布局
+    return MasonryGridView.count(
+      crossAxisCount: cols,
+      mainAxisSpacing: 8,
+      crossAxisSpacing: 8,
       padding: const EdgeInsets.all(8),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: cols,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-        childAspectRatio: 1,
-      ),
       itemCount: folders.length + uncategorized.length,
       itemBuilder: (ctx, i) {
         if (i < folders.length) {
@@ -457,13 +464,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 title: Text(l10n.tr('new_folder')),
                 onTap: () { Navigator.pop(bCtx); _showCreateFolderDialog(ctx, prov); },
               ),
-              const Divider(),
             ],
             const Divider(),
             ListTile(
               leading: const Icon(Icons.file_download_outlined),
               title: Text(l10n.tr('import_backup')),
-              subtitle: const Text('ZIP backup / 批量导入'),
+              subtitle: const Text('从 ZIP 恢复数据或导入图片'),
               onTap: () { Navigator.pop(bCtx); _importZip(ctx); },
             ),
           ],
@@ -498,6 +504,16 @@ class _HomeScreenState extends State<HomeScreen> {
           decoration: InputDecoration(hintText: l10n.tr('hint_text_or_emoji')),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.paste),
+            tooltip: '粘贴',
+            onPressed: () async {
+              final data = await Clipboard.getData(Clipboard.kTextPlain);
+              if (data?.text != null && data!.text!.isNotEmpty) {
+                ctrl.text = data.text!;
+              }
+            },
+          ),
           TextButton(onPressed: () => Navigator.pop(dCtx), child: Text(l10n.tr('cancel'))),
           FilledButton(onPressed: () {
             if (ctrl.text.trim().isNotEmpty) {

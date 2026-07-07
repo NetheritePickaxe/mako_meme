@@ -17,11 +17,6 @@ class MemeGrid extends StatelessWidget {
     this.onReorder,
   });
 
-  /// 是否全部为表情/文字类型（方形卡片）
-  bool get _allSquare => memes.every(
-        (m) => m.type == Meme.typeEmoji || m.type == Meme.typeText,
-      );
-
   int _resolveCols(BuildContext context) {
     final settings = context.read<SettingsProvider>();
     if (settings.gridColumns > 0) return settings.gridColumns;
@@ -49,25 +44,7 @@ class MemeGrid extends StatelessWidget {
 
     final cols = _resolveCols(context);
 
-    // 全部为表情/文字 → 常规方形网格
-    if (_allSquare) {
-      return GridView.builder(
-        padding: EdgeInsets.all(spacing),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: cols,
-          childAspectRatio: 1,
-          crossAxisSpacing: spacing,
-          mainAxisSpacing: spacing,
-        ),
-        itemCount: memes.length,
-        itemBuilder: (ctx, i) => MemeCard(
-          meme: memes[i],
-          onReorder: onReorder,
-        ),
-      );
-    }
-
-    // 含图片 → 瀑布流布局（变高卡片）
+    // 统一使用瀑布流布局，支持文字自适应高度 + 图片变高
     return MasonryGridView.count(
       crossAxisCount: cols,
       mainAxisSpacing: spacing,

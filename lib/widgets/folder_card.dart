@@ -29,48 +29,54 @@ class FolderCard extends StatelessWidget {
 
     // 多选模式：点击切换选中，显示复选框，禁用拖放
     if (isMulti) {
-      return GestureDetector(
-        onTap: () => prov.toggleFolderSelect(folder.id),
-        child: _buildCard(
-          context,
-          theme,
-          color,
-          isDragOver: false,
-          isSelected: isFolderSelected,
-          showCheckbox: true,
+      return AspectRatio(
+        aspectRatio: 1,
+        child: GestureDetector(
+          onTap: () => prov.toggleFolderSelect(folder.id),
+          child: _buildCard(
+            context,
+            theme,
+            color,
+            isDragOver: false,
+            isSelected: isFolderSelected,
+            showCheckbox: true,
+          ),
         ),
       );
     }
 
     // 普通模式：点击进入文件夹，右键菜单，支持拖入表情包
-    return DragTarget<Meme>(
-      onAcceptWithDetails: (details) {
-        final p = context.read<MemeProvider>();
-        p.moveToFolder(details.data.id, folder.id);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('已移至「${folder.name}」'), duration: const Duration(seconds: 1)),
-        );
-      },
-      builder: (ctx, candidateData, rejectedData) {
-        final isDragOver = candidateData.isNotEmpty;
-        return GestureDetector(
-          onTap: () {
-            final p = context.read<MemeProvider>();
-            p.selectFolder(folder.id);
-          },
-          onSecondaryTapUp: (details) {
-            _showFolderContextMenu(details.globalPosition, context, folder, count);
-          },
-          child: _buildCard(
-            context,
-            theme,
-            color,
-            isDragOver: isDragOver,
-            isSelected: false,
-            showCheckbox: false,
-          ),
-        );
-      },
+    return AspectRatio(
+      aspectRatio: 1,
+      child: DragTarget<Meme>(
+        onAcceptWithDetails: (details) {
+          final p = context.read<MemeProvider>();
+          p.moveToFolder(details.data.id, folder.id);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('已移至「${folder.name}」'), duration: const Duration(seconds: 1)),
+          );
+        },
+        builder: (ctx, candidateData, rejectedData) {
+          final isDragOver = candidateData.isNotEmpty;
+          return GestureDetector(
+            onTap: () {
+              final p = context.read<MemeProvider>();
+              p.selectFolder(folder.id);
+            },
+            onSecondaryTapUp: (details) {
+              _showFolderContextMenu(details.globalPosition, context, folder, count);
+            },
+            child: _buildCard(
+              context,
+              theme,
+              color,
+              isDragOver: isDragOver,
+              isSelected: false,
+              showCheckbox: false,
+            ),
+          );
+        },
+      ),
     );
   }
 

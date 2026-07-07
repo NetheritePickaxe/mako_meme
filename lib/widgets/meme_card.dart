@@ -105,10 +105,14 @@ class _MemeCardState extends State<MemeCard> {
   }
 
   bool get _isSquare =>
-      widget.meme.type == Meme.typeEmoji || widget.meme.type == Meme.typeText;
+      widget.meme.type == Meme.typeEmoji;
 
   double get _effectiveAspectRatio {
     if (_isSquare) return 1.0;
+    if (widget.meme.type == Meme.typeText) {
+      // 文字卡片不用固定比例，由内容决定高度
+      return double.nan;
+    }
     if (_aspectRatio.isNaN || _aspectRatio.isInfinite || _aspectRatio <= 0) return 1.0;
     return _aspectRatio;
   }
@@ -198,15 +202,66 @@ class _MemeCardState extends State<MemeCard> {
     );
   }
 
-  /// 方形卡片（表情/文字）固定 1:1，图片卡片按真实宽高比
+  /// 表情卡片固定 1:1，文字卡片自适应高度，图片卡片按真实宽高比
   Widget _buildAspectRatioCard(MemeProvider prov, bool isSelected, bool isMulti, ThemeData theme) {
+    final ratio = _effectiveAspectRatio;
+    if (ratio.isNaN) {
+      // 文字卡片：由内容决定高度，不强制比例
+      return _buildCard(context, prov, isSelected, isMulti, theme);
+    }
     return AspectRatio(
-      aspectRatio: _effectiveAspectRatio,
+      aspectRatio: ratio,
       child: _buildCard(context, prov, isSelected, isMulti, theme),
     );
   }
 
   Widget _buildFeedback() {
+    // 文字卡片：反馈显示文字
+    if (widget.meme.type == Meme.typeText) {
+      return Material(
+        elevation: 4,
+        borderRadius: BorderRadius.circular(12),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 160, maxHeight: 200),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              color: Colors.grey.shade100,
+              padding: const EdgeInsets.all(8),
+              child: Text(
+                widget.meme.textContent ?? '',
+                style: const TextStyle(fontSize: 14, color: Colors.black87),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    // 表情卡片：反馈显示表情
+    if (widget.meme.type == Meme.typeEmoji) {
+      return Material(
+        elevation: 4,
+        borderRadius: BorderRadius.circular(12),
+        child: SizedBox(
+          width: 100,
+          height: 100,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              color: Colors.grey.shade100,
+              alignment: Alignment.center,
+              child: Text(
+                widget.meme.textContent ?? '',
+                style: const TextStyle(fontSize: 28, color: Colors.black87),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    // 图片卡片：反馈显示缩略图
     return Material(
       elevation: 4,
       borderRadius: BorderRadius.circular(12),
@@ -239,6 +294,64 @@ class _MemeCardState extends State<MemeCard> {
   }
 
   Widget _buildCard(BuildContext context, MemeProvider prov, bool isSelected, bool isMulti, ThemeData theme) {
+    // 文字卡片：不用 Stack(fit: expand)，让内容自适应高度
+    if (widget.meme.type == Meme.typeText) {
+      return AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: isSelected ? Border.all(color: Theme.of(context).colorScheme.primary, width: 3) : null,
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4, offset: const Offset(0, 2))],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Stack(
+            children: [
+              ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 48),
+                child: Container(
+                  width: double.infinity,
+                  color: Colors.grey.shade100,
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    widget.meme.textContent ?? '',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.black87),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+              if (widget.meme.isFavorite)
+                Positioned(top: 6, right: 6,
+                  child: Container(padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(color: Theme.of(context).colorScheme.tertiary, shape: BoxShape.circle),
+                    child: Icon(Icons.favorite, size: 14, color: Theme.of(context).colorScheme.onTertiary),
+                  ),
+                ),
+              if (isMulti)
+                Positioned(top: 6, left: 6,
+                  child: Container(padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: isSelected ? Theme.of(context).colorScheme.primary : Colors.white.withValues(alpha: 0.8),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey.shade400, width: 2),
+                    ),
+                    child: isSelected ? const Icon(Icons.check, size: 14, color: Colors.white) : const SizedBox(width: 14, height: 14),
+                  ),
+                ),
+              Positioned(bottom: 6, left: 6,
+                child: Container(padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.6), borderRadius: BorderRadius.circular(4)),
+                  child: const Text('文字',
+                    style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // 图片/表情等卡片：用 Stack(fit: expand) 撑满
     return AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
@@ -256,7 +369,6 @@ class _MemeCardState extends State<MemeCard> {
               else if (widget.meme.isImageType && (_file != null || _bytes != null))
                 _buildThumbnail(fit: BoxFit.cover)
               else if (widget.meme.isImageType)
-                // 图片丢失（Web 刷新后或文件不存在）
                 Container(
                   color: Colors.grey.shade200,
                   child: Center(
@@ -277,7 +389,7 @@ class _MemeCardState extends State<MemeCard> {
                   child: Center(child: Text(
                     widget.meme.textContent ?? '',
                     style: TextStyle(fontSize: widget.meme.type == Meme.typeEmoji ? 28 : 16,
-                      fontWeight: widget.meme.type == Meme.typeText ? FontWeight.w500 : FontWeight.normal,
+                      fontWeight: FontWeight.normal,
                       color: Colors.black87),
                     textAlign: TextAlign.center, overflow: TextOverflow.ellipsis, maxLines: 4,
                   )),

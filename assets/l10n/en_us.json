@@ -13,7 +13,7 @@
   "new_folder": "New Folder",
   "import_images": "Import Images",
   "import_text": "Import Text / Emoji",
-  "import_backup": "Import Backup",
+  "import_backup": "Batch Import",
   "import_confirm": "Import from {filename}?\n\nThis will overwrite existing data.",
   "import_success": "Import successful",
   "imported_count": "Imported {count} images",

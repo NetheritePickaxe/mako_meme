@@ -10,6 +10,13 @@ import '../providers/meme_provider.dart';
 import '../services/storage_service.dart';
 import 'character_card_editor_screen.dart';
 
+/// 是否为移动平台
+bool _isMobilePlatform() {
+  if (kIsWeb) return false;
+  final p = defaultTargetPlatform;
+  return p == TargetPlatform.android || p == TargetPlatform.iOS;
+}
+
 class MemeViewerScreen extends StatefulWidget {
   final List<Meme> memes;
   final int initialIndex;
@@ -98,7 +105,7 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
           return Column(
             children: [
               Expanded(child: _buildImageArea(m, i)),
-              _buildDetailPanel(theme, prov, m),
+              _buildDraggableDetailPanel(theme, prov, m),
             ],
           );
         },
@@ -164,113 +171,126 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
     );
   }
 
-  /// 底部详情面板：名称 + 文件信息 + 标签 + 操作按钮
-  Widget _buildDetailPanel(ThemeData theme, MemeProvider prov, Meme m) {
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 36,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 10),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
+  /// 底部详情面板：可拖动展开/收起
+  Widget _buildDraggableDetailPanel(ThemeData theme, MemeProvider prov, Meme m) {
+    final isMobile = _isMobilePlatform();
+    return DraggableScrollableSheet(
+      initialChildSize: 0.35,
+      minChildSize: 0.15,
+      maxChildSize: 0.85,
+      builder: (ctx, controller) {
+        return Container(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
-          // 名称（点击可编辑）
-          GestureDetector(
-            onTap: _rename,
-            behavior: HitTestBehavior.opaque,
-            child: Row(
+          child: SingleChildScrollView(
+            controller: controller,
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Text(
-                    m.name,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
+                // 手势指示条（可拖动）
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 10),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(2),
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                Icon(
-                  Icons.edit,
-                  size: 16,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                // 名称（点击可编辑）
+                GestureDetector(
+                  onTap: _rename,
+                  behavior: HitTestBehavior.opaque,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          m.name,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Icon(
+                        Icons.edit,
+                        size: 16,
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(height: 8),
+                // 文件信息
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 4,
+                  children: [
+                    _infoChip(theme, _typeLabel(m.type), icon: _typeIcon(m.type)),
+                    _infoChip(theme, _formatFileSize(m.fileSize), icon: Icons.data_usage),
+                    _infoChip(theme, _formatDate(m.createdAt), icon: Icons.access_time),
+                  ],
+                ),
+                if (m.tags.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: m.tags
+                        .map((t) => Chip(
+                              label: Text(t, style: const TextStyle(fontSize: 11)),
+                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                            ))
+                        .toList(),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                // 操作按钮（移动端图片不显示复制）
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 4,
+                  runSpacing: 4,
+                  children: [
+                    if (!(isMobile && m.isImageType))
+                      _actionButton(theme, '复制', Icons.copy, _copy),
+                    _actionButton(theme, '分享', Icons.ios_share, _share),
+                    _actionButton(
+                      theme,
+                      m.isFavorite ? '已收藏' : '收藏',
+                      m.isFavorite ? Icons.favorite : Icons.favorite_border,
+                      () => prov.toggleFavorite(m.id),
+                      color: m.isFavorite ? Colors.red : null,
+                    ),
+                    _actionButton(theme, '分类', Icons.label_outline, _showTypeDialog),
+                    _actionButton(theme, '重命名', Icons.edit, _rename),
+                    _actionButton(theme, '删除', Icons.delete_outline, _confirmDelete, color: Colors.red),
+                  ],
+                ),
+                if (m.type == Meme.typeCharacterCard) ...[
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.tonalIcon(
+                      onPressed: _editCharacterCard,
+                      icon: const Icon(Icons.edit_note),
+                      label: const Text('编辑角色卡'),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
-          const SizedBox(height: 8),
-          // 文件信息
-          Wrap(
-            spacing: 12,
-            runSpacing: 4,
-            children: [
-              _infoChip(theme, _typeLabel(m.type), icon: _typeIcon(m.type)),
-              _infoChip(theme, _formatFileSize(m.fileSize), icon: Icons.data_usage),
-              _infoChip(theme, _formatDate(m.createdAt), icon: Icons.access_time),
-            ],
-          ),
-          if (m.tags.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 4,
-              children: m.tags
-                  .map((t) => Chip(
-                        label: Text(t, style: const TextStyle(fontSize: 11)),
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                      ))
-                  .toList(),
-            ),
-          ],
-          const SizedBox(height: 12),
-          // 操作按钮
-          Wrap(
-            alignment: WrapAlignment.center,
-            spacing: 4,
-            runSpacing: 4,
-            children: [
-              _actionButton(theme, '复制', Icons.copy, _copy),
-              _actionButton(theme, '分享', Icons.ios_share, _share),
-              _actionButton(
-                theme,
-                m.isFavorite ? '已收藏' : '收藏',
-                m.isFavorite ? Icons.favorite : Icons.favorite_border,
-                () => prov.toggleFavorite(m.id),
-                color: m.isFavorite ? Colors.red : null,
-              ),
-              _actionButton(theme, '分类', Icons.label_outline, _showTypeDialog),
-              _actionButton(theme, '重命名', Icons.edit, _rename),
-              _actionButton(theme, '删除', Icons.delete_outline, _confirmDelete, color: Colors.red),
-            ],
-          ),
-          if (m.type == Meme.typeCharacterCard) ...[
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.tonalIcon(
-                onPressed: _editCharacterCard,
-                icon: const Icon(Icons.edit_note),
-                label: const Text('编辑角色卡'),
-              ),
-            ),
-          ],
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -376,14 +396,36 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
   }
 
   void _copy() {
-    final bytes = _bytesCache[_currentIndex];
-    final file = _fileCache[_currentIndex];
-    if (bytes != null || file != null) {
-      Clipboard.setData(ClipboardData(text: ''));
+    final m = _meme;
+    // 文字类型：复制文字内容到剪贴板
+    if (m.type == Meme.typeText) {
+      final text = m.textContent ?? '';
+      if (text.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('无文字内容'), duration: Duration(seconds: 1)),
+        );
+        return;
+      }
+      Clipboard.setData(ClipboardData(text: text));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已复制文字到剪贴板'), duration: Duration(seconds: 1)),
+      );
+      return;
+    }
+    // 表情类型：复制表情符号
+    if (m.type == Meme.typeEmoji) {
+      final text = m.textContent ?? m.name;
+      Clipboard.setData(ClipboardData(text: text));
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('已复制到剪贴板'), duration: Duration(seconds: 1)),
       );
+      return;
     }
+    // 图片类型：复制文件名（Flutter 无原生图片剪贴板支持）
+    Clipboard.setData(ClipboardData(text: m.name));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('已复制名称: ${m.name}'), duration: const Duration(seconds: 1)),
+    );
   }
 
   void _share() {
