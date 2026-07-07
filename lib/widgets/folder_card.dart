@@ -114,7 +114,7 @@ class FolderCard extends StatelessWidget {
               future: context.read<StorageService>().readMemeBytes(coverMeme.filePath),
               builder: (ctx, snapshot) {
                 if (snapshot.connectionState != ConnectionState.done || snapshot.data == null) {
-                  return _buildFallback(theme, color);
+                  return _buildFallback(theme, color, isDragOver: isDragOver, isActive: isActive);
                 }
                 return Image.memory(
                   snapshot.data!,
@@ -125,7 +125,7 @@ class FolderCard extends StatelessWidget {
               },
             )
           else
-            _buildFallback(theme, color),
+            _buildFallback(theme, color, isDragOver: isDragOver, isActive: isActive),
 
           // 渐变遮罩，让文字可读
           Container(
@@ -216,7 +216,7 @@ class FolderCard extends StatelessWidget {
     );
   }
 
-  Widget _buildFallback(ThemeData theme, Color color) {
+  Widget _buildFallback(ThemeData theme, Color color, {required bool isDragOver, required bool isActive}) {
     return Container(
       color: isDragOver
           ? color.withValues(alpha: 0.2)

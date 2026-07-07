@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:gal/gal.dart';
 import 'package:path/path.dart' as p;
 import '../providers/settings_provider.dart';
 import '../providers/meme_provider.dart';
@@ -66,8 +67,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ListTile(
             leading: const Icon(Icons.file_upload_outlined),
             title: const Text('导出数据'),
-            subtitle: const Text('导出所有表情包和元数据到 ZIP'),
-            onTap: () => _exportData(context),
+            subtitle: const Text('导出为 ZIP 或保存到系统相册'),
+            onTap: () => _showExportOptions(context),
           ),
           const SizedBox(height: 16),
 
@@ -605,6 +606,120 @@ class _SettingsScreenState extends State<SettingsScreen> {
         )),
       ),
     );
+  }
+
+  void _showExportOptions(BuildContext context) {
+    final canSaveToGallery = !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.android ||
+         defaultTargetPlatform == TargetPlatform.iOS);
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.folder_zip_outlined),
+              title: const Text('导出为 ZIP'),
+              subtitle: const Text('包含所有表情包和元数据，可恢复'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _exportData(context);
+              },
+            ),
+            if (canSaveToGallery)
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined),
+                title: const Text('保存到系统相册'),
+                subtitle: const Text('将所有表情包图片保存到相册'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _saveToGallery(context);
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _saveToGallery(BuildContext context) async {
+    final storage = context.read<StorageService>();
+    final memes = storage.getAllMemes();
+    if (memes.isEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('没有可导出的表情包')),
+        );
+      }
+      return;
+    }
+
+    // 检查相册权限
+    final hasAccess = await Gal.hasAccess(toAlbum: true);
+    if (!hasAccess) {
+      final granted = await Gal.requestAccess(toAlbum: true);
+      if (!granted) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('需要相册权限才能保存')),
+          );
+        }
+        return;
+      }
+    }
+
+    if (!context.mounted) return;
+
+    final total = memes.length;
+    final progressNotifier = ValueNotifier<int>(0);
+
+    // 显示进度对话框
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          content: ValueListenableBuilder<int>(
+            valueListenable: progressNotifier,
+            builder: (_, done, __) => Row(
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(width: 20),
+                Expanded(child: Text('正在保存到相册… $done/$total')),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    int done = 0;
+    int failed = 0;
+    for (final meme in memes) {
+      final bytes = await storage.readMemeBytes(meme.filePath);
+      if (bytes == null) {
+        failed++;
+        continue;
+      }
+      try {
+        await Gal.putImageBytes(bytes, name: meme.name, album: 'Mako Meme');
+        done++;
+      } catch (_) {
+        failed++;
+      }
+      progressNotifier.value = done + failed;
+    }
+
+    progressNotifier.dispose();
+    if (context.mounted) {
+      Navigator.of(context).pop(); // 关闭进度对话框
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已保存 $done 张到相册${failed > 0 ? '，$failed 张失败' : ''}')),
+      );
+    }
   }
 
   Future<void> _exportData(BuildContext context) async {
