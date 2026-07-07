@@ -10,6 +10,7 @@ class SettingsProvider extends ChangeNotifier {
   Color _customSecondary = const Color(0xFF6366F1);
   Color _customTertiary = const Color(0xFF6366F1);
   bool _useMonet = true;
+  bool _pureBlack = false;
   
   // WebDAV 配置
   bool _useWebDav = false;
@@ -47,6 +48,7 @@ class SettingsProvider extends ChangeNotifier {
     _customSecondary = _parseColor(_storage.getSetting('customSecondary')) ?? const Color(0xFF6366F1);
     _customTertiary = _parseColor(_storage.getSetting('customTertiary')) ?? const Color(0xFF6366F1);
     _useMonet = _storage.getSetting('useMonet') != 'false';
+    _pureBlack = _storage.getSetting('pureBlack') == 'true';
 
     // 加载 WebDAV 配置
     _useWebDav = _storage.getSetting('useWebDav') == 'true';
@@ -71,6 +73,7 @@ class SettingsProvider extends ChangeNotifier {
 
   ThemeMode get themeMode => _themeMode;
   bool get useMonet => _useMonet;
+  bool get pureBlack => _pureBlack;
   Color get customPrimary => _customPrimary;
   Color get customSecondary => _customSecondary;
   Color get customTertiary => _customTertiary;
@@ -114,6 +117,12 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setUseMonet(bool v) async {
     _useMonet = v;
     await _storage.setSetting('useMonet', v.toString());
+    notifyListeners();
+  }
+
+  Future<void> setPureBlack(bool v) async {
+    _pureBlack = v;
+    await _storage.setSetting('pureBlack', v.toString());
     notifyListeners();
   }
 

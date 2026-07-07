@@ -94,26 +94,41 @@ class AppTheme {
     ),
   );
 
-  static ThemeData dark(Color seed) => ThemeData(
-    useMaterial3: true,
-    brightness: Brightness.dark,
-    colorScheme: ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.dark),
-    fontFamily: 'Noto Sans SC',
-    appBarTheme: const AppBarTheme(centerTitle: false, elevation: 0),
-    cardTheme: const CardThemeData(
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
-    ),
-    inputDecorationTheme: InputDecorationTheme(
-      filled: true,
-      fillColor: Colors.grey.shade900,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
+  static ThemeData dark(Color seed, {bool pureBlack = false}) {
+    var scheme = ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.dark);
+    if (pureBlack) {
+      scheme = scheme.copyWith(
+        surface: Colors.black,
+        onSurface: Colors.white,
+        surfaceContainerLowest: Colors.black,
+        surfaceContainerLow: const Color(0xFF0A0A0A),
+        surfaceContainer: const Color(0xFF121212),
+        surfaceContainerHigh: const Color(0xFF1A1A1A),
+        surfaceContainerHighest: const Color(0xFF222222),
+      );
+    }
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      colorScheme: scheme,
+      scaffoldBackgroundColor: pureBlack ? Colors.black : null,
+      fontFamily: 'Noto Sans SC',
+      appBarTheme: AppBarTheme(centerTitle: false, elevation: 0, backgroundColor: pureBlack ? Colors.black : null),
+      cardTheme: const CardThemeData(
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
       ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    ),
-  );
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: pureBlack ? const Color(0xFF1A1A1A) : Colors.grey.shade900,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      ),
+    );
+  }
 
   static ThemeData lightWithPreset(ColorSchemePreset p) {
     final scheme = ColorScheme.fromSeed(
@@ -150,8 +165,8 @@ class AppTheme {
     );
   }
 
-  static ThemeData darkWithPreset(ColorSchemePreset p) {
-    final scheme = ColorScheme.fromSeed(
+  static ThemeData darkWithPreset(ColorSchemePreset p, {bool pureBlack = false}) {
+    var scheme = ColorScheme.fromSeed(
       seedColor: p.primary,
       brightness: Brightness.dark,
     ).copyWith(
@@ -163,19 +178,33 @@ class AppTheme {
       tertiaryContainer: p.tertiary.withValues(alpha: 0.2),
       surfaceContainerHighest: p.surfaceContainerHighest,
     );
+
+    if (pureBlack) {
+      scheme = scheme.copyWith(
+        surface: Colors.black,
+        onSurface: Colors.white,
+        surfaceContainerLowest: Colors.black,
+        surfaceContainerLow: const Color(0xFF0A0A0A),
+        surfaceContainer: const Color(0xFF121212),
+        surfaceContainerHigh: const Color(0xFF1A1A1A),
+        surfaceContainerHighest: const Color(0xFF222222),
+      );
+    }
+
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
       colorScheme: scheme,
+      scaffoldBackgroundColor: pureBlack ? Colors.black : null,
       fontFamily: 'Noto Sans SC',
-      appBarTheme: const AppBarTheme(centerTitle: false, elevation: 0),
+      appBarTheme: AppBarTheme(centerTitle: false, elevation: 0, backgroundColor: pureBlack ? Colors.black : null),
       cardTheme: const CardThemeData(
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.grey.shade900,
+        fillColor: pureBlack ? const Color(0xFF1A1A1A) : Colors.grey.shade900,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,

@@ -239,23 +239,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _themeModeTile(SettingsProvider settings) {
-    return ListTile(
-      leading: const Icon(Icons.brightness_6),
-      title: const Text('主题模式'),
-      trailing: SegmentedButton<ThemeMode>(
-        segments: const [
-          ButtonSegment(value: ThemeMode.system, label: Text('系统')),
-          ButtonSegment(value: ThemeMode.light, label: Text('浅色')),
-          ButtonSegment(value: ThemeMode.dark, label: Text('深色')),
-        ],
-        selected: {settings.themeMode},
-        onSelectionChanged: (v) => settings.setThemeMode(v.first),
-        showSelectedIcon: false,
-        style: ButtonStyle(
-          visualDensity: VisualDensity.compact,
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    final showPureBlack = settings.themeMode == ThemeMode.dark ||
+        (settings.themeMode == ThemeMode.system &&
+            WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark);
+    return Column(
+      children: [
+        ListTile(
+          leading: const Icon(Icons.brightness_6),
+          title: const Text('主题模式'),
+          trailing: SegmentedButton<ThemeMode>(
+            segments: const [
+              ButtonSegment(value: ThemeMode.system, label: Text('系统')),
+              ButtonSegment(value: ThemeMode.light, label: Text('浅色')),
+              ButtonSegment(value: ThemeMode.dark, label: Text('深色')),
+            ],
+            selected: {settings.themeMode},
+            onSelectionChanged: (v) => settings.setThemeMode(v.first),
+            showSelectedIcon: false,
+            style: ButtonStyle(
+              visualDensity: VisualDensity.compact,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
         ),
-      ),
+        if (showPureBlack)
+          SwitchListTile(
+            secondary: const Icon(Icons.contrast),
+            title: const Text('纯黑模式'),
+            subtitle: const Text('AMOLED 纯黑背景，更省电'),
+            value: settings.pureBlack,
+            onChanged: (v) => settings.setPureBlack(v),
+          ),
+      ],
     );
   }
 
