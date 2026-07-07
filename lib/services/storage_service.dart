@@ -863,7 +863,7 @@ class StorageService {
       await for (final entity in exportDir.list(recursive: true, followLinks: false)) {
         if (entity is File) {
           final relPath = p.relative(entity.path, from: exportDir.path);
-          await encoder.addFile(entity, filename: relPath);
+          await encoder.addFile(entity, relPath);
         }
       }
       await encoder.close();

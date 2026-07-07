@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../models/meme.dart';
 import '../providers/meme_provider.dart';
 import '../providers/locale_provider.dart';
-import '../l10n/l10n.dart';
 import '../services/character_card_service.dart';
 
 class CharacterCardEditorScreen extends StatefulWidget {

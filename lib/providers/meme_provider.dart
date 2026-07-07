@@ -244,7 +244,11 @@ class MemeProvider with ChangeNotifier {
       final newType = (ratio <= ratioThreshold) ? Meme.typeEmoji : Meme.typeImage;
       if (newType != meme.type) {
         await _storage.setMemeType(meme.id, newType);
-        if (newType == Meme.typeEmoji) emojiCount++; else imageCount++;
+        if (newType == Meme.typeEmoji) {
+          emojiCount++;
+        } else {
+          imageCount++;
+        }
       }
     }
     await loadAll();

@@ -12,7 +12,6 @@ import '../l10n/l10n.dart';
 import '../models/meme.dart';
 import '../models/folder.dart';
 import '../widgets/meme_grid.dart';
-import '../widgets/meme_card.dart';
 import '../widgets/folder_card.dart';
 import '../widgets/mako_search_bar.dart' as custom;
 import '../widgets/multi_select_bar.dart';

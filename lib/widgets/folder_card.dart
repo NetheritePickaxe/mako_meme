@@ -5,7 +5,6 @@ import '../models/folder.dart';
 import '../models/meme.dart';
 import '../providers/meme_provider.dart';
 import '../providers/locale_provider.dart';
-import '../l10n/l10n.dart';
 import '../services/storage_service.dart';
 
 /// 文件夹卡片 — 也是一个拖放目标，接收表情包拖入

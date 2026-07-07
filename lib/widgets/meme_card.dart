@@ -9,7 +9,6 @@ import 'package:file_picker/file_picker.dart';
 import '../models/meme.dart';
 import '../providers/meme_provider.dart';
 import '../providers/locale_provider.dart';
-import '../l10n/l10n.dart';
 import '../services/storage_service.dart';
 import '../screens/meme_viewer_screen.dart';
 
@@ -136,7 +135,7 @@ class _MemeCardState extends State<MemeCard> {
           opacity: 0.4,
           child: _buildAspectRatioCard(prov, isSelected, isMulti, theme),
         ),
-        onDragStart: () => HapticFeedback.mediumImpact(),
+        onDragStarted: () => HapticFeedback.mediumImpact(),
         child: GestureDetector(
           onTap: isMulti ? () => prov.toggleSelect(widget.meme.id) : _copyToClipboard,
           onSecondaryTapUp: (details) => _showContextMenu(details.globalPosition),
@@ -155,7 +154,7 @@ class _MemeCardState extends State<MemeCard> {
           opacity: 0.4,
           child: _buildAspectRatioCard(prov, isSelected, isMulti, theme),
         ),
-        onDragStart: () => HapticFeedback.mediumImpact(),
+        onDragStarted: () => HapticFeedback.mediumImpact(),
         child: GestureDetector(
           onTap: () => prov.toggleSelect(widget.meme.id),
           child: inner,
