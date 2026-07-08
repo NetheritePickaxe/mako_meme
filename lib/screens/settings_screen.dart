@@ -53,7 +53,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(l10n.tr('settings'))),
       body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: EdgeInsets.zero,
         children: [
           _sectionHeader(l10n.tr('appearance'), cs),
           _languageTile(context, l10n),
@@ -126,11 +126,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             leading: const Icon(Icons.info_outline),
             title: Text(l10n.tr('version')),
             subtitle: Text(_version.isEmpty ? '0.0.1-dev+$_buildNumber' : '$_version+$_buildNumber'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.history),
-            title: Text(l10n.tr('view_changelog')),
-            subtitle: Text(l10n.tr('changelog')),
+            trailing: const Icon(Icons.history, size: 20),
             onTap: () => _showChangelog(context, l10n),
           ),
           ListTile(
@@ -282,18 +278,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final localeProv = context.watch<LocaleProvider>();
     // 使用完整 locale code（带国家码）作为下拉值，确保与 supportedLocales 匹配
     final currentValue = localeProv.locale.countryCode != null
-        ? '${localeProv.locale.languageCode}_${localeProv.locale.countryCode}'
-        : localeProv.locale.languageCode;
+        ? '${localeProv.locale.languageCode}_${localeProv.locale.countryCode}'.toLowerCase()
+        : localeProv.locale.languageCode.toLowerCase();
+    // 当前语言排第一，另一种语言排第二
+    final allLangs = const [
+      ('zh_cn', '简体中文'),
+      ('en_us', 'English'),
+    ];
+    final sorted = [...allLangs]..sort((a, b) {
+        if (a.$1 == currentValue) return -1;
+        if (b.$1 == currentValue) return 1;
+        return 0;
+      });
     return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
       leading: const Icon(Icons.language),
       title: Text(l10n.tr('language')),
       trailing: DropdownButton<String>(
         value: currentValue,
         underline: const SizedBox(),
-        items: const [
-          DropdownMenuItem(value: 'zh_cn', child: Text('简体中文')),
-          DropdownMenuItem(value: 'en_us', child: Text('English')),
-        ],
+        isDense: true,
+        style: Theme.of(context).textTheme.bodyLarge,
+        items: sorted
+            .map((e) => DropdownMenuItem(value: e.$1, child: Text(e.$2)))
+            .toList(),
         onChanged: (val) {
           if (val == null) return;
           final parts = val.split('_');
@@ -903,20 +911,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _exportData(BuildContext context, L10n l10n) async {
     final storage = context.read<StorageService>();
-    final path = await storage.exportData();
-    if (path == null) {
+
+    // Web 端：用内存字节生成 zip 并触发下载
+    if (kIsWeb) {
+      final bytes = await storage.exportDataBytes();
+      if (bytes == null) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.tr('export_failed_msg'))),
+          );
+        }
+        return;
+      }
+      // Web 端 saveFile 接收 bytes 直接下载
+      final saved = await FilePicker.platform.saveFile(
+        dialogTitle: l10n.tr('save_backup'),
+        fileName: 'mako_meme_backup.zip',
+        bytes: bytes,
+      );
+      if (saved == null) {
+        // 用户取消或下载失败
+        return;
+      }
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.tr('export_failed_msg'))),
+          SnackBar(content: Text(l10n.tr('export_success_msg'))),
         );
       }
       return;
     }
 
-    if (kIsWeb) {
+    // 原生端：生成临时文件，让用户选择保存位置
+    final path = await storage.exportData();
+    if (path == null) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.tr('export_not_supported_web'))),
+          SnackBar(content: Text(l10n.tr('export_failed_msg'))),
         );
       }
       return;

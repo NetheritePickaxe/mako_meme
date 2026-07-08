@@ -806,7 +806,11 @@ class StorageService {
 
   // ======================== Export / Import ========================
 
+  /// 导出数据为 zip。
+  /// - 原生端：返回临时文件路径
+  /// - Web 端：返回 null，改用 [exportDataBytes] 获取字节数组
   Future<String?> exportData() async {
+    if (kIsWeb) return null;
     try {
       final tempDir = await getTemporaryDirectory();
       final exportDir = Directory(p.join(tempDir.path, 'mako_meme_export'));
@@ -835,23 +839,11 @@ class StorageService {
       await sink.flush();
       await sink.close();
 
-      if (kIsWeb) {
-        for (final meme in allMemes) {
-          if (meme.filePath.isEmpty) continue;
-          final bytes = await webStorageGetBinary(meme.filePath);
-          if (bytes != null) {
-            final dest = File(p.join(exportDir.path, meme.filePath));
-            await dest.create(recursive: true);
-            await dest.writeAsBytes(bytes);
-          }
-        }
-      } else {
-        final srcMemesDir = Directory(p.join(_basePath!, 'memes'));
-        if (await srcMemesDir.exists()) {
-          await for (final f in srcMemesDir.list()) {
-            if (f is File) {
-              await f.copy(p.join(memesDir.path, p.basename(f.path)));
-            }
+      final srcMemesDir = Directory(p.join(_basePath!, 'memes'));
+      if (await srcMemesDir.exists()) {
+        await for (final f in srcMemesDir.list()) {
+          if (f is File) {
+            await f.copy(p.join(memesDir.path, p.basename(f.path)));
           }
         }
       }
@@ -870,6 +862,60 @@ class StorageService {
 
       await exportDir.delete(recursive: true);
       return zipPath;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// 导出数据为 zip 字节数组（用于 Web 端下载）
+  Future<Uint8List?> exportDataBytes() async {
+    try {
+      final folders = getAllFolders();
+      final allMemes = getAllMemes();
+
+      final archive = Archive();
+
+      // meta.json
+      final meta = {
+        'version': 4,
+        'format': 'jsonl',
+        'folders': folders.map((f) => f.toMap()).toList(),
+        'meme_count': allMemes.length,
+      };
+      archive.addFile(ArchiveFile.bytes(
+        'meta.json',
+        Uint8List.fromList(utf8.encode(jsonEncode(meta))),
+      ));
+
+      // memes.jsonl
+      final jsonlBuf = StringBuffer();
+      for (final meme in allMemes) {
+        jsonlBuf.writeln(jsonEncode(meme.toMap()));
+      }
+      archive.addFile(ArchiveFile.bytes(
+        'memes.jsonl',
+        Uint8List.fromList(utf8.encode(jsonlBuf.toString())),
+      ));
+
+      // memes/ 图片文件
+      for (final meme in allMemes) {
+        if (meme.filePath.isEmpty) continue;
+        Uint8List? bytes;
+        if (kIsWeb) {
+          bytes = await webStorageGetBinary(meme.filePath);
+        } else {
+          final f = getMemeFile(meme.filePath);
+          if (f != null && await f.exists()) {
+            bytes = await f.readAsBytes();
+          }
+        }
+        if (bytes != null) {
+          archive.addFile(ArchiveFile.bytes('memes/${meme.filePath}', bytes));
+        }
+      }
+
+      final zipBytes = ZipEncoder().encode(archive);
+      return Uint8List.fromList(zipBytes);
     } catch (e) {
       return null;
     }

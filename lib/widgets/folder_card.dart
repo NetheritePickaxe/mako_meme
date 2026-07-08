@@ -1,11 +1,9 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/folder.dart';
 import '../models/meme.dart';
 import '../providers/meme_provider.dart';
 import '../providers/locale_provider.dart';
-import '../services/storage_service.dart';
 
 /// 文件夹卡片 — 也是一个拖放目标，接收表情包拖入
 class FolderCard extends StatelessWidget {
@@ -66,7 +64,7 @@ class FolderCard extends StatelessWidget {
               p.selectFolder(folder.id);
             },
             onSecondaryTapUp: (details) {
-              _showFolderContextMenu(details.globalPosition, context, folder, count);
+              _showFolderContextMenu(details.globalPosition, context, folder);
             },
             child: _buildCard(
               context,
@@ -90,13 +88,6 @@ class FolderCard extends StatelessWidget {
     required bool isSelected,
     required bool showCheckbox,
   }) {
-    final prov = context.read<MemeProvider>();
-    // 获取封面 meme：用户自选 > 文件夹内第一个
-    final coverMemeId = folder.coverMemeId ?? prov.memesInFolder(folder.id).firstOrNull?.id;
-    final coverMeme = coverMemeId != null
-        ? prov.memes.where((m) => m.id == coverMemeId).firstOrNull
-        : null;
-
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       clipBehavior: Clip.antiAlias,
@@ -116,70 +107,52 @@ class FolderCard extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // 背景层：封面图片或纯色
-          if (coverMeme != null)
-            _buildCover(context, theme, color, coverMeme, isDragOver: isDragOver, isActive: isActive)
-          else
-            _buildFallback(theme, color, isDragOver: isDragOver, isActive: isActive),
-
-          // 渐变遮罩，让文字可读
+          // 纯色背景
           Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black.withValues(alpha: 0.1),
-                  Colors.black.withValues(alpha: 0.5),
-                ],
+            color: isDragOver
+                ? color.withValues(alpha: 0.2)
+                : isActive
+                    ? color.withValues(alpha: 0.15)
+                    : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+            child: Center(
+              child: Icon(Icons.folder, size: 40, color: color.withValues(alpha: 0.6)),
+            ),
+          ),
+
+          // 文件夹名称（底部左侧）
+          Positioned(
+            left: 8,
+            right: 8,
+            bottom: 8,
+            child: Text(
+              folder.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: theme.colorScheme.onSurface,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
 
-          // 文件夹名称（底部左侧，留出右侧空间给角标）
+          // 数量角标（右上角）
           Positioned(
-            left: 8,
-            right: 48,
-            bottom: 8,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  folder.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // 文件夹角标（右下角）
-          Positioned(
-            bottom: 6,
+            top: 6,
             right: 6,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.6),
+                color: color.withValues(alpha: 0.85),
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.folder, size: 12, color: color.withValues(alpha: 0.9)),
-                  const SizedBox(width: 2),
-                  Text(
-                    '$count',
-                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
-                  ),
-                ],
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  color: theme.colorScheme.onPrimary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ),
@@ -211,64 +184,7 @@ class FolderCard extends StatelessWidget {
     );
   }
 
-  /// 封面图：原生端用 Image.file 流式加载，Web 端读 bytes
-  Widget _buildCover(BuildContext context, ThemeData theme, Color color, Meme coverMeme,
-      {required bool isDragOver, required bool isActive}) {
-    final storage = context.read<StorageService>();
-    if (!kIsWeb) {
-      // 原生端：用 File 流式加载，避免一次性读字节
-      final f = storage.getMemeFile(coverMeme.filePath);
-      if (f == null) {
-        return _buildFallback(theme, color, isDragOver: isDragOver, isActive: isActive);
-      }
-      return FutureBuilder<bool>(
-        future: f.exists(),
-        builder: (ctx, snap) {
-          if (snap.connectionState != ConnectionState.done || snap.data != true) {
-            return _buildFallback(theme, color, isDragOver: isDragOver, isActive: isActive);
-          }
-          return Image.file(
-            f,
-            fit: BoxFit.cover,
-            width: double.infinity,
-            height: double.infinity,
-            cacheWidth: 512,
-            errorBuilder: (_, _, _) => _buildFallback(theme, color, isDragOver: isDragOver, isActive: isActive),
-          );
-        },
-      );
-    }
-    // Web：读 bytes
-    return FutureBuilder<Uint8List?>(
-      future: storage.readMemeBytes(coverMeme.filePath),
-      builder: (ctx, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done || snapshot.data == null) {
-          return _buildFallback(theme, color, isDragOver: isDragOver, isActive: isActive);
-        }
-        return Image.memory(
-          snapshot.data!,
-          fit: BoxFit.cover,
-          width: double.infinity,
-          height: double.infinity,
-        );
-      },
-    );
-  }
-
-  Widget _buildFallback(ThemeData theme, Color color, {required bool isDragOver, required bool isActive}) {
-    return Container(
-      color: isDragOver
-          ? color.withValues(alpha: 0.2)
-          : isActive
-              ? color.withValues(alpha: 0.15)
-              : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-      child: Center(
-        child: Icon(Icons.folder, size: 40, color: color.withValues(alpha: 0.6)),
-      ),
-    );
-  }
-
-  void _showFolderContextMenu(Offset globalPos, BuildContext context, MemeFolder folder, int count) {
+  void _showFolderContextMenu(Offset globalPos, BuildContext context, MemeFolder folder) {
     final l10n = context.read<LocaleProvider>().l10n;
     final renderBox = context.findRenderObject() as RenderBox;
     final localPosition = renderBox.globalToLocal(globalPos);
@@ -280,140 +196,73 @@ class FolderCard extends StatelessWidget {
       ),
       items: <PopupMenuEntry>[
         PopupMenuItem<String>(
-          value: 'set_cover',
-          child: ListTile(leading: const Icon(Icons.photo_library), title: Text(l10n.tr('set_cover')), dense: true),
+          value: 'rename',
+          child: ListTile(leading: const Icon(Icons.edit), title: Text(l10n.tr('rename')), dense: true),
         ),
         PopupMenuItem<String>(
-          value: 'clear_cover',
-          enabled: folder.coverMemeId != null,
-          child: ListTile(leading: const Icon(Icons.clear), title: Text(l10n.tr('clear_cover')), dense: true),
+          value: 'delete',
+          child: ListTile(leading: const Icon(Icons.delete_outline), title: Text(l10n.tr('delete')), dense: true),
         ),
       ],
     ).then((value) {
       if (value == null) return;
       if (!context.mounted) return;
-      if (value == 'set_cover') {
-        _showCoverSelector(context, folder);
-      } else if (value == 'clear_cover') {
-        context.read<MemeProvider>().updateFolderCover(folder.id, null);
+      final prov = context.read<MemeProvider>();
+      if (value == 'rename') {
+        _showRenameDialog(context, folder);
+      } else if (value == 'delete') {
+        _confirmDeleteFolder(context, prov, folder);
       }
     });
   }
 
-  void _showCoverSelector(BuildContext context, MemeFolder folder) {
+  void _showRenameDialog(BuildContext context, MemeFolder folder) {
     final l10n = context.read<LocaleProvider>().l10n;
-    final prov = context.read<MemeProvider>();
-    final memes = prov.memesInFolder(folder.id);
-    if (memes.isEmpty) return;
-
+    final controller = TextEditingController(text: folder.name);
     showDialog(
       context: context,
       builder: (dCtx) => AlertDialog(
-        title: Text(l10n.tr('set_cover')),
-        content: SizedBox(
-          width: 300,
-          height: 300,
-          child: GridView.builder(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 4,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-              childAspectRatio: 1,
-            ),
-            itemCount: memes.length,
-            itemBuilder: (ctx, i) {
-              final meme = memes[i];
-              return _CoverThumb(meme: meme, isCover: meme.id == folder.coverMemeId,
-                onTap: () {
-                  context.read<MemeProvider>().updateFolderCover(folder.id, meme.id);
-                  Navigator.pop(dCtx);
-                });
-            },
-          ),
+        title: Text(l10n.tr('rename')),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: InputDecoration(hintText: l10n.tr('folder_name')),
         ),
         actions: [
-          TextButton(
+          TextButton(onPressed: () => Navigator.pop(dCtx), child: Text(l10n.tr('cancel'))),
+          FilledButton(
             onPressed: () {
-              context.read<MemeProvider>().updateFolderCover(folder.id, null);
+              final name = controller.text.trim();
+              if (name.isNotEmpty) {
+                context.read<MemeProvider>().renameFolder(folder.id, name);
+              }
               Navigator.pop(dCtx);
             },
-            child: Text(l10n.tr('auto_cover')),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(dCtx),
-            child: Text(l10n.tr('cancel')),
+            child: Text(l10n.tr('confirm')),
           ),
         ],
       ),
     );
   }
-}
 
-/// 封面选择对话框的缩略图：原生端用 Image.file，Web 用 Image.memory
-class _CoverThumb extends StatelessWidget {
-  final Meme meme;
-  final bool isCover;
-  final VoidCallback onTap;
-
-  const _CoverThumb({required this.meme, required this.isCover, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final storage = context.read<StorageService>();
-    return GestureDetector(
-      onTap: onTap,
-      child: Stack(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: _buildImage(storage),
+  void _confirmDeleteFolder(BuildContext context, MemeProvider prov, MemeFolder folder) {
+    final l10n = context.read<LocaleProvider>().l10n;
+    showDialog(
+      context: context,
+      builder: (dCtx) => AlertDialog(
+        title: Text(l10n.tr('delete_folder')),
+        content: Text(l10n.tr('delete_folder_confirm', args: {'name': folder.name})),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dCtx), child: Text(l10n.tr('cancel'))),
+          FilledButton(
+            onPressed: () {
+              prov.deleteFolder(folder.id);
+              Navigator.pop(dCtx);
+            },
+            child: Text(l10n.tr('delete')),
           ),
-          if (isCover)
-            Positioned(
-              top: 2,
-              right: 2,
-              child: Container(
-                padding: const EdgeInsets.all(2),
-                decoration: const BoxDecoration(
-                  color: Colors.green,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.check, size: 12, color: Colors.white),
-              ),
-            ),
         ],
       ),
     );
   }
-
-  Widget _buildImage(StorageService storage) {
-    if (!kIsWeb) {
-      final f = storage.getMemeFile(meme.filePath);
-      if (f == null) return _loading();
-      return FutureBuilder<bool>(
-        future: f.exists(),
-        builder: (_, snap) {
-          if (snap.connectionState != ConnectionState.done || snap.data != true) {
-            return _loading();
-          }
-          return Image.file(f, fit: BoxFit.cover, cacheWidth: 256,
-            errorBuilder: (_, _, _) => _loading());
-        },
-      );
-    }
-    return FutureBuilder<Uint8List?>(
-      future: storage.readMemeBytes(meme.filePath),
-      builder: (_, snap) {
-        if (snap.connectionState != ConnectionState.done || snap.data == null) {
-          return _loading();
-        }
-        return Image.memory(snap.data!, fit: BoxFit.cover);
-      },
-    );
-  }
-
-  Widget _loading() => Container(
-    color: Colors.grey.shade200,
-    child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-  );
 }

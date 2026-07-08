@@ -58,6 +58,11 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         title: Text(_getTitle(prov, l10n)),
         actions: [
+          IconButton(
+            icon: Icon(prov.isMulti ? Icons.close : Icons.checklist),
+            tooltip: prov.isMulti ? l10n.tr('exit_multi_select') : l10n.tr('multi_select'),
+            onPressed: () => prov.toggleMulti(),
+          ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.sort),
             tooltip: l10n.tr('sort'),
@@ -76,11 +81,6 @@ class _HomeScreenState extends State<HomeScreen> {
               const PopupMenuDivider(),
               PopupMenuItem(value: 'order', child: Text(prov.order == SortOrder.asc ? '↑ ${l10n.tr('asc')}' : '↓ ${l10n.tr('desc')}')),
             ],
-          ),
-          IconButton(
-            icon: Icon(prov.isMulti ? Icons.close : Icons.checklist),
-            tooltip: prov.isMulti ? l10n.tr('exit_multi_select') : l10n.tr('multi_select'),
-            onPressed: () => prov.toggleMulti(),
           ),
         ],
         bottom: prov.isMulti ? const PreferredSize(
@@ -190,16 +190,8 @@ class _HomeScreenState extends State<HomeScreen> {
       return _buildFoldersGrid(prov);
     }
 
-    // 根视图：如果选择了类型/标签/文件夹过滤器，则显示所有匹配的 meme（无视文件夹）
-    if (prov.typeFilter.isNotEmpty ||
-        prov.tagFilter.isNotEmpty ||
-        prov.folderFilter.isNotEmpty) {
-      return MemeGrid(memes: prov.memes);
-    }
-
-    // 默认根视图：只显示未分类的 meme（不显示文件夹卡片）
-    final uncategorized = prov.memes.where((m) => m.folderId == null).toList();
-    return MemeGrid(memes: uncategorized);
+    // 根视图“全部”：显示所有表情（无视文件夹归属）
+    return MemeGrid(memes: prov.memes);
   }
 
   Widget _buildFoldersGrid(MemeProvider prov) {
@@ -404,7 +396,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// 圆角矩形分类按钮
+  /// 圆形（stadium）分类按钮
   Widget _buildRoundedChip({
     required BuildContext context,
     required IconData icon,
@@ -417,12 +409,12 @@ class _HomeScreenState extends State<HomeScreen> {
       color: selected
           ? colorScheme.primary
           : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-      borderRadius: BorderRadius.circular(10),
+      shape: const StadiumBorder(),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
+        customBorder: const StadiumBorder(),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
