@@ -6,9 +6,7 @@ class SettingsProvider extends ChangeNotifier {
   final StorageService _storage;
   ThemeMode _themeMode = ThemeMode.system;
   int _presetIndex = 0;
-  Color _customPrimary = const Color(0xFF6366F1);
-  Color _customSecondary = const Color(0xFF6366F1);
-  Color _customTertiary = const Color(0xFF6366F1);
+  Color _customSeed = AppTheme.defaultSeed;
   bool _useMonet = true;
   bool _pureBlack = false;
   int _gridColumns = 0; // 0 = 自动
@@ -34,12 +32,13 @@ class SettingsProvider extends ChangeNotifier {
         _presetIndex = idx;
       }
     } else {
+      // 兼容旧版 accentColor：尝试匹配预设种子色
       final savedHex = _storage.getSetting('accentColor');
       if (savedHex != null) {
         final parsed = int.tryParse(savedHex);
         if (parsed != null) {
           final match = AppTheme.presets.indexWhere(
-            (p) => p.primary.toARGB32() == parsed,
+            (p) => p.seed.toARGB32() == parsed,
           );
           if (match >= 0) {
             _presetIndex = match;
@@ -47,9 +46,10 @@ class SettingsProvider extends ChangeNotifier {
         }
       }
     }
-    _customPrimary = _parseColor(_storage.getSetting('customPrimary')) ?? const Color(0xFF6366F1);
-    _customSecondary = _parseColor(_storage.getSetting('customSecondary')) ?? const Color(0xFF6366F1);
-    _customTertiary = _parseColor(_storage.getSetting('customTertiary')) ?? const Color(0xFF6366F1);
+    // 兼容旧版 customPrimary（旧自定义三色），新版只用 customSeed
+    _customSeed = _parseColor(_storage.getSetting('customSeed')) ??
+        _parseColor(_storage.getSetting('customPrimary')) ??
+        AppTheme.defaultSeed;
     _useMonet = _storage.getSetting('useMonet') != 'false';
     _pureBlack = _storage.getSetting('pureBlack') == 'true';
     final savedCols = int.tryParse(_storage.getSetting('gridColumns') ?? '');
@@ -85,25 +85,19 @@ class SettingsProvider extends ChangeNotifier {
   int get gridColumns => _gridColumns;
   bool get autoClassify => _autoClassify;
   double get classifyRatio => _classifyRatio;
-  Color get customPrimary => _customPrimary;
-  Color get customSecondary => _customSecondary;
-  Color get customTertiary => _customTertiary;
+  Color get customSeed => _customSeed;
   int get presetIndex => _presetIndex;
 
+  /// 当前生效的预设。若为自定义则返回基于 [_customSeed] 的预设。
   ColorSchemePreset get currentPreset {
     if (_presetIndex < AppTheme.presets.length) {
       return AppTheme.presets[_presetIndex];
     }
-    return ColorSchemePreset(
-      name: '自定义',
-      primary: _customPrimary,
-      secondary: _customSecondary,
-      tertiary: _customTertiary,
-      surfaceContainerHighest: null,
-    );
+    return ColorSchemePreset(name: '自定义', seed: _customSeed);
   }
 
-  Color get accentColor => currentPreset.primary;
+  /// 当前生效的种子色（用于动态颜色 / 主题构建）
+  Color get seedColor => currentPreset.seed;
 
   static ThemeMode _toThemeMode(String? v) {
     switch (v) {
@@ -164,26 +158,23 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> setCustomColors(Color primary, Color secondary, Color tertiary) async {
-    _customPrimary = primary;
-    _customSecondary = secondary;
-    _customTertiary = tertiary;
+  /// 设置自定义种子色。M3 会从这个种子派生整套色板。
+  Future<void> setCustomSeed(Color seed) async {
+    _customSeed = seed;
     _presetIndex = AppTheme.presets.length;
     await _storage.setSetting('presetIndex', _presetIndex.toString());
     await _storage.setSetting('useMonet', 'false');
-    await _storage.setSetting('customPrimary', '#${primary.toARGB32().toRadixString(16).padLeft(8, '0')}');
-    await _storage.setSetting('customSecondary', '#${secondary.toARGB32().toRadixString(16).padLeft(8, '0')}');
-    await _storage.setSetting('customTertiary', '#${tertiary.toARGB32().toRadixString(16).padLeft(8, '0')}');
+    await _storage.setSetting('customSeed', '#${seed.toARGB32().toRadixString(16).padLeft(8, '0')}');
     notifyListeners();
   }
-  
+
   // WebDAV 设置方法
   Future<void> setUseWebDav(bool v) async {
     _useWebDav = v;
     await _storage.setSetting('useWebDav', v.toString());
     notifyListeners();
   }
-  
+
   Future<void> setWebDavConfig({
     required String baseUrl,
     required String username,

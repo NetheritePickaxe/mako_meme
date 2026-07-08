@@ -40,13 +40,11 @@ class MakoMemeApp extends StatelessWidget {
       builder: (lightDynamic, darkDynamic) {
         return Consumer<SettingsProvider>(
           builder: (ctx, s, _) {
-            final useMonet = s.useMonet && lightDynamic != null;
-            final theme = useMonet
-                ? AppTheme.light(lightDynamic.primary)
-                : AppTheme.lightWithPreset(s.currentPreset);
-            final darkTheme = useMonet
-                ? AppTheme.dark(lightDynamic.primary, pureBlack: s.pureBlack)
-                : AppTheme.darkWithPreset(s.currentPreset, pureBlack: s.pureBlack);
+            final monetSeed = lightDynamic?.primary;
+            final useMonet = s.useMonet && monetSeed != null;
+            final seed = useMonet ? monetSeed : s.seedColor;
+            final theme = AppTheme.light(seed);
+            final darkTheme = AppTheme.dark(seed, pureBlack: s.pureBlack);
             return Consumer<LocaleProvider>(
               builder: (ctx, lp, _) {
                 return MaterialApp(

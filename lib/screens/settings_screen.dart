@@ -507,33 +507,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         child: Row(
           children: [
+            // 单种子色圆点 — M3 从此色派生整套色板
             Container(
-              width: 4,
-              height: 36,
+              width: 28,
+              height: 28,
               decoration: BoxDecoration(
-                color: preset.primary,
-                borderRadius: BorderRadius.circular(2),
+                color: preset.seed,
+                shape: BoxShape.circle,
+                border: Border.all(color: cs.outline.withValues(alpha: 0.3), width: 0.5),
               ),
-            ),
-            const SizedBox(width: 14),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                preset.primary,
-                preset.secondary,
-                preset.tertiary,
-              ].map((c) {
-                return Container(
-                  width: 16,
-                  height: 16,
-                  decoration: BoxDecoration(
-                    color: c,
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: cs.outline.withValues(alpha: 0.3), width: 0.5),
-                  ),
-                );
-              }).toList(),
             ),
             const SizedBox(width: 14),
             Expanded(child: Text(preset.name, style: const TextStyle(fontSize: 14))),
@@ -570,27 +552,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showCustomColorPicker(BuildContext context, SettingsProvider settings, ColorScheme cs, L10n l10n) {
-    final primaryCtrl = TextEditingController(
-      text: '#${settings.customPrimary.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase()}',
-    );
-    final secondaryCtrl = TextEditingController(
-      text: '#${settings.customSecondary.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase()}',
-    );
-    final tertiaryCtrl = TextEditingController(
-      text: '#${settings.customTertiary.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase()}',
+    final hexCtrl = TextEditingController(
+      text: '#${settings.customSeed.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase()}',
     );
 
-    Color currentColor = settings.customPrimary;
-    int editingIndex = 0;
+    Color currentColor = settings.customSeed;
 
     void setColor(Color c) {
       currentColor = c;
-      if (editingIndex == 0) primaryCtrl.text = '#${c.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase()}';
-      if (editingIndex == 1) secondaryCtrl.text = '#${c.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase()}';
-      if (editingIndex == 2) tertiaryCtrl.text = '#${c.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase()}';
+      hexCtrl.text = '#${c.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase()}';
     }
-
-    setColor(settings.customPrimary);
 
     showModalBottomSheet(
       context: context,
@@ -604,32 +575,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: _colorTab(l10n.tr('primary_color'), editingIndex == 0, () {
-                      setModalState(() => setColor(currentColor));
-                      setModalState(() => editingIndex = 0);
-                      setModalState(() => currentColor = settings.customPrimary);
-                    }),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _colorTab(l10n.tr('secondary_color'), editingIndex == 1, () {
-                      setModalState(() => editingIndex = 1);
-                      setModalState(() => currentColor = settings.customSecondary);
-                    }),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _colorTab(l10n.tr('tertiary_color'), editingIndex == 2, () {
-                      setModalState(() => editingIndex = 2);
-                      setModalState(() => currentColor = settings.customTertiary);
-                    }),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
+              Text(l10n.tr('custom_color_scheme'),
+                style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
               SizedBox(
                 width: 240,
                 height: 240,
@@ -662,7 +610,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(width: 48),
                   Expanded(
                     child: TextField(
-                      controller: editingIndex == 0 ? primaryCtrl : (editingIndex == 1 ? secondaryCtrl : tertiaryCtrl),
+                      controller: hexCtrl,
                       maxLength: 9,
                       textAlign: TextAlign.center,
                       style: const TextStyle(fontFamily: 'monospace'),
@@ -698,13 +646,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child:                   FilledButton(
+                    child: FilledButton(
                       onPressed: () {
-                        settings.setCustomColors(
-                          editingIndex == 0 ? currentColor : settings.customPrimary,
-                          editingIndex == 1 ? currentColor : settings.customSecondary,
-                          editingIndex == 2 ? currentColor : settings.customTertiary,
-                        );
+                        settings.setCustomSeed(currentColor);
                         Navigator.pop(bCtx);
                       },
                       child: Text(l10n.tr('save')),
@@ -716,29 +660,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _colorTab(String label, bool selected, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: selected ? Theme.of(context).colorScheme.primary : Colors.transparent,
-              width: 2,
-            ),
-          ),
-        ),
-        child: Text(label, style: TextStyle(
-          fontSize: 13,
-          fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-          color: selected ? Theme.of(context).colorScheme.primary : null,
-        )),
       ),
     );
   }
