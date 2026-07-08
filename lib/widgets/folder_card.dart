@@ -136,27 +136,6 @@ class FolderCard extends StatelessWidget {
             ),
           ),
 
-          // 数量角标（右上角）
-          Positioned(
-            top: 6,
-            right: 6,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.85),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                '$count',
-                style: TextStyle(
-                  color: theme.colorScheme.onPrimary,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-
           // 多选复选框
           if (showCheckbox)
             Positioned(

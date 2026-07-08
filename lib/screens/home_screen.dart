@@ -339,13 +339,13 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildCategoryChips(MemeProvider prov) {
     final l10n = context.read<LocaleProvider>().l10n;
     final categories = [
-      {'type': Meme.typeEmoji, 'label': l10n.tr('cat_emoji'), 'icon': Icons.face},
-      {'type': Meme.typeGif, 'label': l10n.tr('cat_gif'), 'icon': Icons.gif},
-      {'type': Meme.typeImage, 'label': l10n.tr('cat_image'), 'icon': Icons.image},
-      {'type': Meme.typeText, 'label': l10n.tr('cat_text'), 'icon': Icons.text_fields},
-      {'type': Meme.typePortrait, 'label': l10n.tr('cat_portrait'), 'icon': Icons.portrait},
-      {'type': Meme.typeCg, 'label': l10n.tr('cat_cg'), 'icon': Icons.photo_library},
-      {'type': Meme.typeCharacterCard, 'label': l10n.tr('cat_character_card'), 'icon': Icons.person_outline},
+      {'type': Meme.typeEmoji, 'label': l10n.tr('cat_emoji')},
+      {'type': Meme.typeGif, 'label': l10n.tr('cat_gif')},
+      {'type': Meme.typeImage, 'label': l10n.tr('cat_image')},
+      {'type': Meme.typeText, 'label': l10n.tr('cat_text')},
+      {'type': Meme.typePortrait, 'label': l10n.tr('cat_portrait')},
+      {'type': Meme.typeCg, 'label': l10n.tr('cat_cg')},
+      {'type': Meme.typeCharacterCard, 'label': l10n.tr('cat_character_card')},
     ];
 
     return SizedBox(
@@ -363,7 +363,6 @@ class _HomeScreenState extends State<HomeScreen> {
             final selected = prov.typeFilter.isEmpty;
             return _buildRoundedChip(
               context: ctx,
-              icon: Icons.grid_view_rounded,
               label: l10n.tr('cat_all'),
               selected: selected,
               colorScheme: cs,
@@ -374,12 +373,10 @@ class _HomeScreenState extends State<HomeScreen> {
           final cat = categories[i - 1];
           final type = cat['type'] as String;
           final label = cat['label'] as String;
-          final icon = cat['icon'] as IconData;
           final selected = prov.typeFilter.contains(type);
 
           return _buildRoundedChip(
             context: ctx,
-            icon: icon,
             label: label,
             selected: selected,
             colorScheme: cs,
@@ -396,10 +393,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// 圆形（stadium）分类按钮
+  /// 圆形（stadium）分类按钮 — 纯文字，无图标
   Widget _buildRoundedChip({
     required BuildContext context,
-    required IconData icon,
     required String label,
     required bool selected,
     required ColorScheme colorScheme,
@@ -415,19 +411,11 @@ class _HomeScreenState extends State<HomeScreen> {
         customBorder: const StadiumBorder(),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 15,
-                color: selected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant),
-              const SizedBox(width: 4),
-              Text(label, style: TextStyle(
-                fontSize: 13,
-                fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-                color: selected ? colorScheme.onPrimary : colorScheme.onSurface,
-              )),
-            ],
-          ),
+          child: Text(label, style: TextStyle(
+            fontSize: 13,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+            color: selected ? colorScheme.onPrimary : colorScheme.onSurface,
+          )),
         ),
       ),
     );

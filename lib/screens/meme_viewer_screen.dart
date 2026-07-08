@@ -105,10 +105,15 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
         onPageChanged: (i) => setState(() => _currentIndex = i),
         itemBuilder: (ctx, i) {
           final m = widget.memes[i];
-          return Column(
+          // 使用 Stack 让面板覆盖在图片上方，避免 Column 无界高度导致 DraggableScrollableSheet 失效
+          // Align(bottomCenter) 让面板固定在底部并可正确计算高度
+          return Stack(
             children: [
-              Expanded(child: _buildImageArea(m, i)),
-              _buildDraggableDetailPanel(theme, prov, m, l10n),
+              Positioned.fill(child: _buildImageArea(m, i)),
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: _buildDraggableDetailPanel(theme, prov, m, l10n),
+              ),
             ],
           );
         },
