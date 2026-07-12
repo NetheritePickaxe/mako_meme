@@ -613,7 +613,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 shape: const StadiumBorder(),
                 showCheckmark: false,
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                visualDensity: VisualDensity.compact,
+                visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                labelPadding: const EdgeInsets.symmetric(horizontal: 4),
               );
             }).toList(),
           ),
@@ -656,7 +658,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   deleteIconColor: cs.onSurfaceVariant,
                   shape: const StadiumBorder(),
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  visualDensity: VisualDensity.compact,
+                  visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                  labelPadding: const EdgeInsets.symmetric(horizontal: 4),
                 );
               }).toList(),
             ),
@@ -712,38 +716,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
       tilePadding: const EdgeInsets.symmetric(horizontal: 16),
       childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       children: [
-        Container(
-          decoration: BoxDecoration(
+        ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: ColoredBox(
             color: cs.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            children: [
-              SwitchListTile(
-                secondary: const Icon(Icons.label_outline),
-                title: Text(l10n.tr('card_show_name')),
-                value: settings.showCardName,
-                onChanged: (v) => settings.setShowCardName(v),
-              ),
-              SwitchListTile(
-                secondary: const Icon(Icons.tag),
-                title: Text(l10n.tr('card_show_tags')),
-                value: settings.showCardTags,
-                onChanged: (v) => settings.setShowCardTags(v),
-              ),
-              SwitchListTile(
-                secondary: const Icon(Icons.category_outlined),
-                title: Text(l10n.tr('card_show_type')),
-                value: settings.showCardType,
-                onChanged: (v) => settings.setShowCardType(v),
-              ),
-              SwitchListTile(
-                secondary: const Icon(Icons.extension),
-                title: Text(l10n.tr('card_show_ext')),
-                value: settings.showCardExt,
-                onChanged: (v) => settings.setShowCardExt(v),
-              ),
-            ],
+            child: Column(
+              children: [
+                SwitchListTile(
+                  secondary: const Icon(Icons.label_outline),
+                  title: Text(l10n.tr('card_show_name')),
+                  value: settings.showCardName,
+                  onChanged: (v) => settings.setShowCardName(v),
+                ),
+                SwitchListTile(
+                  secondary: const Icon(Icons.tag),
+                  title: Text(l10n.tr('card_show_tags')),
+                  value: settings.showCardTags,
+                  onChanged: (v) => settings.setShowCardTags(v),
+                ),
+                SwitchListTile(
+                  secondary: const Icon(Icons.category_outlined),
+                  title: Text(l10n.tr('card_show_type')),
+                  value: settings.showCardType,
+                  onChanged: (v) => settings.setShowCardType(v),
+                ),
+                SwitchListTile(
+                  secondary: const Icon(Icons.extension),
+                  title: Text(l10n.tr('card_show_ext')),
+                  value: settings.showCardExt,
+                  onChanged: (v) => settings.setShowCardExt(v),
+                ),
+              ],
+            ),
           ),
         ),
       ],

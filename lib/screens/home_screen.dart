@@ -952,11 +952,6 @@ class _HomeScreenState extends State<HomeScreen> {
               subtitle: Text(l10n.tr('plain_text_or_emoji')),
               onTap: () { Navigator.pop(bCtx); _importText(ctx, prov); },
             ),
-            ListTile(
-              leading: const Icon(Icons.create_new_folder),
-              title: Text(l10n.tr('new_folder')),
-              onTap: () { Navigator.pop(bCtx); _showCreateFolderDialog(ctx, prov); },
-            ),
             const Divider(),
             ListTile(
               leading: const Icon(Icons.file_download_outlined),
