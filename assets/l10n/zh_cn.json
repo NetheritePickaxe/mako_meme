@@ -222,5 +222,20 @@
   "check_update_desc": "查看 GitHub 最新版本",
   "already_latest": "已是最新版本",
   "new_version_available": "发现新版本",
-  "version_available": "版本 {version} 可用，是否下载？"
+  "version_available": "版本 {version} 可用，是否下载？",
+  "keyboard_setup": "表情包输入法",
+  "keyboard_setup_desc": "启用自定义输入法，在任意 App 中搜索并发送表情包",
+  "ime_enabled": "输入法已启用",
+  "ime_not_enabled": "输入法未启用",
+  "ime_is_default": "当前默认输入法",
+  "ime_not_default": "非默认输入法，需手动切换",
+  "enable_ime": "启用输入法",
+  "switch_ime": "切换为默认输入法",
+  "accessibility_enabled": "无障碍服务已启用",
+  "accessibility_not_enabled": "无障碍服务未启用",
+  "accessibility_desc": "启用后可一键发送表情包到微信/QQ（自动完成选择图片并发送）",
+  "enable_accessibility": "启用无障碍服务",
+  "open_ime_settings": "输入法设置",
+  "open_accessibility_settings": "无障碍设置",
+  "keyboard_feature_unavailable": "此功能仅 Android 可用"
 }

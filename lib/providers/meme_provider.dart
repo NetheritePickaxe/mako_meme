@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import '../models/meme.dart';
 import '../models/folder.dart';
 import '../services/storage_service.dart';
+import '../services/meme_index_exporter.dart';
 import '../services/webdav_service.dart';
 import 'settings_provider.dart';
 
@@ -57,11 +58,16 @@ class MemeProvider with ChangeNotifier {
 
   Future<void> init() => loadAll();
 
+  MemeIndexExporter? _indexExporter;
+  MemeIndexExporter get _exporter => _indexExporter ??= MemeIndexExporter(_storage);
+
   Future<void> loadAll() async {
     _all = _storage.getAllMemes();
     _folders = _storage.getAllFolders();
     _apply();
     notifyListeners();
+    // 同步 meme 索引到原生 ContentProvider（供 IME 进程读取）
+    _exporter.exportAll(_all);
   }
 
   void selectFolder(String? id) {

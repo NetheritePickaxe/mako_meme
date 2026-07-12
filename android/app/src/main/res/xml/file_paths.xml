@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 应用内部存储的 files 目录，用于分享 meme 图片 -->
+    <files-path name="meme_files" path="." />
+    <!-- 外部存储的 pictures 目录，用于无障碍临时图片 -->
+    <external-files-path name="meme_ext" path="." />
+    <external-path name="meme_public" path="." />
+</paths>

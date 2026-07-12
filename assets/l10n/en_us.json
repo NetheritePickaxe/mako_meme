@@ -222,5 +222,20 @@
   "check_update_desc": "View latest version on GitHub",
   "already_latest": "Already the latest version",
   "new_version_available": "New version available",
-  "version_available": "Version {version} available. Download?"
+  "version_available": "Version {version} available. Download?",
+  "keyboard_setup": "Meme Keyboard",
+  "keyboard_setup_desc": "Enable custom input method to search and send memes in any app",
+  "ime_enabled": "Input method enabled",
+  "ime_not_enabled": "Input method not enabled",
+  "ime_is_default": "Current default input method",
+  "ime_not_default": "Not default, switch manually",
+  "enable_ime": "Enable Input Method",
+  "switch_ime": "Set as Default",
+  "accessibility_enabled": "Accessibility service enabled",
+  "accessibility_not_enabled": "Accessibility service not enabled",
+  "accessibility_desc": "Enables one-tap send to WeChat/QQ (auto-selects image and sends)",
+  "enable_accessibility": "Enable Accessibility",
+  "open_ime_settings": "Input Method Settings",
+  "open_accessibility_settings": "Accessibility Settings",
+  "keyboard_feature_unavailable": "This feature is Android-only"
 }

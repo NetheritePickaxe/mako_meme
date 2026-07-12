@@ -13,6 +13,7 @@ import '../providers/locale_provider.dart';
 import '../l10n/l10n.dart';
 import '../services/storage_service.dart';
 import '../services/update_service.dart';
+import 'keyboard_setup_screen.dart';
 import '../services/webdav_service.dart';
 import '../theme/app_theme.dart';
 
@@ -121,6 +122,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           const SizedBox(height: 16),
 
+          _sectionHeader(l10n.tr('keyboard_setup'), cs),
+          ListTile(
+            leading: const Icon(Icons.keyboard_outlined),
+            title: Text(l10n.tr('keyboard_setup')),
+            subtitle: Text(l10n.tr('keyboard_setup_desc')),
+            trailing: const Icon(Icons.chevron_right, size: 20),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const KeyboardSetupScreen()),
+            ),
+          ),
+
+          const SizedBox(height: 16),
           _sectionHeader(l10n.tr('about'), cs),
           ListTile(
             leading: const Icon(Icons.info_outline),

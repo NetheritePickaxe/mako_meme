@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  输入法声明：让系统识别 Mako IME 为一个可选输入法。
+  isDefault=false：不抢占默认输入法，用户需手动在系统设置中启用。
+-->
+<input-method xmlns:android="http://schemas.android.com/apk/res/android"
+    android:settingsActivity="com.mako.mako_meme.MainActivity"
+    android:isDefault="false" />

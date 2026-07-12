@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Mako Meme</string>
+    <string name="accessibility_service_desc">Mako Meme 表情包快速发送服务。启用后可在微信/QQ 中通过自定义输入法一键发送表情包，自动完成选择图片并发送的操作。</string>
+    <string name="ime_label">Mako 表情包输入法</string>
+</resources>
