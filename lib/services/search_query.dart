@@ -77,78 +77,78 @@ class SelectorKey {
   static const all = [
     SelectorKey(
       name: 'type',
-      description: '类型或文件后缀。支持中文别名（表情/gif/图片/文字/立绘/CG/角色卡）或后缀（.png/.ico）',
-      usage: 'type=<类型|后缀>',
+      description: '类型或文件后缀。中文别名：表情/gif/图片/文字/立绘/CG/角色卡；后缀以 . 开头',
+      usage: '[!]type(=|~|≈)(<类型>|<.后缀>|{<类型列表>})',
       examples: ['type=图片', 'type=.png', 'type=!表情包', 'type={gif,image}'],
       multiValue: true,
     ),
     SelectorKey(
       name: 'tag',
-      description: '标签。= 多值 AND（同时含所有），~ 多值 OR（含任一），单值只能用 =',
-      usage: 'tag[op]<标签名或{列表}>',
+      description: '标签。= 与匹配（含所有值），~ 或匹配（含任一，需{列表}），≈ 模糊或匹配（需{列表}），单值仅 =',
+      usage: '[!]tag(=|~|≈)(<标签名>|{<标签列表>})',
       examples: ['tag=开心', 'tag={开心,喜欢}', 'tag~{开心,喜欢}', 'tag=!讨厌'],
       multiValue: true,
     ),
     SelectorKey(
       name: 'folder',
       description: '文件夹名匹配（选择器内用 folder=，独立前缀用 @）',
-      usage: 'folder=<文件夹名>',
+      usage: '[!]folder(=|~|≈)(<文件夹名>|{<文件夹列表>})',
       examples: ['folder=文件夹1', 'folder={文件夹1,文件夹2}'],
       multiValue: true,
     ),
     SelectorKey(
       name: 'name',
-      description: '文件名。默认 ~ 包含，= 精确，≈ 模糊',
-      usage: 'name[op]<文件名>',
+      description: '文件名。= 精确，~ 包含，≈ 模糊',
+      usage: '[!]name(=|~|≈)<文件名>',
       examples: ['name~这是', 'name=精确名', 'name≈表情'],
       multiValue: false,
     ),
     SelectorKey(
       name: 'x',
-      description: '横向（宽度）像素。支持范围(..)和单位(cm/mm/in/pt)',
-      usage: 'x=<数值>[..<数值>][单位]',
+      description: '横向（宽度）像素。.. 表示范围，单位默认 px',
+      usage: '[!]x(=|~|≈)<数值>[..<数值>][cm|mm|in|pt]',
       examples: ['x=100', 'x=100..', 'x=..100', 'x=50..100', 'x=30cm'],
       multiValue: false,
     ),
     SelectorKey(
       name: 'y',
-      description: '竖向（高度）像素。支持范围和单位',
-      usage: 'y=<数值>[..<数值>][单位]',
+      description: '竖向（高度）像素。.. 表示范围，单位默认 px',
+      usage: '[!]y(=|~|≈)<数值>[..<数值>][cm|mm|in|pt]',
       examples: ['y=100', 'y=..200', 'y=50..100mm'],
       multiValue: false,
     ),
     SelectorKey(
       name: 'w',
-      description: '较长边像素 max(宽,高)。支持范围和单位',
-      usage: 'w=<数值>[..<数值>][单位]',
+      description: '较长边像素 max(宽,高)。.. 表示范围，单位默认 px',
+      usage: '[!]w(=|~|≈)<数值>[..<数值>][cm|mm|in|pt]',
       examples: ['w=1920', 'w=1000..', 'w=10..50cm'],
       multiValue: false,
     ),
     SelectorKey(
       name: 'h',
-      description: '较短边像素 min(宽,高)。支持范围和单位',
-      usage: 'h=<数值>[..<数值>][单位]',
+      description: '较短边像素 min(宽,高)。.. 表示范围，单位默认 px',
+      usage: '[!]h(=|~|≈)<数值>[..<数值>][cm|mm|in|pt]',
       examples: ['h=1080', 'h=..500', 'h=5..20cm'],
       multiValue: false,
     ),
     SelectorKey(
       name: 'xy',
-      description: '宽高比（宽:高）。= 精确 ≈ 模糊。横向>1 竖向<1',
-      usage: 'xy[op]<宽:高|比值>',
+      description: '宽高比（宽:高）。= 精确，≈ 模糊（15% 容差）。横向>1 竖向<1',
+      usage: '[!]xy(=|≈)(<宽:高>|<比值>)',
       examples: ['xy=16:9', 'xy≈2:1', 'xy≈1:2', 'xy=1.78'],
       multiValue: false,
     ),
     SelectorKey(
       name: 'wh',
-      description: '长短边比（max:min，始终≥1）',
-      usage: 'wh[op]<长:短|比值>',
+      description: '长短边比（max:min，始终≥1）。= 精确，≈ 模糊',
+      usage: '[!]wh(=|≈)(<长:短>|<比值>)',
       examples: ['wh=16:9', 'wh≈2:1', 'wh=1.78'],
       multiValue: false,
     ),
     SelectorKey(
       name: 'regex',
       description: '正则匹配文件名',
-      usage: 'regex=<正则>',
+      usage: '[!]regex=<正则表达式>',
       examples: ['regex=.*表情.*', 'regex=^IMG_\\d+'],
       multiValue: false,
     ),
@@ -180,14 +180,14 @@ class TopCommandDef {
   static const all = [
     TopCommandDef(
       name: 'tag',
-      description: '批量添加/移除标签。用选择器筛选目标 meme，add/remove 标签',
-      usage: '/tag [选择器] add|remove <标签名>',
+      description: '批量添加/移除标签。用选择器筛选目标 meme，未给选择器时作用于全部',
+      usage: '/tag [<选择器>] (add|remove) <标签名>',
       examples: ['/tag [xy=1:2] add 竖图', '/tag [xy=2:1] remove 喜欢', '/tag [type=图片] add 图片'],
     ),
     TopCommandDef(
       name: 'help',
-      description: '显示帮助。/? 或 /help 看全部，/tag ? 看 tag 帮助',
-      usage: '/help 或 /<命令> ?',
+      description: '显示帮助。/? 或 /help 看全部，/<命令> ? 看该命令帮助',
+      usage: '(/?|/help) 或 /<命令> ?',
       examples: ['/?', '/help', '/tag ?'],
     ),
   ];
@@ -259,16 +259,24 @@ class SearchQuery {
     sb.writeln('搜索语法帮助');
     sb.writeln('=' * 40);
     sb.writeln();
-    sb.writeln('【三种语法】');
-    sb.writeln('1. 普通搜索：直接输入文字，支持 * ? 通配符');
-    sb.writeln('   #标签  按标签搜（独立前缀，不在选择器内）');
-    sb.writeln('   @文件夹  按文件夹搜（独立前缀，不在选择器内）');
-    sb.writeln('2. 选择器筛选：[条件1,条件2,...] 高级筛选');
-    sb.writeln('3. 命令：/命令 [选择器] 操作 参数');
+    sb.writeln('【参数术语】');
+    sb.writeln('  <参数>     需替换为合适的值');
+    sb.writeln('  [输入项]   可选');
+    sb.writeln('  (a|b)      必选其一');
+    sb.writeln('  [a|b]      可选其一，可省略');
+    sb.writeln('  其余字面量原样输入');
     sb.writeln();
-    sb.writeln('【操作符】= 精确 | ~ 包含或OR | ≈ 模糊 | ! 反选');
-    sb.writeln('【范围】100.. (≥) | ..100 (≤) | 50..100 (之间)');
-    sb.writeln('【单位】px(默认) cm mm in pt');
+    sb.writeln('【三种语法】');
+    sb.writeln('1. 普通搜索：<文字>  支持 * ? 通配符');
+    sb.writeln('   #<标签>    按标签搜（独立前缀，不在选择器内）');
+    sb.writeln('   @<文件夹>  按文件夹搜（独立前缀，不在选择器内）');
+    sb.writeln('2. 选择器：[<条件>,<条件>,...]  高级筛选');
+    sb.writeln('3. 命令：/命令 [<选择器>] 操作 <参数>');
+    sb.writeln();
+    sb.writeln('【操作符】(=|~|≈)  = 精确 | ~ 包含或OR | ≈ 模糊');
+    sb.writeln('【反选】!  可置于条件前(!type=表情包)或值前(type=!表情包)');
+    sb.writeln('【范围】<数值>..<数值>  如 100.. (≥) | ..100 (≤) | 50..100');
+    sb.writeln('【单位】[cm|mm|in|pt]  默认 px');
     sb.writeln();
     sb.writeln('── 顶层命令 ──');
     for (final cmd in TopCommandDef.all) {
@@ -280,8 +288,8 @@ class SearchQuery {
     sb.writeln('── 选择器条件 ──');
     for (final key in SelectorKey.all) {
       sb.writeln('  ${key.name}${key.multiValue ? " (多值)" : ""}');
-      sb.writeln('    ${key.description}');
       sb.writeln('    用法: ${key.usage}');
+      sb.writeln('    说明: ${key.description}');
       sb.writeln('    示例: ${key.examples.join(" | ")}');
       sb.writeln();
     }
@@ -566,6 +574,11 @@ class SearchQuery {
           .toList();
       if (values.isEmpty) return '"$keyStr" 的值列表为空';
     } else {
+      // 支持 ! 前置于值：type=!表情包
+      if (s.startsWith('!')) {
+        s = s.substring(1).trim();
+        if (s.isEmpty) return '"$keyStr" 缺少值';
+      }
       values = [s];
     }
 
@@ -769,6 +782,11 @@ class SearchQuery {
           .where((e) => e.isNotEmpty)
           .toList();
     } else {
+      // 支持 ! 前置于值：type=!表情包 等价于 !type=表情包
+      if (s.startsWith('!')) {
+        negate = !negate;
+        s = s.substring(1).trim();
+      }
       values = [s];
     }
 
