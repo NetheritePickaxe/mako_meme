@@ -29,7 +29,7 @@ object MemeSender {
 
     /**
      * 通过系统分享发送 meme。
-     * - 图片类：FileProvider 生成 content URI，FLAG_GRANT_READ_URI_PERMISSION，mimeType 为 image/*（或 meme 自带 mimeType）。
+     * - 图片类：FileProvider 生成 content URI，FLAG_GRANT_READ_URI_PERMISSION，mimeType 为 image 通用类型（或 meme 自带 mimeType）。
      * - 文字类：EXTRA_TEXT 发送 textContent。
      * - 始终加 FLAG_ACTIVITY_NEW_TASK（从 Service/非 Activity Context 启动需要）。
      */

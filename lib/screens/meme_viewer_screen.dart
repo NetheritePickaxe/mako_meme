@@ -248,15 +248,15 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
 
       // SVG 矢量图：无限缩放不失真
       if (m.isVector) {
+        final svgBytes = bytes ?? file?.readAsBytesSync();
         return Center(
           child: InteractiveViewer(
             minScale: 0.5,
             maxScale: 8.0,
-            child: file != null
-                ? SvgPicture.file(file, fit: BoxFit.contain,
+            child: svgBytes != null
+                ? SvgPicture.memory(svgBytes, fit: BoxFit.contain,
                     placeholderBuilder: (_) => _loadingIndicator(theme))
-                : SvgPicture.memory(bytes!, fit: BoxFit.contain,
-                    placeholderBuilder: (_) => _loadingIndicator(theme)),
+                : _loadingIndicator(theme),
           ),
         );
       }

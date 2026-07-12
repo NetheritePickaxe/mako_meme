@@ -398,16 +398,10 @@ class _MemeCardState extends State<MemeCard> {
     }
     // SVG 矢量图：用 flutter_svg 渲染，无限缩放不失真
     if (widget.meme.isVector) {
-      if (_file != null) {
-        return SvgPicture.file(
-          _file!,
-          fit: fit,
-          placeholderBuilder: (_) => _placeholder(),
-        );
-      }
-      if (_bytes != null) {
+      final svgBytes = _bytes ?? _file?.readAsBytesSync();
+      if (svgBytes != null) {
         return SvgPicture.memory(
-          _bytes!,
+          svgBytes,
           fit: fit,
           placeholderBuilder: (_) => _placeholder(),
         );

@@ -230,13 +230,14 @@ class _MemePreviewPanelState extends State<MemePreviewPanel> {
   Widget _buildImage(ThemeData theme, Meme m) {
     // SVG
     if (m.isVector) {
+      final svgBytes = _bytes ?? _file?.readAsBytesSync();
       return Center(
         child: InteractiveViewer(
           minScale: 0.5,
           maxScale: 6.0,
-          child: _file != null
-              ? SvgPicture.file(_file!, fit: BoxFit.contain)
-              : SvgPicture.memory(_bytes!, fit: BoxFit.contain),
+          child: svgBytes != null
+              ? SvgPicture.memory(svgBytes, fit: BoxFit.contain)
+              : const SizedBox.shrink(),
         ),
       );
     }
