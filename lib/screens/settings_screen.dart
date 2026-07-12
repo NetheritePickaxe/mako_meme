@@ -610,9 +610,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 label: Text(label),
                 selected: visible,
                 onSelected: (v) => settings.toggleCategoryVisibility(type),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
+                shape: const StadiumBorder(),
                 showCheckmark: false,
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 visualDensity: VisualDensity.compact,
@@ -656,9 +654,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   label: Text(name),
                   onDeleted: () => settings.removeCustomCategory(name),
                   deleteIconColor: cs.onSurfaceVariant,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
+                  shape: const StadiumBorder(),
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   visualDensity: VisualDensity.compact,
                 );
