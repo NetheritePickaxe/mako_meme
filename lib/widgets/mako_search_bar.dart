@@ -16,6 +16,7 @@ class _MakoSearchBarState extends State<MakoSearchBar> {
   final _controller = TextEditingController();
   List<SearchSuggestion> _suggestions = [];
   String _lastHelpShown = '';
+  String? _error;
 
   @override
   void dispose() {
@@ -25,10 +26,28 @@ class _MakoSearchBarState extends State<MakoSearchBar> {
 
   void _onChanged(String v) {
     setState(() {
-      _updateSuggestions(v);
-      _maybeShowHelp(v);
+      _updateError(v);
+      if (_error == null) {
+        _updateSuggestions(v);
+        _maybeShowHelp(v);
+      } else {
+        _suggestions = [];
+      }
     });
-    widget.onSearch(v);
+    // 有错误时不触发搜索（保持上次结果）
+    if (_error == null) {
+      widget.onSearch(v);
+    }
+  }
+
+  /// 校验语法，有错时设置 _error
+  void _updateError(String v) {
+    if (v.trim().isEmpty || !v.trim().startsWith('/')) {
+      _error = null;
+      return;
+    }
+    final prov = context.read<MemeProvider>();
+    _error = SearchQuery.validate(v, prov.folders);
   }
 
   void _updateSuggestions(String v) {
@@ -146,6 +165,9 @@ class _MakoSearchBarState extends State<MakoSearchBar> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = context.watch<LocaleProvider>().l10n;
+    final hasError = _error != null;
+    final errorColor = theme.colorScheme.error;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -156,7 +178,10 @@ class _MakoSearchBarState extends State<MakoSearchBar> {
             decoration: InputDecoration(
               hintText: l10n.tr('search_hint'),
               hintStyle: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
-              prefixIcon: Icon(Icons.search, color: theme.colorScheme.onSurfaceVariant),
+              prefixIcon: Icon(
+                hasError ? Icons.error_outline : Icons.search,
+                color: hasError ? errorColor : theme.colorScheme.onSurfaceVariant,
+              ),
               suffixIcon: _controller.text.isNotEmpty
                   ? IconButton(
                       icon: Icon(Icons.clear, color: theme.colorScheme.onSurfaceVariant),
@@ -164,33 +189,63 @@ class _MakoSearchBarState extends State<MakoSearchBar> {
                         _controller.clear();
                         _suggestions = [];
                         _lastHelpShown = '';
+                        _error = null;
                         widget.onSearch('');
                         setState(() {});
                       },
                     )
                   : null,
               filled: true,
-              fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              fillColor: hasError
+                  ? errorColor.withValues(alpha: 0.08)
+                  : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(28),
-                borderSide: BorderSide(color: theme.colorScheme.outline),
+                borderSide: BorderSide(color: hasError ? errorColor : theme.colorScheme.outline),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(28),
-                borderSide: BorderSide(color: theme.colorScheme.outline),
+                borderSide: BorderSide(
+                  color: hasError ? errorColor : theme.colorScheme.outline,
+                  width: hasError ? 1.5 : 1,
+                ),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(28),
-                borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
+                borderSide: BorderSide(
+                  color: hasError ? errorColor : theme.colorScheme.primary,
+                  width: 2,
+                ),
               ),
             ),
             style: TextStyle(color: theme.colorScheme.onSurface),
             onChanged: _onChanged,
-            onSubmitted: widget.onSearch,
+            onSubmitted: (v) {
+              if (_error == null) widget.onSearch(v);
+            },
           ),
         ),
-        // 补全建议列表
-        if (_suggestions.isNotEmpty)
+        // 错误提示
+        if (hasError)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(28, 0, 16, 4),
+            child: Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, size: 14, color: errorColor),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    _error!,
+                    style: TextStyle(fontSize: 12, color: errorColor),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        // 补全建议列表（有错误时不显示）
+        if (!hasError && _suggestions.isNotEmpty)
           Container(
             constraints: const BoxConstraints(maxHeight: 200),
             margin: const EdgeInsets.symmetric(horizontal: 12),

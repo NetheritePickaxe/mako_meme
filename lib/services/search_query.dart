@@ -40,9 +40,9 @@ class CommandDef {
     CommandDef(
       name: 'tag',
       aliases: ['#'],
-      description: '标签匹配。支持多值和反选',
-      usage: 'tag=<标签名>',
-      examples: ['tag=开心', 'tag={开心,喜欢}', 'tag=!讨厌'],
+      description: '标签匹配。= 多值为 AND（同时含所有 tag），~ 多值为 OR（含任一），单值只能用 =',
+      usage: 'tag[op]<标签名或{列表}>',
+      examples: ['tag=开心', 'tag={开心,喜欢}', 'tag~{开心,喜欢}', 'tag=!讨厌'],
       multiValue: true,
       hasValueSuggestions: true,
     ),
@@ -155,6 +155,127 @@ class SearchQuery {
       return _parseCommand(q.substring(1), folders);
     }
     return _parsePlain(q, folders);
+  }
+
+  /// 校验查询语法，返回错误信息（null 表示无错误）。
+  /// 搜索框根据此结果报红显示错误提示。
+  static String? validate(String query, List<MemeFolder> folders) {
+    final q = query.trim();
+    if (q.isEmpty) return null;
+    if (isHelpRequest(q) || isCommandHelpRequest(q) != null) return null;
+    if (!q.startsWith('/')) return null; // 普通模式不校验
+
+    final afterSlash = q.substring(1).trim();
+    int i = 0;
+    while (i < afterSlash.length) {
+      if (afterSlash[i] == '[') {
+        final end = _findMatchingBracket(afterSlash, i);
+        if (end == -1) return '方括号未闭合，缺少 ]';
+        final inner = afterSlash.substring(i + 1, end);
+        final parts = _splitTopLevel(inner, ',');
+        for (final part in parts) {
+          final trimmed = part.trim();
+          if (trimmed.isEmpty) continue;
+          final err = _validateCondition(trimmed);
+          if (err != null) return err;
+        }
+        i = end + 1;
+      } else {
+        i++;
+      }
+    }
+    return null;
+  }
+
+  /// 校验单个条件，返回错误信息或 null
+  static String? _validateCondition(String s) {
+    if (s.startsWith('!')) {
+      s = s.substring(1).trim();
+    }
+    if (s.isEmpty) return '条件为空';
+
+    final keyMatch = RegExp(r'^([a-zA-Z@#]+)').firstMatch(s);
+    if (keyMatch == null) return '无法解析条件: "$s"';
+    final keyStr = keyMatch.group(1)!.toLowerCase();
+    s = s.substring(keyMatch.end);
+
+    // 解析 op
+    String op = '=';
+    if (s.startsWith('≈')) { op = '≈'; s = s.substring(1); }
+    else if (s.startsWith('~')) { op = '~'; s = s.substring(1); }
+    else if (s.startsWith('=')) { op = '='; s = s.substring(1); }
+    s = s.trim();
+    if (s.isEmpty) return '"$keyStr" 缺少值';
+
+    // 解析值
+    List<String> values;
+    if (s.startsWith('{') && s.endsWith('}')) {
+      values = _splitTopLevel(s.substring(1, s.length - 1), ',')
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+      if (values.isEmpty) return '"$keyStr" 的值列表为空';
+    } else {
+      values = [s];
+    }
+
+    final key = _normalizeKey(keyStr);
+    if (key == null) return '未知条件: "$keyStr"';
+
+    // tag + ~ + 单值 = 错误
+    if (key == _ConditionKey.tag && op == '~' && values.length == 1) {
+      return 'tag 使用 ~ 时需要多值（如 tag~{开心,喜欢}），单值请用 tag=开心';
+    }
+
+    // 不可多值的 key 检查
+    const multiValueKeys = [
+      _ConditionKey.tag, _ConditionKey.type, _ConditionKey.folder,
+    ];
+    if (!multiValueKeys.contains(key) && values.length > 1) {
+      return '"$keyStr" 不支持多值';
+    }
+
+    // 尺寸参数校验
+    if (key == _ConditionKey.width || key == _ConditionKey.height ||
+        key == _ConditionKey.longSide || key == _ConditionKey.shortSide) {
+      for (final v in values) {
+        if (_DimensionMatcher.parse(v) == null) {
+          return '"$keyStr" 的值 "$v" 无效，应为数值或范围（如 100, 100.., ..100, 50..100cm）';
+        }
+      }
+    }
+
+    // 比例参数校验
+    if (key == _ConditionKey.ratioXY || key == _ConditionKey.ratioWH) {
+      for (final v in values) {
+        if (!_isValidRatioValue(v)) {
+          return '"$keyStr" 的值 "$v" 无效，应为比例（如 16:9）或数值（如 1.78）';
+        }
+      }
+    }
+
+    // 正则校验
+    if (key == _ConditionKey.regex) {
+      for (final v in values) {
+        try {
+          RegExp(v);
+        } catch (_) {
+          return '无效的正则表达式: "$v"';
+        }
+      }
+    }
+
+    return null;
+  }
+
+  static bool _isValidRatioValue(String v) {
+    v = v.trim();
+    if (v.contains(':')) {
+      final parts = v.split(':');
+      if (parts.length != 2) return false;
+      return double.tryParse(parts[0]) != null && double.tryParse(parts[1]) != null;
+    }
+    return double.tryParse(v) != null;
   }
 
   // ===== 帮助检测 =====
@@ -589,7 +710,20 @@ class _Condition {
       case _ConditionKey.type:
         return values.any((v) => _matchType(m, v));
       case _ConditionKey.tag:
-        return values.any((v) => m.tags.any((t) => _matchString(t, v, op)));
+        // tag 语义：= 多值 AND（同时含所有 tag），~ 多值 OR（含任一），≈ 多值 OR fuzzy
+        switch (op) {
+          case '=':
+            // AND：必须同时含有所有指定的 tag（精确匹配）
+            return values.every((v) => m.tags.any((t) => _matchString(t, v, '=')));
+          case '~':
+            // OR：含有任一 tag（精确匹配值，~ 表示或语义）
+            return values.any((v) => m.tags.any((t) => _matchString(t, v, '=')));
+          case '≈':
+            // OR fuzzy：含有任一模糊匹配的 tag
+            return values.any((v) => m.tags.any((t) => _matchString(t, v, '≈')));
+          default:
+            return values.every((v) => m.tags.any((t) => _matchString(t, v, '=')));
+        }
       case _ConditionKey.folder:
         final matchedFolderIds = <String>{};
         for (final v in values) {
