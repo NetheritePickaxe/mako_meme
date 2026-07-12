@@ -30,12 +30,12 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   bool _dragOver = false;
-  // 0=表情包, 1=文件夹, 2=收藏, 3=设置
+  // 0=表情包, 1=文件夹, 2=收藏, 3=情绪, 4=设置
   int _currentTab = 0;
 
   void _onTabChanged(int i) {
     final prov = context.read<MemeProvider>();
-    if (i == 3) {
+    if (i == 4) {
       // 设置：打开设置页，不切换标签
       Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
       return;
@@ -46,12 +46,20 @@ class _HomeScreenState extends State<HomeScreen> {
       if (i == 0) {
         prov.setShowFavorites(false);
         prov.setShowFoldersView(false);
+        prov.setMoodFilter(null);
       } else if (i == 1) {
         prov.setShowFavorites(false);
         prov.setShowFoldersView(true);
+        prov.setMoodFilter(null);
       } else if (i == 2) {
         prov.setShowFoldersView(false);
         prov.setShowFavorites(true);
+        prov.setMoodFilter(null);
+      } else if (i == 3) {
+        // 情绪页：清除其他筛选
+        prov.setShowFoldersView(false);
+        prov.setShowFavorites(false);
+        prov.setMoodFilter(null);
       }
     });
   }
@@ -98,6 +106,11 @@ class _HomeScreenState extends State<HomeScreen> {
             label: l10n.tr('favorites'),
           ),
           NavigationDestination(
+            icon: const Icon(Icons.mood_outlined),
+            selectedIcon: Icon(Icons.mood, color: theme.colorScheme.onSurface),
+            label: l10n.tr('nav_moods'),
+          ),
+          NavigationDestination(
             icon: const Icon(Icons.settings_outlined),
             selectedIcon: Icon(Icons.settings, color: theme.colorScheme.onSurface),
             label: l10n.tr('settings'),
@@ -115,6 +128,14 @@ class _HomeScreenState extends State<HomeScreen> {
         icon: const Icon(Icons.arrow_back),
         tooltip: l10n.tr('back'),
         onPressed: () => prov.selectFolder(null),
+      );
+    }
+    // 情绪标签：选了具体情绪时显示返回
+    if (_currentTab == 3 && prov.moodFilter != null) {
+      return IconButton(
+        icon: const Icon(Icons.arrow_back),
+        tooltip: l10n.tr('back'),
+        onPressed: () => prov.setMoodFilter(null),
       );
     }
     if (_currentTab == 0) {
@@ -178,12 +199,121 @@ class _HomeScreenState extends State<HomeScreen> {
     return null;
   }
 
+  /// 情绪页：按情绪分类展示表情包
+  /// 无筛选时显示所有情绪的网格（带表情包数量），选了情绪后显示该情绪的表情包列表
+  Widget _buildMoodsView(MemeProvider prov, L10n l10n) {
+    final theme = Theme.of(context);
+
+    // 选了具体情绪：显示该情绪下的表情包
+    if (prov.moodFilter != null) {
+      return _buildMemesListView(prov, l10n);
+    }
+
+    // 情绪网格视图
+    final moodGroups = prov.memesByMood;
+    if (moodGroups.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.mood_bad, size: 64, color: theme.colorScheme.outline),
+            const SizedBox(height: 16),
+            Text(l10n.tr('no_moods'),
+              style: TextStyle(fontSize: 18, color: theme.colorScheme.outline)),
+            const SizedBox(height: 8),
+            Text(l10n.tr('no_moods_hint'),
+              style: TextStyle(fontSize: 12, color: theme.colorScheme.outline)),
+          ],
+        ),
+      );
+    }
+
+    final moods = moodGroups.keys.toList()..sort((a, b) {
+      // 按总权重降序排序
+      final aw = moodGroups[a]!.fold<int>(0, (sum, m) {
+        return sum + (m.moods.firstWhere((mo) => mo['name'] == a,
+            orElse: () => {'weight': 0})['weight'] as int);
+      });
+      final bw = moodGroups[b]!.fold<int>(0, (sum, m) {
+        return sum + (m.moods.firstWhere((mo) => mo['name'] == b,
+            orElse: () => {'weight': 0})['weight'] as int);
+      });
+      return bw.compareTo(aw);
+    });
+
+    return GridView.builder(
+      padding: const EdgeInsets.all(12),
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 180,
+        childAspectRatio: 1.2,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+      ),
+      itemCount: moods.length,
+      itemBuilder: (ctx, i) {
+        final moodName = moods[i];
+        final memes = moodGroups[moodName]!;
+        final totalWeight = memes.fold<int>(0, (sum, m) {
+          return sum + (m.moods.firstWhere((mo) => mo['name'] == moodName,
+              orElse: () => {'weight': 0})['weight'] as int);
+        });
+        return Card(
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () => prov.setMoodFilter(moodName),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.mood, size: 32, color: theme.colorScheme.tertiary),
+                  const SizedBox(height: 8),
+                  Text(
+                    moodName,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${memes.length} ${l10n.tr('items_count')}',
+                    style: TextStyle(fontSize: 12, color: theme.colorScheme.outline),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.star, size: 12, color: theme.colorScheme.tertiary),
+                      const SizedBox(width: 2),
+                      Text(
+                        '$totalWeight',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: theme.colorScheme.tertiary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildBody(MemeProvider prov, L10n l10n) {
     switch (_currentTab) {
       case 1:
         return _buildFoldersGrid(prov);
       case 2:
         return _buildMemesListView(prov, l10n);
+      case 3:
+        return _buildMoodsView(prov, l10n);
       case 0:
       default:
         return _buildMemesListView(prov, l10n);
@@ -340,6 +470,8 @@ class _HomeScreenState extends State<HomeScreen> {
         return l10n.tr('browse_folders');
       case 2:
         return l10n.tr('favorites');
+      case 3:
+        return prov.moodFilter ?? l10n.tr('nav_moods');
       case 0:
       default:
         if (prov.folderId != null) {

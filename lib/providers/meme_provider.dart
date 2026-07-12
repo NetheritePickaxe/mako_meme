@@ -31,9 +31,12 @@ class MemeProvider with ChangeNotifier {
   final Set<String> _tagFilter = {};
   final Set<String> _folderFilter = {};
   final Set<String> _typeFilter = {};
+  // 情绪筛选：null=全部，否则只显示该 mood 的 memes
+  String? _moodFilter;
 
   Set<String> get folderFilter => _folderFilter;
   Set<String> get typeFilter => _typeFilter;
+  String? get moodFilter => _moodFilter;
   bool get showFoldersView => _showFoldersView;
   bool get showFavorites => _showFavorites;
   Meme? get previewMeme => _previewMeme;
@@ -58,6 +61,39 @@ class MemeProvider with ChangeNotifier {
       s.addAll(m.tags);
     }
     return s.toList()..sort();
+  }
+
+  /// 所有情绪标签（去重排序）
+  List<String> get allMoods {
+    final s = <String>{};
+    for (final m in _all) {
+      for (final mood in m.moods) {
+        s.add(mood['name'] as String);
+      }
+    }
+    return s.toList()..sort();
+  }
+
+  /// 按情绪分组：moodName 映射到对应的 Meme 列表（按权重降序）
+  Map<String, List<Meme>> get memesByMood {
+    final map = <String, List<Meme>>{};
+    for (final m in _all) {
+      for (final mood in m.moods) {
+        final name = mood['name'] as String;
+        map.putIfAbsent(name, () => []).add(m);
+      }
+    }
+    // 每个 mood 内按权重降序
+    for (final entry in map.entries) {
+      entry.value.sort((a, b) {
+        final aw = a.moods.firstWhere((m) => m['name'] == entry.key,
+            orElse: () => {'weight': 0})['weight'] as int;
+        final bw = b.moods.firstWhere((m) => m['name'] == entry.key,
+            orElse: () => {'weight': 0})['weight'] as int;
+        return bw.compareTo(aw);
+      });
+    }
+    return map;
   }
 
   Future<void> init() => loadAll();
@@ -142,6 +178,37 @@ class MemeProvider with ChangeNotifier {
     _tagFilter.clear();
     _apply();
     notifyListeners();
+  }
+
+  /// 设置情绪筛选（null=清除筛选）
+  void setMoodFilter(String? mood) {
+    _moodFilter = mood;
+    _apply();
+    notifyListeners();
+  }
+
+  /// 给单个 meme 添加 tag
+  Future<void> addTag(String memeId, String tag) async {
+    await _storage.addTagToMeme(memeId, tag);
+    await loadAll();
+  }
+
+  /// 给单个 meme 移除 tag
+  Future<void> removeTag(String memeId, String tag) async {
+    await _storage.removeTagFromMeme(memeId, tag);
+    await loadAll();
+  }
+
+  /// 给单个 meme 添加/更新情绪标签（权重 1-5）
+  Future<void> addMood(String memeId, String mood, int weight) async {
+    await _storage.addMoodToMeme(memeId, mood, weight);
+    await loadAll();
+  }
+
+  /// 给单个 meme 移除情绪标签
+  Future<void> removeMood(String memeId, String mood) async {
+    await _storage.removeMoodFromMeme(memeId, mood);
+    await loadAll();
   }
 
   void toggleFolderFilter(String folderId) {
@@ -492,6 +559,9 @@ class MemeProvider with ChangeNotifier {
     }
     if (_typeFilter.isNotEmpty) {
       list = list.where((m) => _typeFilter.contains(m.type)).toList();
+    }
+    if (_moodFilter != null) {
+      list = list.where((m) => m.moods.any((mo) => mo['name'] == _moodFilter)).toList();
     }
     if (_query.isNotEmpty) {
       final result = SearchQuery.parse(_query, _folders);

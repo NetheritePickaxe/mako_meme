@@ -11,6 +11,7 @@ import 'package:provider/provider.dart';
 import '../models/meme.dart';
 import '../providers/meme_provider.dart';
 import '../providers/locale_provider.dart';
+import '../providers/settings_provider.dart';
 import '../l10n/l10n.dart';
 import '../services/storage_service.dart';
 import 'text_editor_screen.dart';
@@ -897,6 +898,7 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
   /// 底部详情面板：可拖动展开/收起
   Widget _buildDraggableDetailPanel(ThemeData theme, MemeProvider prov, Meme m, L10n l10n) {
     final isMobile = _isMobilePlatform();
+    final settings = context.watch<SettingsProvider>();
     return DraggableScrollableSheet(
       initialChildSize: 0.35,
       minChildSize: 0.15,
@@ -961,19 +963,31 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                     _infoChip(theme, _formatDate(m.createdAt), icon: Icons.access_time),
                   ],
                 ),
-                if (m.tags.isNotEmpty) ...[
+                // Tag 区域：tagSubdivision 开启时双列（情绪+普通），否则单列只读
+                if (settings.tagSubdivision) ...[
+                  const SizedBox(height: 8),
+                  _buildTagEditorSection(theme, l10n, prov, m),
+                ] else if (m.tags.isNotEmpty || m.hasMoods) ...[
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 6,
                     runSpacing: 4,
-                    children: m.tags
-                        .map((t) => Chip(
-                              label: Text(t, style: const TextStyle(fontSize: 11)),
-                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              visualDensity: VisualDensity.compact,
-                              padding: EdgeInsets.zero,
-                            ))
-                        .toList(),
+                    children: [
+                      ...m.tags.map((t) => Chip(
+                        label: Text(t, style: const TextStyle(fontSize: 11)),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                      )),
+                      ...m.moods.map((mo) => Chip(
+                        label: Text('${mo['name']} ${_moodWeightStars(mo['weight'] as int)}',
+                            style: const TextStyle(fontSize: 11)),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        backgroundColor: theme.colorScheme.tertiaryContainer,
+                      )),
+                    ],
                   ),
                 ],
                 const SizedBox(height: 12),
@@ -1016,6 +1030,288 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
           ),
         );
       },
+    );
+  }
+
+  /// 双列 Tag 编辑区：左列情绪 tag（带权重），右列普通 tag
+  Widget _buildTagEditorSection(ThemeData theme, L10n l10n, MemeProvider prov, Meme m) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 左列：情绪 tag
+        Expanded(
+          child: _buildMoodColumn(theme, l10n, prov, m),
+        ),
+        const SizedBox(width: 8),
+        // 右列：普通 tag
+        Expanded(
+          child: _buildTagColumn(theme, l10n, prov, m),
+        ),
+      ],
+    );
+  }
+
+  /// 情绪 tag 列（带权重）
+  Widget _buildMoodColumn(ThemeData theme, L10n l10n, MemeProvider prov, Meme m) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.mood, size: 14, color: theme.colorScheme.tertiary),
+            const SizedBox(width: 4),
+            Text(l10n.tr('mood_tags'),
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: theme.colorScheme.tertiary,
+              )),
+            const Spacer(),
+            InkWell(
+              onTap: () => _showAddMoodDialog(theme, l10n, prov, m),
+              child: Padding(
+                padding: const EdgeInsets.all(2),
+                child: Icon(Icons.add, size: 16, color: theme.colorScheme.tertiary),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        if (m.moods.isEmpty)
+          Text(l10n.tr('no_mood_tags'),
+            style: TextStyle(fontSize: 10, color: theme.colorScheme.outline))
+        else
+          Wrap(
+            spacing: 4,
+            runSpacing: 4,
+            children: m.moods.map((mo) {
+              final name = mo['name'] as String;
+              final weight = mo['weight'] as int;
+              return InputChip(
+                label: Text('$name ${_moodWeightStars(weight)}',
+                  style: const TextStyle(fontSize: 10)),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                backgroundColor: theme.colorScheme.tertiaryContainer,
+                onDeleted: () => prov.removeMood(m.id, name),
+                deleteIconColor: theme.colorScheme.tertiary,
+                onPressed: () => _showEditMoodDialog(theme, l10n, prov, m, name, weight),
+              );
+            }).toList(),
+          ),
+      ],
+    );
+  }
+
+  /// 普通 tag 列
+  Widget _buildTagColumn(ThemeData theme, L10n l10n, MemeProvider prov, Meme m) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.label, size: 14, color: theme.colorScheme.primary),
+            const SizedBox(width: 4),
+            Text(l10n.tr('content_tags'),
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: theme.colorScheme.primary,
+              )),
+            const Spacer(),
+            InkWell(
+              onTap: () => _showAddTagDialog(theme, l10n, prov, m),
+              child: Padding(
+                padding: const EdgeInsets.all(2),
+                child: Icon(Icons.add, size: 16, color: theme.colorScheme.primary),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        if (m.tags.isEmpty)
+          Text(l10n.tr('no_content_tags'),
+            style: TextStyle(fontSize: 10, color: theme.colorScheme.outline))
+        else
+          Wrap(
+            spacing: 4,
+            runSpacing: 4,
+            children: m.tags.map((t) => InputChip(
+              label: Text(t, style: const TextStyle(fontSize: 10)),
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              onDeleted: () => prov.removeTag(m.id, t),
+              onPressed: () => _showAddTagDialog(theme, l10n, prov, m, initialTag: t),
+            )).toList(),
+          ),
+      ],
+    );
+  }
+
+  /// 情绪权重星星（1-5）
+  String _moodWeightStars(int weight) {
+    return '★' * weight.clamp(1, 5);
+  }
+
+  /// 添加情绪对话框（名称 + 权重滑块）
+  void _showAddMoodDialog(ThemeData theme, L10n l10n, MemeProvider prov, Meme m) {
+    final nameCtrl = TextEditingController();
+    int weight = 3;
+    // 预设情绪
+    final presets = [
+      '开心', '大笑', '微笑', '生气', '很生气', '赌气', '悲伤', '哭泣',
+      '惊讶', '害怕', '害羞', '得意', '无奈', '困惑', '期待', '无聊',
+    ];
+    showDialog(
+      context: context,
+      builder: (dCtx) => StatefulBuilder(
+        builder: (dCtx, setDialogState) => AlertDialog(
+          title: Text(l10n.tr('add_mood')),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 预设情绪选择
+              Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                children: presets.map((p) => ActionChip(
+                  label: Text(p, style: const TextStyle(fontSize: 11)),
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  onPressed: () {
+                    nameCtrl.text = p;
+                    setDialogState(() {});
+                  },
+                )).toList(),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: nameCtrl,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: l10n.tr('mood_name'),
+                  isDense: true,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text('${l10n.tr('mood_weight')}: $weight ${_moodWeightStars(weight)}',
+                style: const TextStyle(fontSize: 12)),
+              Slider(
+                value: weight.toDouble(),
+                min: 1,
+                max: 5,
+                divisions: 4,
+                label: weight.toString(),
+                onChanged: (v) => setDialogState(() => weight = v.round()),
+              ),
+              Text(l10n.tr('mood_weight_hint'),
+                style: TextStyle(fontSize: 10, color: theme.colorScheme.outline)),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dCtx), child: Text(l10n.tr('cancel'))),
+            FilledButton(
+              onPressed: () {
+                final name = nameCtrl.text.trim();
+                if (name.isEmpty) return;
+                prov.addMood(m.id, name, weight);
+                Navigator.pop(dCtx);
+              },
+              child: Text(l10n.tr('confirm')),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 编辑已有情绪（修改权重或删除）
+  void _showEditMoodDialog(ThemeData theme, L10n l10n, MemeProvider prov, Meme m, String name, int currentWeight) {
+    int weight = currentWeight;
+    showDialog(
+      context: context,
+      builder: (dCtx) => StatefulBuilder(
+        builder: (dCtx, setDialogState) => AlertDialog(
+          title: Text(name),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${l10n.tr('mood_weight')}: $weight ${_moodWeightStars(weight)}',
+                style: const TextStyle(fontSize: 12)),
+              Slider(
+                value: weight.toDouble(),
+                min: 1,
+                max: 5,
+                divisions: 4,
+                label: weight.toString(),
+                onChanged: (v) => setDialogState(() => weight = v.round()),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                prov.removeMood(m.id, name);
+                Navigator.pop(dCtx);
+              },
+              child: Text(l10n.tr('delete'), style: const TextStyle(color: Colors.red)),
+            ),
+            TextButton(onPressed: () => Navigator.pop(dCtx), child: Text(l10n.tr('cancel'))),
+            FilledButton(
+              onPressed: () {
+                prov.addMood(m.id, name, weight);
+                Navigator.pop(dCtx);
+              },
+              child: Text(l10n.tr('confirm')),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 添加/编辑普通 tag 对话框
+  void _showAddTagDialog(ThemeData theme, L10n l10n, MemeProvider prov, Meme m, {String? initialTag}) {
+    final ctrl = TextEditingController(text: initialTag ?? '');
+    final isEdit = initialTag != null;
+    showDialog(
+      context: context,
+      builder: (dCtx) => AlertDialog(
+        title: Text(isEdit ? l10n.tr('edit_tag') : l10n.tr('add_tag')),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: InputDecoration(
+            labelText: l10n.tr('tag_name'),
+            isDense: true,
+          ),
+        ),
+        actions: [
+          if (isEdit)
+            TextButton(
+              onPressed: () {
+                prov.removeTag(m.id, initialTag);
+                Navigator.pop(dCtx);
+              },
+              child: Text(l10n.tr('delete'), style: const TextStyle(color: Colors.red)),
+            ),
+          TextButton(onPressed: () => Navigator.pop(dCtx), child: Text(l10n.tr('cancel'))),
+          FilledButton(
+            onPressed: () {
+              final name = ctrl.text.trim();
+              if (name.isEmpty) return;
+              if (isEdit) prov.removeTag(m.id, initialTag);
+              prov.addTag(m.id, name);
+              Navigator.pop(dCtx);
+            },
+            child: Text(l10n.tr('confirm')),
+          ),
+        ],
+      ),
     );
   }
 

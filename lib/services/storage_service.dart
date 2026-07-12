@@ -1362,6 +1362,34 @@ class StorageService {
     );
   }
 
+  // ======================== Mood CRUD ========================
+
+  /// 添加情绪标签（带权重 1-5）
+  Future<void> addMoodToMeme(String id, String mood, int weight) async {
+    if (_memeBox == null) return;
+    final meme = _getMeme(id);
+    if (meme == null) return;
+    final w = weight.clamp(1, 5);
+    // 已存在则更新权重
+    final moods = List<Map<String, dynamic>>.from(meme.moods);
+    final idx = moods.indexWhere((m) => m['name'] == mood);
+    if (idx >= 0) {
+      moods[idx] = {'name': mood, 'weight': w};
+    } else {
+      moods.add({'name': mood, 'weight': w});
+    }
+    await _memeBox!.put(id, meme.copyWith(moods: moods).toMap());
+  }
+
+  /// 移除情绪标签
+  Future<void> removeMoodFromMeme(String id, String mood) async {
+    if (_memeBox == null) return;
+    final meme = _getMeme(id);
+    if (meme == null) return;
+    final moods = meme.moods.where((m) => m['name'] != mood).toList();
+    await _memeBox!.put(id, meme.copyWith(moods: moods).toMap());
+  }
+
   // ======================== Folder CRUD ========================
 
   Future<MemeFolder> createFolder(String name) async {

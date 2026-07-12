@@ -72,6 +72,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _mobileLongPressTile(settings, l10n),
             const Divider(indent: 16, endIndent: 16),
           ],
+          _tagSubdivisionTile(settings, l10n),
+          const Divider(indent: 16, endIndent: 16),
           if (defaultTargetPlatform == TargetPlatform.android) ...[
             _monetTile(settings, l10n),
             if (!settings.useMonet) ...[
@@ -455,6 +457,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
         selected: {settings.mobileLongPress},
         onSelectionChanged: (s) => settings.setMobileLongPress(s.first),
       ),
+    );
+  }
+
+  Widget _tagSubdivisionTile(SettingsProvider settings, L10n l10n) {
+    return SwitchListTile(
+      secondary: const Icon(Icons.label_outline),
+      title: Text(l10n.tr('tag_subdivision')),
+      subtitle: Text(l10n.tr('tag_subdivision_desc')),
+      value: settings.tagSubdivision,
+      onChanged: (v) => settings.setTagSubdivision(v),
     );
   }
 

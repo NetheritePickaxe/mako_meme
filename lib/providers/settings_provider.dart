@@ -28,6 +28,9 @@ class SettingsProvider extends ChangeNotifier {
   // 手机端长按行为：'share' 或 'menu'
   String _mobileLongPress = 'share';
 
+  // tag 细分：开启后大图详情面板显示双列 tag（情绪+普通）
+  bool _tagSubdivision = false;
+
   // 分类可见性 — 默认隐藏特殊功能分类（角色卡/立绘/CG/小说）
   // 存储为逗号分隔的隐藏类型字符串
   Set<String> _hiddenCategories = {
@@ -103,6 +106,9 @@ class SettingsProvider extends ChangeNotifier {
       _mobileLongPress = savedLongPress!;
     }
 
+    // 加载 tag 细分设置
+    _tagSubdivision = _storage.getSetting('tagSubdivision') == 'true';
+
     // 加载分类可见性（未设置时默认隐藏 portrait/cg/character_card）
     final savedHidden = _storage.getSetting('hiddenCategories');
     if (savedHidden != null && savedHidden.isNotEmpty) {
@@ -153,6 +159,8 @@ class SettingsProvider extends ChangeNotifier {
   bool get hasCustomBg => _bgImagePath != null && _bgImagePath!.isNotEmpty;
   String get mobileLongPress => _mobileLongPress;
   bool get mobileLongPressIsMenu => _mobileLongPress == 'menu';
+
+  bool get tagSubdivision => _tagSubdivision;
 
   Set<String> get hiddenCategories => Set.unmodifiable(_hiddenCategories);
   List<String> get customCategories => List.unmodifiable(_customCategories);
@@ -278,6 +286,12 @@ class SettingsProvider extends ChangeNotifier {
     if (v != 'share' && v != 'menu') return;
     _mobileLongPress = v;
     await _storage.setSetting('mobileLongPress', v);
+    notifyListeners();
+  }
+
+  Future<void> setTagSubdivision(bool v) async {
+    _tagSubdivision = v;
+    await _storage.setSetting('tagSubdivision', v ? 'true' : 'false');
     notifyListeners();
   }
 

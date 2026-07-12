@@ -37,6 +37,9 @@ class Meme {
   /// 是否为 PSD
   bool get isPsd => type == typePsd;
 
+  /// 是否有情绪标签
+  bool get hasMoods => moods.isNotEmpty;
+
   /// 是否为立绘/CG 精灵图（支持图层合成）
   bool get isSprite => (type == typePortrait || type == typeCg) &&
       spriteLayers != null && spriteLayers!.isNotEmpty;
@@ -104,6 +107,9 @@ class Meme {
   /// 立绘/CG 精灵图层（krkr pjson / VN 多图合并）
   /// 每层结构：{name, path, category(base/expression/outfit/accessory), visible, zOrder}
   final List<Map<String, dynamic>>? spriteLayers;
+  /// 情绪标签（带权重），每项 {name, weight(1-5)}
+  /// weight 表示情绪强度：1=轻微，5=强烈（如"大笑"weight=5，"微笑"weight=2）
+  final List<Map<String, dynamic>> moods;
   /// 漫画多页路径列表（每页为相对存储路径，filePath 为首页/封面）
   final List<String> pages;
 
@@ -126,6 +132,7 @@ class Meme {
     this.thumbPath,
     this.psdLayers,
     this.spriteLayers,
+    this.moods = const [],
     this.pages = const [],
   });
 
@@ -148,6 +155,7 @@ class Meme {
     'thumbPath': thumbPath,
     'psdLayers': psdLayers,
     'spriteLayers': spriteLayers,
+    'moods': moods,
     'pages': pages,
   };
 
@@ -176,6 +184,10 @@ class Meme {
         ? List<Map<String, dynamic>>.from(
             (map['spriteLayers'] as List).map((e) => Map<String, dynamic>.from(e as Map)))
         : null,
+    moods: map['moods'] != null
+        ? List<Map<String, dynamic>>.from(
+            (map['moods'] as List).map((e) => Map<String, dynamic>.from(e as Map)))
+        : const [],
     pages: map['pages'] != null
         ? List<String>.from(map['pages'] as List)
         : const [],
@@ -200,6 +212,7 @@ class Meme {
     String? thumbPath,
     List<Map<String, dynamic>>? psdLayers,
     List<Map<String, dynamic>>? spriteLayers,
+    List<Map<String, dynamic>>? moods,
     List<String>? pages,
   }) => Meme(
     id: id ?? this.id,
@@ -220,6 +233,7 @@ class Meme {
     thumbPath: thumbPath ?? this.thumbPath,
     psdLayers: psdLayers ?? this.psdLayers,
     spriteLayers: spriteLayers ?? this.spriteLayers,
+    moods: moods ?? this.moods,
     pages: pages ?? this.pages,
   );
 }
