@@ -6,10 +6,26 @@ class Meme {
   static const String typePortrait = 'portrait';
   static const String typeCg = 'cg';
   static const String typeCharacterCard = 'character_card';
+  static const String typeVector = 'vector';   // SVG 矢量图
+  static const String typePsd = 'psd';          // PSD 多图层
 
-  static const List<String> allTypes = [typeEmoji, typeGif, typeImage, typeText, typePortrait, typeCg, typeCharacterCard];
+  static const List<String> allTypes = [
+    typeEmoji, typeGif, typeImage, typeText, typePortrait, typeCg,
+    typeCharacterCard, typeVector, typePsd,
+  ];
 
-  bool get isImageType => type == typeImage || type == typeGif || type == typePortrait || type == typeCg || type == typeCharacterCard;
+  bool get isImageType => type == typeImage || type == typeGif ||
+      type == typePortrait || type == typeCg || type == typeCharacterCard ||
+      type == typeVector || type == typePsd;
+
+  /// 是否为动画类型（GIF / APNG）
+  bool get isAnimated => type == typeGif || mimeType == 'image/apng';
+
+  /// 是否为矢量图（SVG）
+  bool get isVector => type == typeVector;
+
+  /// 是否为 PSD
+  bool get isPsd => type == typePsd;
 
   final String id;
   final String name;
@@ -26,6 +42,10 @@ class Meme {
   final Map<String, dynamic>? characterData;
   final int width;
   final int height;
+  /// PSD 合成预览图路径（导入时生成的 PNG 副本）
+  final String? thumbPath;
+  /// PSD 图层信息（名称/可见性/边界），用于查看器图层面板
+  final List<Map<String, dynamic>>? psdLayers;
 
   Meme({
     required this.id,
@@ -43,6 +63,8 @@ class Meme {
     this.characterData,
     this.width = 0,
     this.height = 0,
+    this.thumbPath,
+    this.psdLayers,
   });
 
   Map<String, dynamic> toMap() => {
@@ -61,6 +83,8 @@ class Meme {
     'characterData': characterData,
     'width': width,
     'height': height,
+    'thumbPath': thumbPath,
+    'psdLayers': psdLayers,
   };
 
   factory Meme.fromMap(Map<String, dynamic> map) => Meme(
@@ -79,6 +103,11 @@ class Meme {
     characterData: map['characterData'] as Map<String, dynamic>?,
     width: map['width'] as int? ?? 0,
     height: map['height'] as int? ?? 0,
+    thumbPath: map['thumbPath'] as String?,
+    psdLayers: map['psdLayers'] != null
+        ? List<Map<String, dynamic>>.from(
+            (map['psdLayers'] as List).map((e) => Map<String, dynamic>.from(e as Map)))
+        : null,
   );
 
   Meme copyWith({
@@ -97,6 +126,8 @@ class Meme {
     Map<String, dynamic>? characterData,
     int? width,
     int? height,
+    String? thumbPath,
+    List<Map<String, dynamic>>? psdLayers,
   }) => Meme(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -113,5 +144,7 @@ class Meme {
     characterData: characterData ?? this.characterData,
     width: width ?? this.width,
     height: height ?? this.height,
+    thumbPath: thumbPath ?? this.thumbPath,
+    psdLayers: psdLayers ?? this.psdLayers,
   );
 }

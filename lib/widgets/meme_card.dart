@@ -1,8 +1,8 @@
 import 'dart:io';
-import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:file_picker/file_picker.dart';
@@ -34,13 +34,22 @@ class _MemeCardState extends State<MemeCard> {
     _loadBytes();
   }
 
+  /// 实际用于显示的路径：PSD 用合成预览，其他用原路径
+  String get _displayPath {
+    if (widget.meme.isPsd && widget.meme.thumbPath != null) {
+      return widget.meme.thumbPath!;
+    }
+    return widget.meme.filePath;
+  }
+
   void _loadBytes() {
     if (!_loading) return;
     final storage = context.read<StorageService>();
-    if (widget.meme.isImageType && widget.meme.filePath.isNotEmpty) {
+    final m = widget.meme;
+    if (m.isImageType && _displayPath.isNotEmpty) {
       if (kIsWeb) {
         // Web：读 bytes
-        storage.readMemeBytes(widget.meme.filePath).then((b) {
+        storage.readMemeBytes(_displayPath).then((b) {
           if (mounted) {
             setState(() {
               _bytes = b;
@@ -53,7 +62,7 @@ class _MemeCardState extends State<MemeCard> {
         });
       } else {
         // 原生：用 File 直接显示，避免一次性载入大文件字节
-        final f = storage.getMemeFile(widget.meme.filePath);
+        final f = storage.getMemeFile(_displayPath);
         if (f == null) {
           if (mounted) setState(() { _loading = false; });
           return;
@@ -75,15 +84,12 @@ class _MemeCardState extends State<MemeCard> {
     }
   }
 
-  Future<void> _loadAspectRatioFromBytes(Uint8List bytes) async {
-    // Web 上仍用 codec 解码，Web 文件通常不大
+  void _loadAspectRatioFromBytes(Uint8List bytes) {
+    // 从文件头解析宽高，不解码整图（避免 OOM）
     try {
-      final codec = await ui.instantiateImageCodec(bytes);
-      final frame = await codec.getNextFrame();
-      final w = frame.image.width;
-      final h = frame.image.height;
-      if (mounted && w > 0 && h > 0) {
-        setState(() => _aspectRatio = w / h);
+      final dims = StorageService.parseImageDimensionsFromHeader(bytes);
+      if (dims != null && dims.width > 0 && dims.height > 0 && mounted) {
+        setState(() => _aspectRatio = dims.width / dims.height);
       }
     } catch (_) {}
   }
@@ -92,7 +98,7 @@ class _MemeCardState extends State<MemeCard> {
     // 原生端只读 64KB 头部解析宽高，不解码整图
     try {
       final storage = context.read<StorageService>();
-      final ratio = await storage.getImageAspectRatio(widget.meme.filePath);
+      final ratio = await storage.getImageAspectRatio(_displayPath);
       if (mounted && ratio != null && ratio > 0 && ratio.isFinite) {
         setState(() => _aspectRatio = ratio);
       }
@@ -284,22 +290,72 @@ class _MemeCardState extends State<MemeCard> {
     );
   }
 
-  /// 统一的缩略图渲染：原生端用 Image.file（不读字节），Web 端用 Image.memory
+  /// 统一的缩略图渲染：SVG 用 SvgPicture，其他用 Image.file/memory（带 cacheWidth 防止 OOM）
   Widget _buildThumbnail({required BoxFit fit}) {
+    // SVG 矢量图：用 flutter_svg 渲染，无限缩放不失真
+    if (widget.meme.isVector) {
+      if (_file != null) {
+        return SvgPicture.file(
+          _file!,
+          fit: fit,
+          placeholderBuilder: (_) => _placeholder(),
+        );
+      }
+      if (_bytes != null) {
+        return SvgPicture.memory(
+          _bytes!,
+          fit: fit,
+          placeholderBuilder: (_) => _placeholder(),
+        );
+      }
+      return _placeholder();
+    }
+    // PSD 没有合成预览时的占位
+    if (widget.meme.isPsd && _file == null && _bytes == null) {
+      return _psdPlaceholder();
+    }
+    // 普通位图：原生端用 Image.file，Web 端用 Image.memory，都加 cacheWidth
     if (_file != null) {
       return Image.file(
         _file!,
         fit: fit,
-        // 限制缓存尺寸，避免超大图片全分辨率缓存
+        // 限制缓存尺寸，避免超大图片全分辨率缓存导致 OOM
         cacheWidth: 512,
         errorBuilder: (_, _, _) => _placeholder(),
       );
     }
     if (_bytes != null) {
-      return Image.memory(_bytes!, fit: fit, errorBuilder: (_, _, _) => _placeholder());
+      return Image.memory(
+        _bytes!,
+        fit: fit,
+        // Web 端也加 cacheWidth，防止大图解码 OOM
+        cacheWidth: 512,
+        errorBuilder: (_, _, _) => _placeholder(),
+      );
     }
     return Container(color: Colors.grey.shade300);
   }
+
+  Widget _placeholder() => Container(
+    color: Colors.grey.shade200,
+    child: const Center(
+      child: Icon(Icons.broken_image_outlined, color: Colors.grey, size: 32),
+    ),
+  );
+
+  Widget _psdPlaceholder() => Container(
+    color: Colors.grey.shade100,
+    child: const Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.layers, color: Colors.grey, size: 32),
+          SizedBox(height: 4),
+          Text('PSD', style: TextStyle(fontSize: 10, color: Colors.grey)),
+        ],
+      ),
+    ),
+  );
 
   Widget _buildCard(BuildContext context, MemeProvider prov, bool isSelected, bool isMulti, ThemeData theme) {
     // 文字卡片：不用 Stack(fit: expand)，让内容自适应高度
@@ -617,11 +673,6 @@ class _MemeCardState extends State<MemeCard> {
     }
   }
 
-  Widget _placeholder() => Container(
-    color: Colors.grey.shade200,
-    child: Icon(Icons.broken_image, color: Colors.grey.shade400),
-  );
-
   String _typeLabel(String type) {
     final l10n = context.read<LocaleProvider>().l10n;
     switch (type) {
@@ -631,12 +682,20 @@ class _MemeCardState extends State<MemeCard> {
       case Meme.typePortrait: return l10n.tr('type_portrait');
       case Meme.typeCg: return l10n.tr('type_cg');
       case Meme.typeCharacterCard: return l10n.tr('type_character_card');
+      case Meme.typeVector: return l10n.tr('type_vector');
+      case Meme.typePsd: return l10n.tr('type_psd');
       default: return '';
     }
   }
 
   void _reimport() async {
-    final result = await FilePicker.platform.pickFiles(type: FileType.image);
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: [
+        'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp',
+        'svg', 'apng', 'psd',
+      ],
+    );
     if (result != null && result.files.isNotEmpty && mounted) {
       final file = result.files.first;
       final storage = context.read<StorageService>();

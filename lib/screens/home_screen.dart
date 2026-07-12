@@ -91,7 +91,7 @@ class _HomeScreenState extends State<HomeScreen> {
       drawer: _buildDrawer(context, prov),
       body: DropTarget(
         onDragDone: (detail) async {
-          final validExts = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'];
+          final validExts = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'apng', 'psd'];
           final files = detail.files.where((f) {
             return validExts.contains(f.name.split('.').last.toLowerCase());
           }).toList();
@@ -346,6 +346,8 @@ class _HomeScreenState extends State<HomeScreen> {
       {'type': Meme.typePortrait, 'label': l10n.tr('cat_portrait')},
       {'type': Meme.typeCg, 'label': l10n.tr('cat_cg')},
       {'type': Meme.typeCharacterCard, 'label': l10n.tr('cat_character_card')},
+      {'type': Meme.typeVector, 'label': l10n.tr('cat_vector')},
+      {'type': Meme.typePsd, 'label': l10n.tr('cat_psd')},
     ];
 
     return SizedBox(
@@ -490,7 +492,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _importFiles(BuildContext ctx, MemeProvider prov) async {
-    final result = await FilePicker.platform.pickFiles(allowMultiple: true, type: FileType.image);
+    final result = await FilePicker.platform.pickFiles(
+      allowMultiple: true,
+      type: FileType.custom,
+      allowedExtensions: [
+        'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp',
+        'svg', 'apng', 'psd',
+      ],
+    );
     if (result != null && result.files.isNotEmpty) {
       final settings = context.read<SettingsProvider>();
       await prov.importFiles(

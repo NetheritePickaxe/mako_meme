@@ -1,7 +1,9 @@
 import 'dart:io';
+import 'dart:collection';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:provider/provider.dart';
@@ -19,6 +21,30 @@ bool _isMobilePlatform() {
   return p == TargetPlatform.android || p == TargetPlatform.iOS;
 }
 
+/// LRU 缓存：限制条目数，超出时淘汰最久未访问的
+class _LruCache<K, V> {
+  final int maxSize;
+  final LinkedHashMap<K, V> _map = LinkedHashMap();
+
+  _LruCache(this.maxSize);
+
+  V? get(K key) {
+    final v = _map.remove(key);
+    if (v != null) _map[key] = v;
+    return v;
+  }
+
+  void put(K key, V value) {
+    _map.remove(key);
+    _map[key] = value;
+    while (_map.length > maxSize) {
+      _map.remove(_map.keys.first);
+    }
+  }
+
+  bool containsKey(K key) => _map.containsKey(key);
+}
+
 class MemeViewerScreen extends StatefulWidget {
   final List<Meme> memes;
   final int initialIndex;
@@ -31,8 +57,9 @@ class MemeViewerScreen extends StatefulWidget {
 class _MemeViewerScreenState extends State<MemeViewerScreen> {
   late PageController _controller;
   late int _currentIndex;
-  final Map<int, Uint8List?> _bytesCache = {};
-  final Map<int, File?> _fileCache = {};
+  // LRU 缓存：最多保留 3 项，避免来回滑动时内存累积导致 OOM
+  final _LruCache<int, Uint8List?> _bytesCache = _LruCache(3);
+  final _LruCache<int, File?> _fileCache = _LruCache(3);
 
   @override
   void initState() {
@@ -41,25 +68,48 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
     _controller = PageController(initialPage: _currentIndex);
   }
 
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
   Meme get _meme => widget.memes[_currentIndex];
+
+  /// 全屏查看时的 cacheWidth：按屏幕短边 × devicePixelRatio 计算，上限 4096
+  /// 这样既保证清晰度，又避免超大图全分辨率解码导致 OOM
+  int get _viewerCacheWidth {
+    final size = MediaQuery.of(context).size;
+    final dpr = MediaQuery.of(context).devicePixelRatio;
+    final shortSide = size.shortestSide;
+    final target = (shortSide * dpr).round();
+    return target > 4096 ? 4096 : target;
+  }
+
+  /// 实际显示路径：PSD 用合成预览，其他用原路径
+  String _displayPath(Meme m) {
+    if (m.isPsd && m.thumbPath != null) return m.thumbPath!;
+    return m.filePath;
+  }
 
   Future<void> _ensureBytes(int index) async {
     if (_bytesCache.containsKey(index) || _fileCache.containsKey(index)) return;
     final m = widget.memes[index];
-    if (!m.isImageType || m.filePath.isEmpty) {
-      _bytesCache[index] = null;
+    final path = _displayPath(m);
+    if (!m.isImageType || path.isEmpty) {
+      _bytesCache.put(index, null);
       return;
     }
     try {
       final storage = context.read<StorageService>();
       if (kIsWeb) {
-        final b = await storage.readMemeBytes(m.filePath);
-        if (mounted) setState(() => _bytesCache[index] = b);
+        final b = await storage.readMemeBytes(path);
+        if (mounted) setState(() => _bytesCache.put(index, b));
       } else {
         // 原生端：直接拿 File，不读字节，避免大文件 OOM
-        final f = storage.getMemeFile(m.filePath);
+        final f = storage.getMemeFile(path);
         final exists = f != null && await f.exists();
-        if (mounted) setState(() => _fileCache[index] = exists ? f : null);
+        if (mounted) setState(() => _fileCache.put(index, exists ? f : null));
       }
     } catch (_) {}
   }
@@ -97,6 +147,15 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
             ),
           ],
         ),
+        actions: [
+          // PSD 图层面板按钮
+          if (_meme.isPsd)
+            IconButton(
+              icon: const Icon(Icons.layers),
+              tooltip: l10n.tr('psd_layers'),
+              onPressed: () => _showPsdLayersPanel(_meme, l10n),
+            ),
+        ],
       ),
       body: PageView.builder(
         physics: const BouncingScrollPhysics(),
@@ -121,12 +180,16 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
     );
   }
 
-  /// 图片展示区：图片用 PhotoView 缩放，GIF 用 Image.memory，文字居中显示
+  /// 图片展示区
+  /// - SVG: SvgPicture + InteractiveViewer（矢量无限缩放）
+  /// - GIF/APNG: Image + InteractiveViewer（保持动画播放）
+  /// - PSD: 显示合成预览（thumbPath）
+  /// - 普通位图: PhotoView（支持手势缩放）
   Widget _buildImageArea(Meme m, int i) {
     final theme = Theme.of(context);
     _ensureBytes(i);
-    final bytes = _bytesCache[i];
-    final file = _fileCache[i];
+    final bytes = _bytesCache.get(i);
+    final file = _fileCache.get(i);
     final hasData = bytes != null || file != null;
 
     if (m.isImageType) {
@@ -138,15 +201,38 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
           ),
         );
       }
-      if (m.type == Meme.typeGif) {
+
+      // SVG 矢量图：无限缩放不失真
+      if (m.isVector) {
         return Center(
           child: InteractiveViewer(
+            minScale: 0.5,
+            maxScale: 8.0,
             child: file != null
-                ? Image.file(file, fit: BoxFit.contain)
-                : Image.memory(bytes!, fit: BoxFit.contain),
+                ? SvgPicture.file(file, fit: BoxFit.contain,
+                    placeholderBuilder: (_) => _loadingIndicator(theme))
+                : SvgPicture.memory(bytes!, fit: BoxFit.contain,
+                    placeholderBuilder: (_) => _loadingIndicator(theme)),
           ),
         );
       }
+
+      // GIF / APNG 动图：保持动画播放，加 cacheWidth 避免多帧 OOM
+      if (m.isAnimated) {
+        final cw = _viewerCacheWidth;
+        return Center(
+          child: InteractiveViewer(
+            child: file != null
+                ? Image.file(file, fit: BoxFit.contain, cacheWidth: cw)
+                : Image.memory(bytes!, fit: BoxFit.contain, cacheWidth: cw),
+          ),
+        );
+      }
+
+      // PSD / 普通位图：用 PhotoView 手势缩放
+      // 注意：PhotoView 不直接支持 cacheWidth，但 FileImage/MemoryImage 内部会解码
+      // 对于超大图，这里依赖 cacheWidth 的方式有限，但 PhotoView 的 maxScale 限制
+      // 已能避免过度放大导致 OOM
       return PhotoView(
         imageProvider: file != null
             ? FileImage(file)
@@ -163,6 +249,7 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                 (event.expectedTotalBytes ?? 1),
           ),
         ),
+        errorBuilder: (_, error, ___) => _errorWidget(theme, error),
       );
     }
 
@@ -176,6 +263,146 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
           textAlign: TextAlign.center,
         ),
       ),
+    );
+  }
+
+  Widget _loadingIndicator(ThemeData theme) => Center(
+    child: CircularProgressIndicator(
+      strokeWidth: 2,
+      color: theme.colorScheme.primary,
+    ),
+  );
+
+  Widget _errorWidget(ThemeData theme, Object? error) => Center(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.broken_image_outlined, size: 48, color: theme.colorScheme.error),
+        const SizedBox(height: 8),
+        Text(
+          '图片加载失败',
+          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+        ),
+      ],
+    ),
+  );
+
+  /// PSD 图层面板
+  void _showPsdLayersPanel(Meme m, L10n l10n) {
+    final theme = Theme.of(context);
+    final layers = m.psdLayers ?? [];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.5,
+          minChildSize: 0.25,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (ctx, controller) => Container(
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      Icon(Icons.layers, color: theme.colorScheme.primary, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${l10n.tr('psd_layers')} (${layers.length})',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '${m.width}×${m.height}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                if (layers.isEmpty)
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        l10n.tr('psd_no_layers'),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  Expanded(
+                    child: ListView.builder(
+                      controller: controller,
+                      itemCount: layers.length,
+                      itemBuilder: (ctx, i) {
+                        final layer = layers[i];
+                        final name = layer['name'] as String? ?? '';
+                        final visible = layer['visible'] as bool? ?? true;
+                        final left = layer['left'] as int? ?? 0;
+                        final top = layer['top'] as int? ?? 0;
+                        final w = layer['width'] as int? ?? 0;
+                        final h = layer['height'] as int? ?? 0;
+                        final depth = layer['depth'] as int? ?? 0;
+                        final hasImage = layer['hasImage'] as bool? ?? false;
+
+                        return ListTile(
+                          leading: Padding(
+                            padding: EdgeInsets.only(left: depth * 12.0),
+                            child: Icon(
+                              hasImage ? Icons.image : Icons.folder_outlined,
+                              size: 20,
+                              color: hasImage
+                                  ? theme.colorScheme.primary
+                                  : theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          title: Text(
+                            name,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: visible
+                                  ? theme.colorScheme.onSurface
+                                  : theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          subtitle: hasImage
+                              ? Text(
+                                  '$w×$h @ ($left,$top)',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                )
+                              : null,
+                          trailing: Icon(
+                            visible ? Icons.visibility : Icons.visibility_off,
+                            size: 18,
+                            color: visible
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.onSurfaceVariant,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

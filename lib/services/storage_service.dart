@@ -14,6 +14,7 @@ import 'character_card_service.dart';
 import 'storage_platform.dart';
 import 'webdav_service.dart';
 import 'admin_service.dart';
+import 'psd_service.dart';
 
 /// 图片宽高信息
 class ImageDimensions {
@@ -432,7 +433,57 @@ class StorageService {
       await _saveMeme(meme, fileHash);
     }
 
+    // PSD 解析：提取合成预览 + 图层信息
+    if (memeType == Meme.typePsd) {
+      meme = await _processPsdImport(meme, file, bytes, fileHash);
+    }
+
     return meme;
+  }
+
+  /// PSD 导入后处理：解析图层，生成合成预览 PNG
+  Future<Meme> _processPsdImport(
+    Meme meme,
+    PlatformFile file,
+    Uint8List? inMemoryBytes,
+    String? fileHash,
+  ) async {
+    try {
+      Uint8List? psdBytes;
+      if (inMemoryBytes != null) {
+        psdBytes = inMemoryBytes;
+      } else if (file.path != null && !kIsWeb) {
+        psdBytes = await File(file.path!).readAsBytes();
+      }
+      if (psdBytes == null) return meme;
+
+      final result = PsdService.parse(psdBytes);
+      if (result == null) return meme;
+
+      // 保存合成预览 PNG
+      String? thumbPath;
+      if (result.compositePng != null && !kIsWeb) {
+        final thumbName = '${meme.id}_composite.png';
+        thumbPath = 'memes/$thumbName';
+        final dest = File(p.join(_basePath!, thumbPath));
+        await dest.create(recursive: true);
+        await dest.writeAsBytes(result.compositePng!);
+      } else if (result.compositePng != null && kIsWeb) {
+        thumbPath = 'memes/${meme.id}_composite';
+        await webStorageSetBinary(thumbPath, result.compositePng!);
+      }
+
+      final updated = meme.copyWith(
+        thumbPath: thumbPath,
+        psdLayers: result.layers,
+        width: result.width,
+        height: result.height,
+      );
+      await _saveMeme(updated, fileHash);
+      return updated;
+    } catch (_) {
+      return meme;
+    }
   }
 
   Future<void> _saveMeme(Meme meme, String? fileHash) async {
@@ -498,9 +549,17 @@ class StorageService {
     }
   }
 
-  /// 从文件头字节解析图片宽高（支持 PNG/JPEG/GIF/BMP/WEBP）
+  /// 公开接口：从字节头解析图片宽高（不解码整图，避免 OOM）
+  static ImageDimensions? parseImageDimensionsFromHeader(Uint8List bytes) =>
+      _parseImageDimensionsFromHeader(bytes);
+
+  /// 从文件头字节解析图片宽高（支持 PNG/JPEG/GIF/BMP/WEBP/SVG）
   static ImageDimensions? _parseImageDimensionsFromHeader(Uint8List bytes) {
     if (bytes.length < 12) return null;
+    // SVG: 文本 "<?xml" 或 "<svg"
+    if (bytes[0] == 0x3C && (bytes[1] == 0x3F || bytes[1] == 0x73)) {
+      return _parseSvgDimensions(bytes);
+    }
     // PNG: 89 50 4E 47 0D 0A 1A 0A
     if (bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47) {
       if (bytes.length < 24) return null;
@@ -576,6 +635,53 @@ class StorageService {
       i += 2 + segLen;
     }
     return null;
+  }
+
+  /// 解析 SVG 宽高：优先 width/height 属性，其次 viewBox
+  static ImageDimensions? _parseSvgDimensions(Uint8List bytes) {
+    // 仅读前 16KB，足够找到 <svg> 头部属性
+    final len = bytes.length < 16 * 1024 ? bytes.length : 16 * 1024;
+    final head = String.fromCharCodes(bytes.sublist(0, len));
+    final svgStart = head.indexOf('<svg');
+    if (svgStart < 0) return null;
+    // 截到 <svg> 标签结束（首个 '>'）
+    final tagEnd = head.indexOf('>', svgStart);
+    final tag = tagEnd < 0 ? head.substring(svgStart) : head.substring(svgStart, tagEnd + 1);
+
+    double? w = _parseSvgLength(_extractAttr(tag, 'width'));
+    double? h = _parseSvgLength(_extractAttr(tag, 'height'));
+    // 回退到 viewBox="minx miny w h"
+    if ((w == null || w <= 0 || h == null || h <= 0)) {
+      final vb = _extractAttr(tag, 'viewBox');
+      if (vb != null) {
+        final parts = vb.split(RegExp(r'[\s,]+')).where((s) => s.isNotEmpty).toList();
+        if (parts.length >= 4) {
+          final vw = double.tryParse(parts[2]);
+          final vh = double.tryParse(parts[3]);
+          if (vw != null && vw > 0 && vh != null && vh > 0) {
+            w = w ?? vw;
+            h = h ?? vh;
+          }
+        }
+      }
+    }
+    if (w == null || w <= 0 || h == null || h <= 0) return null;
+    return ImageDimensions(w.toInt(), h.toInt());
+  }
+
+  static String? _extractAttr(String tag, String name) {
+    final m = RegExp('$name="([^"]*)"').firstMatch(tag);
+    if (m != null) return m.group(1);
+    final m2 = RegExp("$name='([^']*)'").firstMatch(tag);
+    return m2?.group(1);
+  }
+
+  static double? _parseSvgLength(String? s) {
+    if (s == null || s.isEmpty) return null;
+    // 去除单位（px/pt/in/mm/cm/% 等）
+    final m = RegExp(r'^([\d.]+)').firstMatch(s.trim());
+    if (m == null) return null;
+    return double.tryParse(m.group(1)!);
   }
 
   Future<List<Meme>> importFiles(List<PlatformFile> files, {String? folderId, bool autoClassify = false, double classifyRatio = 1.1}) async {
@@ -1219,10 +1325,13 @@ class StorageService {
   String _guessMime(String ext) {
     switch (ext) {
       case '.png': return 'image/png';
+      case '.apng': return 'image/apng';
       case '.jpg': case '.jpeg': return 'image/jpeg';
       case '.gif': return 'image/gif';
       case '.webp': return 'image/webp';
       case '.bmp': return 'image/bmp';
+      case '.svg': return 'image/svg+xml';
+      case '.psd': return 'image/vnd.adobe.photoshop';
       default: return 'image/png';
     }
   }
@@ -1234,7 +1343,12 @@ class StorageService {
   }
 
   String _guessType(String ext) {
-    if (ext == '.gif') return Meme.typeGif;
-    return Meme.typeImage;
+    switch (ext) {
+      case '.gif': return Meme.typeGif;
+      case '.apng': return Meme.typeGif; // APNG 当动图处理
+      case '.svg': return Meme.typeVector;
+      case '.psd': return Meme.typePsd;
+      default: return Meme.typeImage;
+    }
   }
 }
