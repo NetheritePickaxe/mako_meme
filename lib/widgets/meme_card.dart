@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:file_picker/file_picker.dart';
@@ -688,8 +689,23 @@ class _MemeCardState extends State<MemeCard> {
     ));
   }
 
-  void _shareMeme() {
-    Share.share(widget.meme.name);
+  Future<void> _shareMeme() async {
+    final m = widget.meme;
+    final storage = context.read<StorageService>();
+    if (kIsWeb) {
+      // Web：从内存读取字节分享
+      final bytes = await storage.readMemeBytes(m.filePath);
+      if (bytes == null) return;
+      final ext = p.extension(m.filePath).replaceFirst('.', '');
+      await Share.shareXFiles([
+        XFile.fromData(bytes, name: '${m.name}.$ext', mimeType: 'image/$ext'),
+      ]);
+    } else {
+      // 原生：直接分享文件
+      final file = storage.getMemeFile(m.filePath);
+      if (file == null || !await file.exists()) return;
+      await Share.shareXFiles([XFile(file.path)]);
+    }
   }
 
   void _showContextMenu(Offset tapPosition) {

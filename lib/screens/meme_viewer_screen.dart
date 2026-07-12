@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:photo_view/photo_view.dart';
+import 'package:path/path.dart' as p;
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
@@ -1525,8 +1526,23 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
     );
   }
 
-  void _share() {
-    Share.share(_meme.name);
+  Future<void> _share() async {
+    final m = _meme;
+    final storage = context.read<StorageService>();
+    if (kIsWeb) {
+      // Web：从内存读取字节分享
+      final bytes = await storage.readMemeBytes(m.filePath);
+      if (bytes == null) return;
+      final ext = p.extension(m.filePath).replaceFirst('.', '');
+      await Share.shareXFiles([
+        XFile.fromData(bytes, name: '${m.name}.$ext', mimeType: 'image/$ext'),
+      ]);
+    } else {
+      // 原生：直接分享文件
+      final file = storage.getMemeFile(m.filePath);
+      if (file == null || !await file.exists()) return;
+      await Share.shareXFiles([XFile(file.path)]);
+    }
   }
 
   void _rename() async {
