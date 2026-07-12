@@ -19,6 +19,12 @@ on:
     tags: ["v*"]
   pull_request:
     branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "触发原因（可选）"
+        required: false
+        default: "手动触发"
 
 env:
   FLUTTER_VERSION: "3.44.2"

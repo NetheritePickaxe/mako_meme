@@ -689,7 +689,7 @@ class _HomeScreenState extends State<HomeScreen> {
         .toList();
 
     return SizedBox(
-      height: 40,
+      height: 44,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -733,7 +733,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// 圆形（stadium）分类按钮 — 纯文字，无图标
+  /// 胶囊状分类按钮 — 纯文字，无图标，文字水平垂直居中
   Widget _buildRoundedChip({
     required BuildContext context,
     required String label,
@@ -746,15 +746,17 @@ class _HomeScreenState extends State<HomeScreen> {
           ? colorScheme.primary
           : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
       shape: const StadiumBorder(),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        customBorder: const StadiumBorder(),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+          alignment: Alignment.center,
           child: Text(label, style: TextStyle(
             fontSize: 13,
             fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
             color: selected ? colorScheme.onPrimary : colorScheme.onSurface,
+            height: 1.0,
           )),
         ),
       ),
