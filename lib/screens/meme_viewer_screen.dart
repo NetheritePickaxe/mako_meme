@@ -64,6 +64,10 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
   final _LruCache<int, Uint8List?> _bytesCache = _LruCache(3);
   final _LruCache<int, File?> _fileCache = _LruCache(3);
 
+  // 详情面板当前占据屏幕高度的比例（0.0~1.0）
+  // 拖动面板时实时更新，图片区域随之收缩，保证图片始终可见
+  double _panelExtent = 0.45;
+
   // 漫画内部页面滑动
   int _mangaPageIndex = 0;
   final _LruCache<String, Uint8List?> _mangaBytesCache = _LruCache(3);
@@ -192,16 +196,31 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
         }),
         itemBuilder: (ctx, i) {
           final m = widget.memes[i];
+          final screenHeight = MediaQuery.sizeOf(context).height;
+          // 图片区域底部留出面板高度的空白，拖动面板时图片随之收缩
+          final panelHeight = _panelExtent * screenHeight;
           // 使用 Stack 让面板覆盖在图片上方，避免 Column 无界高度导致 DraggableScrollableSheet 失效
           // Align(bottomCenter) 让面板固定在底部并可正确计算高度
-          return Stack(
-            children: [
-              Positioned.fill(child: _buildImageArea(m, i)),
-              Align(
-                alignment: Alignment.bottomCenter,
-                child: _buildDraggableDetailPanel(theme, prov, m, l10n),
-              ),
-            ],
+          return NotificationListener<DraggableScrollableNotification>(
+            onNotification: (notification) {
+              final newExtent = notification.extent;
+              if ((newExtent - _panelExtent).abs() > 0.005) {
+                setState(() => _panelExtent = newExtent);
+              }
+              return false;
+            },
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  bottom: panelHeight,
+                  child: _buildImageArea(m, i),
+                ),
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: _buildDraggableDetailPanel(theme, prov, m, l10n),
+                ),
+              ],
+            ),
           );
         },
       ),
@@ -963,32 +982,62 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                     _infoChip(theme, _formatDate(m.createdAt), icon: Icons.access_time),
                   ],
                 ),
-                // Tag 区域：tagSubdivision 开启时双列（情绪+普通），否则单列只读
+                // Tag 区域：tagSubdivision 开启时双列（情绪+普通），否则单列可编辑
                 if (settings.tagSubdivision) ...[
                   const SizedBox(height: 8),
                   _buildTagEditorSection(theme, l10n, prov, m),
-                ] else if (m.tags.isNotEmpty || m.hasMoods) ...[
+                ] else ...[
                   const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
+                  Row(
                     children: [
-                      ...m.tags.map((t) => Chip(
-                        label: Text(t, style: const TextStyle(fontSize: 11)),
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                      )),
-                      ...m.moods.map((mo) => Chip(
-                        label: Text('${mo['name']} ${_moodWeightStars(mo['weight'] as int)}',
-                            style: const TextStyle(fontSize: 11)),
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        backgroundColor: theme.colorScheme.tertiaryContainer,
-                      )),
+                      Icon(Icons.label, size: 14, color: theme.colorScheme.primary),
+                      const SizedBox(width: 4),
+                      Text(l10n.tr('content_tags'),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: theme.colorScheme.primary,
+                        )),
+                      const Spacer(),
+                      InkWell(
+                        onTap: () => _showAddTagDialog(theme, l10n, prov, m),
+                        child: Padding(
+                          padding: const EdgeInsets.all(2),
+                          child: Icon(Icons.add, size: 16, color: theme.colorScheme.primary),
+                        ),
+                      ),
                     ],
                   ),
+                  const SizedBox(height: 4),
+                  if (m.tags.isEmpty && m.moods.isEmpty)
+                    Text(l10n.tr('no_content_tags'),
+                      style: TextStyle(fontSize: 10, color: theme.colorScheme.outline))
+                  else
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        ...m.tags.map((t) => InputChip(
+                          label: Text(t, style: const TextStyle(fontSize: 11)),
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          onDeleted: () => prov.removeTag(m.id, t),
+                          onPressed: () => _showAddTagDialog(theme, l10n, prov, m, initialTag: t),
+                        )),
+                        ...m.moods.map((mo) => InputChip(
+                          label: Text('${mo['name']} ${_moodWeightStars(mo['weight'] as int)}',
+                              style: const TextStyle(fontSize: 11)),
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          backgroundColor: theme.colorScheme.tertiaryContainer,
+                          onDeleted: () => prov.removeMood(m.id, mo['name'] as String),
+                          onPressed: () => _showEditMoodDialog(theme, l10n, prov, m,
+                              mo['name'] as String, mo['weight'] as int),
+                        )),
+                      ],
+                    ),
                 ],
                 const SizedBox(height: 12),
                 // 操作按钮（移动端图片不显示复制）
@@ -1010,7 +1059,6 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                     _actionButton(theme, l10n.tr('select_category'), Icons.label_outline, _showTypeDialog),
                     if (m.isTextLike)
                       _actionButton(theme, l10n.tr('edit'), Icons.edit_note, () => _editText(m)),
-                    _actionButton(theme, l10n.tr('rename'), Icons.edit, _rename),
                     _actionButton(theme, l10n.tr('delete'), Icons.delete_outline, _confirmDelete, color: Colors.red),
                   ],
                 ),
@@ -1508,7 +1556,8 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
 
   void _showTypeDialog() {
     final l10n = context.read<LocaleProvider>().l10n;
-    final types = [
+    final settings = context.read<SettingsProvider>();
+    final allTypes = [
       {'type': Meme.typeEmoji, 'label': l10n.tr('type_emoji'), 'icon': Icons.face},
       {'type': Meme.typeGif, 'label': l10n.tr('type_gif'), 'icon': Icons.gif},
       {'type': Meme.typeImage, 'label': l10n.tr('type_image'), 'icon': Icons.image},
@@ -1519,6 +1568,11 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
       {'type': Meme.typeCg, 'label': l10n.tr('type_cg'), 'icon': Icons.photo_library},
       {'type': Meme.typeCharacterCard, 'label': l10n.tr('type_character_card'), 'icon': Icons.person_outline},
     ];
+    // 仅显示已启用的分类 + 当前 meme 所属分类（即便被隐藏也可保持）
+    final types = allTypes.where((t) {
+      final type = t['type'] as String;
+      return settings.isCategoryVisible(type) || _meme.type == type;
+    }).toList();
 
     showDialog(
       context: context,

@@ -1,5 +1,7 @@
 {
-  "search_hint": "搜索 / #标签 @文件夹 *通配符",
+  "search_hint": "搜索名称或标签，输入 / 查看命令",
+  "search_folder_hint": "搜索文件夹",
+  "search_mood_hint": "搜索情绪",
   "search_help_title": "搜索帮助",
   "close": "关闭",
   "command_mode_hint": "命令模式：按回车执行",

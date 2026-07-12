@@ -338,22 +338,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
       contentPadding: const EdgeInsets.symmetric(horizontal: 16),
       leading: const Icon(Icons.language),
       title: Text(l10n.tr('language')),
-      trailing: DropdownButton<String>(
-        value: currentValue,
-        underline: const SizedBox(),
-        isDense: true,
-        style: Theme.of(context).textTheme.bodyLarge,
-        items: sorted
-            .map((e) => DropdownMenuItem(value: e.$1, child: Text(e.$2)))
-            .toList(),
-        onChanged: (val) {
-          if (val == null) return;
-          final parts = val.split('_');
-          final locale = parts.length == 2
-              ? Locale(parts[0], parts[1])
-              : Locale(parts[0]);
-          localeProv.setLocale(locale);
-        },
+      trailing: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: DropdownButton<String>(
+          value: currentValue,
+          underline: const SizedBox(),
+          isDense: true,
+          style: Theme.of(context).textTheme.bodyLarge,
+          borderRadius: BorderRadius.circular(16),
+          items: sorted
+              .map((e) => DropdownMenuItem(value: e.$1, child: Text(e.$2)))
+              .toList(),
+          onChanged: (val) {
+            if (val == null) return;
+            final parts = val.split('_');
+            final locale = parts.length == 2
+                ? Locale(parts[0], parts[1])
+                : Locale(parts[0]);
+            localeProv.setLocale(locale);
+          },
+        ),
       ),
     );
   }
@@ -402,16 +410,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
       subtitle: Text(settings.gridColumns == 0
           ? l10n.tr('auto_col')
           : l10n.tr('n_columns', args: {'count': settings.gridColumns.toString()})),
-      trailing: DropdownButton<int>(
-        value: settings.gridColumns,
-        items: List.generate(options.length, (i) {
-          final v = options[i];
-          return DropdownMenuItem(
-            value: v,
-            child: Text(v == 0 ? l10n.tr('auto_col') : '$v'),
-          );
-        }),
-        onChanged: (v) { if (v != null) settings.setGridColumns(v); },
+      trailing: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: DropdownButton<int>(
+          value: settings.gridColumns,
+          underline: const SizedBox(),
+          isDense: true,
+          borderRadius: BorderRadius.circular(16),
+          items: List.generate(options.length, (i) {
+            final v = options[i];
+            return DropdownMenuItem(
+              value: v,
+              child: Text(v == 0 ? l10n.tr('auto_col') : '$v'),
+            );
+          }),
+          onChanged: (v) { if (v != null) settings.setGridColumns(v); },
+        ),
       ),
     );
   }

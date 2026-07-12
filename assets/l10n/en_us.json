@@ -1,5 +1,7 @@
 {
-  "search_hint": "Search / #tag @folder *wildcard",
+  "search_hint": "Search name or tag, type / for commands",
+  "search_folder_hint": "Search folders",
+  "search_mood_hint": "Search moods",
   "search_help_title": "Search Help",
   "close": "Close",
   "command_mode_hint": "Command mode: press Enter to execute",

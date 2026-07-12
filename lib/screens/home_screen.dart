@@ -30,16 +30,14 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   bool _dragOver = false;
-  // 0=表情包, 1=文件夹, 2=收藏, 3=情绪, 4=设置
+  // 0=表情包, 1=文件夹, 2=收藏, 3=情绪（仅 tagSubdivision 开启时可用）
   int _currentTab = 0;
+  // 文件夹/情绪页面的本地搜索关键字
+  String _folderQuery = '';
+  String _moodQuery = '';
 
   void _onTabChanged(int i) {
     final prov = context.read<MemeProvider>();
-    if (i == 4) {
-      // 设置：打开设置页，不切换标签
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
-      return;
-    }
     prov.clearPreviewMeme();
     setState(() {
       _currentTab = i;
@@ -64,6 +62,10 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  void _openSettings() {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+  }
+
   @override
   Widget build(BuildContext context) {
     final prov = context.watch<MemeProvider>();
@@ -71,6 +73,16 @@ class _HomeScreenState extends State<HomeScreen> {
     final theme = Theme.of(context);
     final settings = context.watch<SettingsProvider>();
     final hasBg = settings.hasCustomBg;
+    // 情绪页仅在 tag 细分开启时显示
+    final showMoodTab = settings.tagSubdivision;
+    // 若 tag 细分被关闭但当前在情绪页，回退到表情包页
+    if (!showMoodTab && _currentTab == 3) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _onTabChanged(0);
+      });
+    }
+    // 实际 selectedIndex 需要跳过被隐藏的情绪标签
+    final navIndex = _currentTab == 3 ? 3 : _currentTab.clamp(0, showMoodTab ? 3 : 2);
 
     return Scaffold(
       backgroundColor: hasBg ? Colors.transparent : theme.colorScheme.surface,
@@ -84,10 +96,10 @@ class _HomeScreenState extends State<HomeScreen> {
           child: MultiSelectBar(),
         ) : null,
       ),
-      drawer: _currentTab == 0 ? _buildDrawer(context, prov) : null,
+      drawer: _buildDrawer(context, prov),
       body: _buildBackgroundedBody(prov, l10n),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentTab,
+        selectedIndex: navIndex,
         onDestinationSelected: _onTabChanged,
         destinations: [
           NavigationDestination(
@@ -105,16 +117,12 @@ class _HomeScreenState extends State<HomeScreen> {
             selectedIcon: Icon(Icons.favorite, color: theme.colorScheme.onSurface),
             label: l10n.tr('favorites'),
           ),
-          NavigationDestination(
-            icon: const Icon(Icons.mood_outlined),
-            selectedIcon: Icon(Icons.mood, color: theme.colorScheme.onSurface),
-            label: l10n.tr('nav_moods'),
-          ),
-          NavigationDestination(
-            icon: const Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings, color: theme.colorScheme.onSurface),
-            label: l10n.tr('settings'),
-          ),
+          if (showMoodTab)
+            NavigationDestination(
+              icon: const Icon(Icons.mood_outlined),
+              selectedIcon: Icon(Icons.mood, color: theme.colorScheme.onSurface),
+              label: l10n.tr('nav_moods'),
+            ),
         ],
       ),
       floatingActionButton: _buildFab(prov),
@@ -138,16 +146,14 @@ class _HomeScreenState extends State<HomeScreen> {
         onPressed: () => prov.setMoodFilter(null),
       );
     }
-    if (_currentTab == 0) {
-      return Builder(
-        builder: (ctx) => IconButton(
-          icon: const Icon(Icons.menu),
-          tooltip: l10n.tr('menu'),
-          onPressed: () => Scaffold.of(ctx).openDrawer(),
-        ),
-      );
-    }
-    return const SizedBox.shrink();
+    // 所有页面都有侧边栏按钮
+    return Builder(
+      builder: (ctx) => IconButton(
+        icon: const Icon(Icons.menu),
+        tooltip: l10n.tr('menu'),
+        onPressed: () => Scaffold.of(ctx).openDrawer(),
+      ),
+    );
   }
 
   List<Widget> _buildActions(MemeProvider prov, L10n l10n) {
@@ -240,69 +246,96 @@ class _HomeScreenState extends State<HomeScreen> {
       });
       return bw.compareTo(aw);
     });
+    // 按搜索关键字过滤情绪名
+    final filteredMoods = _moodQuery.isEmpty
+        ? moods
+        : moods.where((name) => name.toLowerCase().contains(_moodQuery.toLowerCase())).toList();
 
-    return GridView.builder(
-      padding: const EdgeInsets.all(12),
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 180,
-        childAspectRatio: 1.2,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
-      ),
-      itemCount: moods.length,
-      itemBuilder: (ctx, i) {
-        final moodName = moods[i];
-        final memes = moodGroups[moodName]!;
-        final totalWeight = memes.fold<int>(0, (sum, m) {
-          return sum + (m.moods.firstWhere((mo) => mo['name'] == moodName,
-              orElse: () => {'weight': 0})['weight'] as int);
-        });
-        return Card(
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: () => prov.setMoodFilter(moodName),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.mood, size: 32, color: theme.colorScheme.tertiary),
-                  const SizedBox(height: 8),
-                  Text(
-                    moodName,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${memes.length} ${l10n.tr('items_count')}',
-                    style: TextStyle(fontSize: 12, color: theme.colorScheme.outline),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.star, size: 12, color: theme.colorScheme.tertiary),
-                      const SizedBox(width: 2),
-                      Text(
-                        '$totalWeight',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: theme.colorScheme.tertiary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+    return Column(
+      children: [
+        // 搜索栏（情绪名搜索）
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: TextField(
+            onChanged: (v) => setState(() => _moodQuery = v),
+            decoration: InputDecoration(
+              hintText: l10n.tr('search_mood_hint'),
+              prefixIcon: const Icon(Icons.search),
+              filled: true,
+              fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(28),
+                borderSide: BorderSide.none,
               ),
             ),
           ),
-        );
-      },
+        ),
+        Expanded(
+          child: GridView.builder(
+            padding: const EdgeInsets.all(12),
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 180,
+              childAspectRatio: 1.2,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+            ),
+            itemCount: filteredMoods.length,
+            itemBuilder: (ctx, i) {
+              final moodName = filteredMoods[i];
+              final memes = moodGroups[moodName]!;
+              final totalWeight = memes.fold<int>(0, (sum, m) {
+                return sum + (m.moods.firstWhere((mo) => mo['name'] == moodName,
+                    orElse: () => {'weight': 0})['weight'] as int);
+              });
+              return Card(
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: () => prov.setMoodFilter(moodName),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.mood, size: 32, color: theme.colorScheme.tertiary),
+                        const SizedBox(height: 8),
+                        Text(
+                          moodName,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${memes.length} ${l10n.tr('items_count')}',
+                          style: TextStyle(fontSize: 12, color: theme.colorScheme.outline),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.star, size: 12, color: theme.colorScheme.tertiary),
+                            const SizedBox(width: 2),
+                            Text(
+                              '$totalWeight',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: theme.colorScheme.tertiary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -484,6 +517,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildFoldersGrid(MemeProvider prov) {
     final settings = context.watch<SettingsProvider>();
     final l10n = context.read<LocaleProvider>().l10n;
+    final theme = Theme.of(context);
     final width = MediaQuery.sizeOf(context).width;
     final cols = settings.gridColumns > 0
         ? settings.gridColumns
@@ -494,30 +528,59 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.folder_open, size: 64, color: Theme.of(context).colorScheme.outline),
+            Icon(Icons.folder_open, size: 64, color: theme.colorScheme.outline),
             const SizedBox(height: 16),
-            Text(l10n.tr('no_folders'), style: TextStyle(fontSize: 18, color: Theme.of(context).colorScheme.outline)),
+            Text(l10n.tr('no_folders'), style: TextStyle(fontSize: 18, color: theme.colorScheme.outline)),
           ],
         ),
       );
     }
 
-    return MasonryGridView.count(
-      crossAxisCount: cols,
-      mainAxisSpacing: 8,
-      crossAxisSpacing: 8,
-      padding: const EdgeInsets.all(8),
-      itemCount: prov.folders.length,
-      itemBuilder: (ctx, i) {
-        final f = prov.folders[i];
-        return FolderCard(
-          folder: f,
-          count: prov.countInFolder(f.id),
-          isActive: prov.folderId == f.id,
-          onSelected: () => setState(() => _currentTab = 0),
-        );
-      },
+    return Column(
+      children: [
+        // 搜索栏（文件夹名搜索）
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: TextField(
+            onChanged: (v) => setState(() => _folderQuery = v),
+            decoration: InputDecoration(
+              hintText: l10n.tr('search_folder_hint'),
+              prefixIcon: const Icon(Icons.search),
+              filled: true,
+              fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(28),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+        ),
+        Expanded(
+          child: MasonryGridView.count(
+            crossAxisCount: cols,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            padding: const EdgeInsets.all(8),
+            itemCount: _filteredFolders(prov).length,
+            itemBuilder: (ctx, i) {
+              final f = _filteredFolders(prov)[i];
+              return FolderCard(
+                folder: f,
+                count: prov.countInFolder(f.id),
+                isActive: prov.folderId == f.id,
+                onSelected: () => setState(() => _currentTab = 0),
+              );
+            },
+          ),
+        ),
+      ],
     );
+  }
+
+  List<MemeFolder> _filteredFolders(MemeProvider prov) {
+    if (_folderQuery.isEmpty) return prov.folders;
+    final q = _folderQuery.toLowerCase();
+    return prov.folders.where((f) => f.name.toLowerCase().contains(q)).toList();
   }
 
   Widget _buildDrawer(BuildContext context, MemeProvider prov) {
@@ -603,17 +666,31 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     ),
             ),
-            // 底部：新建文件夹
+            // 底部：新建文件夹 + 设置
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              child: ListTile(
-                leading: const Icon(Icons.create_new_folder_outlined),
-                title: Text(l10n.tr('new_folder')),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showCreateFolderDialog(context, prov);
-                },
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.create_new_folder_outlined),
+                    title: Text(l10n.tr('new_folder')),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showCreateFolderDialog(context, prov);
+                    },
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.settings_outlined),
+                    title: Text(l10n.tr('settings')),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _openSettings();
+                    },
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ],
               ),
             ),
           ],
