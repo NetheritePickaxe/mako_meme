@@ -106,7 +106,10 @@ class _KeyboardSetupScreenState extends State<KeyboardSetupScreen> with WidgetsB
                       SizedBox(
                         width: double.infinity,
                         child: FilledButton.icon(
-                          onPressed: () => ImeStatusService.showImePicker(),
+                          onPressed: () async {
+                            await ImeStatusService.showImePicker();
+                            if (mounted) _refreshStatus();
+                          },
                           icon: const Icon(Icons.swap_horiz, size: 18),
                           label: Text(l10n.tr('switch_to_ime')),
                         ),
@@ -246,6 +249,8 @@ class _KeyboardSetupScreenState extends State<KeyboardSetupScreen> with WidgetsB
               child: FilledButton.tonal(
                 onPressed: () async {
                   await onAction();
+                  // 从系统设置返回后立即刷新状态
+                  if (mounted) _refreshStatus();
                 },
                 child: Text(actionLabel),
               ),

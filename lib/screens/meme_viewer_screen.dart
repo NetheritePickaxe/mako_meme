@@ -96,7 +96,18 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
     super.dispose();
   }
 
-  Meme get _meme => widget.memes[_currentIndex];
+  /// 当前 meme：优先从 provider 读取最新数据（标签/名称等变更后立即刷新）
+  /// 若列表已变化导致索引越界，则回退到 widget 传入的快照
+  Meme get _meme {
+    final liveList = context.read<MemeProvider>().memes;
+    if (_currentIndex >= 0 && _currentIndex < liveList.length) {
+      return liveList[_currentIndex];
+    }
+    if (_currentIndex >= 0 && _currentIndex < widget.memes.length) {
+      return widget.memes[_currentIndex];
+    }
+    return widget.memes.first;
+  }
 
   /// 切换全屏查看模式：单击图片进入/退出全屏
   void _toggleFullscreen() {
@@ -205,13 +216,14 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
         body: PageView.builder(
           physics: const BouncingScrollPhysics(),
           controller: _controller,
-          itemCount: widget.memes.length,
+          // 使用 provider 的实时列表，标签/名称变更后立即刷新
+          itemCount: prov.memes.length,
           onPageChanged: (i) => setState(() {
             _currentIndex = i;
             _mangaPageIndex = 0;
           }),
           itemBuilder: (ctx, i) {
-            final m = widget.memes[i];
+            final m = prov.memes[i];
             final screenHeight = MediaQuery.sizeOf(context).height;
             // 全屏模式下面板高度为 0，图片占满；否则留出面板高度
             final panelHeight = _isFullscreen ? 0.0 : _panelExtent * screenHeight;
@@ -1006,47 +1018,45 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                           fontWeight: FontWeight.w600,
                           color: theme.colorScheme.primary,
                         )),
-                      const Spacer(),
-                      IconButton(
-                        onPressed: () => _showAddTagDialog(theme, l10n, prov, m),
-                        icon: Icon(Icons.add_circle, size: 22, color: theme.colorScheme.primary),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      ...m.tags.map((t) => InputChip(
+                        label: Text(t, style: const TextStyle(fontSize: 11)),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         visualDensity: VisualDensity.compact,
-                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                         padding: EdgeInsets.zero,
+                        backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.12),
+                        onDeleted: () => prov.removeTag(m.id, t),
+                        onPressed: () => _showAddTagDialog(theme, l10n, prov, m, initialTag: t),
+                      )),
+                      ...m.moods.map((mo) => InputChip(
+                        label: Text('${mo['name']} ${_moodWeightStars(mo['weight'] as int)}',
+                            style: const TextStyle(fontSize: 11)),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        backgroundColor: theme.colorScheme.tertiaryContainer,
+                        onDeleted: () => prov.removeMood(m.id, mo['name'] as String),
+                        onPressed: () => _showEditMoodDialog(theme, l10n, prov, m,
+                            mo['name'] as String, mo['weight'] as int),
+                      )),
+                      // 添加按钮和其他 chip 放一起
+                      ActionChip(
+                        label: Icon(Icons.add, size: 16, color: theme.colorScheme.primary),
+                        onPressed: () => _showAddTagDialog(theme, l10n, prov, m),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.08),
                         tooltip: l10n.tr('add_tag'),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  if (m.tags.isEmpty && m.moods.isEmpty)
-                    Text(l10n.tr('no_content_tags'),
-                      style: TextStyle(fontSize: 10, color: theme.colorScheme.outline))
-                  else
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      children: [
-                        ...m.tags.map((t) => InputChip(
-                          label: Text(t, style: const TextStyle(fontSize: 11)),
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          visualDensity: VisualDensity.compact,
-                          padding: EdgeInsets.zero,
-                          onDeleted: () => prov.removeTag(m.id, t),
-                          onPressed: () => _showAddTagDialog(theme, l10n, prov, m, initialTag: t),
-                        )),
-                        ...m.moods.map((mo) => InputChip(
-                          label: Text('${mo['name']} ${_moodWeightStars(mo['weight'] as int)}',
-                              style: const TextStyle(fontSize: 11)),
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          visualDensity: VisualDensity.compact,
-                          padding: EdgeInsets.zero,
-                          backgroundColor: theme.colorScheme.tertiaryContainer,
-                          onDeleted: () => prov.removeMood(m.id, mo['name'] as String),
-                          onPressed: () => _showEditMoodDialog(theme, l10n, prov, m,
-                              mo['name'] as String, mo['weight'] as int),
-                        )),
-                      ],
-                    ),
                 ],
                 const SizedBox(height: 12),
                 // 操作按钮（移动端图片不显示复制）
@@ -1124,26 +1134,14 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                 fontWeight: FontWeight.w600,
                 color: theme.colorScheme.tertiary,
               )),
-            const Spacer(),
-            IconButton(
-              onPressed: () => _showAddMoodDialog(theme, l10n, prov, m),
-              icon: Icon(Icons.add_circle, size: 22, color: theme.colorScheme.tertiary),
-              visualDensity: VisualDensity.compact,
-              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-              padding: EdgeInsets.zero,
-              tooltip: l10n.tr('add_mood'),
-            ),
           ],
         ),
         const SizedBox(height: 4),
-        if (m.moods.isEmpty)
-          Text(l10n.tr('no_mood_tags'),
-            style: TextStyle(fontSize: 10, color: theme.colorScheme.outline))
-        else
-          Wrap(
-            spacing: 4,
-            runSpacing: 4,
-            children: m.moods.map((mo) {
+        Wrap(
+          spacing: 4,
+          runSpacing: 4,
+          children: [
+            ...m.moods.map((mo) {
               final name = mo['name'] as String;
               final weight = mo['weight'] as int;
               return InputChip(
@@ -1157,8 +1155,18 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                 deleteIconColor: theme.colorScheme.tertiary,
                 onPressed: () => _showEditMoodDialog(theme, l10n, prov, m, name, weight),
               );
-            }).toList(),
-          ),
+            }),
+            ActionChip(
+              label: Icon(Icons.add, size: 14, color: theme.colorScheme.tertiary),
+              onPressed: () => _showAddMoodDialog(theme, l10n, prov, m),
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              backgroundColor: theme.colorScheme.tertiary.withValues(alpha: 0.12),
+              tooltip: l10n.tr('add_mood'),
+            ),
+          ],
+        ),
       ],
     );
   }
@@ -1178,34 +1186,33 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                 fontWeight: FontWeight.w600,
                 color: theme.colorScheme.primary,
               )),
-            const Spacer(),
-            IconButton(
-              onPressed: () => _showAddTagDialog(theme, l10n, prov, m),
-              icon: Icon(Icons.add_circle, size: 22, color: theme.colorScheme.primary),
-              visualDensity: VisualDensity.compact,
-              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-              padding: EdgeInsets.zero,
-              tooltip: l10n.tr('add_tag'),
-            ),
           ],
         ),
         const SizedBox(height: 4),
-        if (m.tags.isEmpty)
-          Text(l10n.tr('no_content_tags'),
-            style: TextStyle(fontSize: 10, color: theme.colorScheme.outline))
-        else
-          Wrap(
-            spacing: 4,
-            runSpacing: 4,
-            children: m.tags.map((t) => InputChip(
+        Wrap(
+          spacing: 4,
+          runSpacing: 4,
+          children: [
+            ...m.tags.map((t) => InputChip(
               label: Text(t, style: const TextStyle(fontSize: 10)),
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
+              backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.12),
               onDeleted: () => prov.removeTag(m.id, t),
               onPressed: () => _showAddTagDialog(theme, l10n, prov, m, initialTag: t),
-            )).toList(),
-          ),
+            )),
+            ActionChip(
+              label: Icon(Icons.add, size: 14, color: theme.colorScheme.primary),
+              onPressed: () => _showAddTagDialog(theme, l10n, prov, m),
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.08),
+              tooltip: l10n.tr('add_tag'),
+            ),
+          ],
+        ),
       ],
     );
   }
