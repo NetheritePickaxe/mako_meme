@@ -1482,9 +1482,8 @@ class _CustomBackgroundImageState extends State<_CustomBackgroundImage> {
   }
 }
 
-/// 满屏 emoji 特效（🥰😍😘）
-/// 支持 3 种类型：rain(下雨) / explosion(爆炸) / both(上下齐发)
-/// 点击任意位置或动画结束后自动关闭
+/// 满屏 emoji 下雨特效（🥰😍😘）
+/// 点击穿透，动画结束后自动关闭
 class _EmojiRainOverlay extends StatefulWidget {
   const _EmojiRainOverlay();
 
@@ -1495,14 +1494,12 @@ class _EmojiRainOverlay extends StatefulWidget {
 class _EmojiRainOverlayState extends State<_EmojiRainOverlay>
     with TickerProviderStateMixin {
   late AnimationController _controller;
-  late String _effectType;
   final List<_EmojiParticle> _particles = [];
   static const _emojis = ['🥰', '😍', '😘'];
 
   @override
   void initState() {
     super.initState();
-    _effectType = context.read<SettingsProvider>().emojiEffectType;
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 3500),
@@ -1515,58 +1512,17 @@ class _EmojiRainOverlayState extends State<_EmojiRainOverlay>
 
   void _spawnParticles() {
     final rng = Random();
-    switch (_effectType) {
-      case 'explosion':
-        // 爆炸：粒子从中心向四周扩散
-        for (int i = 0; i < 48; i++) {
-          final angle = rng.nextDouble() * 2 * pi;
-          _particles.add(_EmojiParticle(
-            emoji: _emojis[rng.nextInt(_emojis.length)],
-            x: 0.5,
-            y: 0.5,
-            delay: rng.nextDouble() * 0.1,
-            size: 24.0 + rng.nextDouble() * 28.0,
-            rotation: (rng.nextDouble() - 0.5) * 2.0,
-            vx: cos(angle) * (0.3 + rng.nextDouble() * 0.5),
-            vy: sin(angle) * (0.3 + rng.nextDouble() * 0.5),
-            speed: 1.0,
-          ));
-        }
-        break;
-      case 'both':
-        // 上下齐发：一半从上下落，一半从下上升
-        for (int i = 0; i < 40; i++) {
-          final fromTop = i < 20;
-          _particles.add(_EmojiParticle(
-            emoji: _emojis[rng.nextInt(_emojis.length)],
-            x: rng.nextDouble(),
-            y: fromTop ? 0.0 : 1.0,
-            delay: rng.nextDouble() * 0.3,
-            size: 26.0 + rng.nextDouble() * 26.0,
-            rotation: (rng.nextDouble() - 0.5) * 2.0,
-            vx: (rng.nextDouble() - 0.5) * 0.2,
-            vy: fromTop ? 1.0 : -1.0,
-            speed: 0.8 + rng.nextDouble() * 0.4,
-          ));
-        }
-        break;
-      case 'rain':
-      default:
-        // 下雨：从顶部下落
-        for (int i = 0; i < 36; i++) {
-          _particles.add(_EmojiParticle(
-            emoji: _emojis[rng.nextInt(_emojis.length)],
-            x: rng.nextDouble(),
-            y: 0.0,
-            delay: rng.nextDouble() * 0.4,
-            size: 28.0 + rng.nextDouble() * 28.0,
-            rotation: (rng.nextDouble() - 0.5) * 2.0,
-            vx: (rng.nextDouble() - 0.5) * 0.25,
-            vy: 1.0,
-            speed: 0.8 + rng.nextDouble() * 0.4,
-          ));
-        }
-        break;
+    // 下雨：从顶部下落，粒子数量加大
+    for (int i = 0; i < 80; i++) {
+      _particles.add(_EmojiParticle(
+        emoji: _emojis[rng.nextInt(_emojis.length)],
+        x: rng.nextDouble(),
+        delay: rng.nextDouble() * 0.4,
+        size: 28.0 + rng.nextDouble() * 28.0,
+        rotation: (rng.nextDouble() - 0.5) * 2.0,
+        drift: (rng.nextDouble() - 0.5) * 0.25,
+        speed: 0.8 + rng.nextDouble() * 0.4,
+      ));
     }
   }
 
@@ -1579,8 +1535,8 @@ class _EmojiRainOverlayState extends State<_EmojiRainOverlay>
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
-    return GestureDetector(
-      onTap: () => Navigator.of(context).maybePop(),
+    // IgnorePointer 让点击穿透，粒子不影响下方操作
+    return IgnorePointer(
       child: Material(
         type: MaterialType.transparency,
         child: AnimatedBuilder(
@@ -1591,28 +1547,15 @@ class _EmojiRainOverlayState extends State<_EmojiRainOverlay>
                 double t = (_controller.value - p.delay) * p.speed;
                 if (t <= 0) return const SizedBox.shrink();
                 if (t > 1) t = 1;
-                // 计算位置
-                double px, py;
-                if (_effectType == 'explosion') {
-                  // 爆炸：从中心向外扩散，带减速
-                  final dist = t * size.shortestSide * 0.6;
-                  px = p.x * size.width + p.vx * dist;
-                  py = p.y * size.height + p.vy * dist;
-                } else {
-                  // rain / both：沿 vy 方向移动
-                  final travel = (p.vy > 0)
-                      ? -60.0 + t * (size.height + 120)
-                      : size.height + 60.0 - t * (size.height + 120);
-                  px = p.x * size.width + p.vx * size.width * t;
-                  py = travel;
-                }
+                final y = -60.0 + t * (size.height + 120);
+                final x = p.x * size.width + p.drift * size.width * t;
                 final opacity = t < 0.08
                     ? t / 0.08
                     : (t > 0.85 ? (1 - t) / 0.15 : 1.0);
                 final angle = p.rotation * t * pi * 2;
                 return Positioned(
-                  left: px,
-                  top: py,
+                  left: x,
+                  top: y,
                   child: Opacity(
                     opacity: opacity.clamp(0.0, 1.0),
                     child: Transform.rotate(
@@ -1640,22 +1583,18 @@ class _EmojiRainOverlayState extends State<_EmojiRainOverlay>
 class _EmojiParticle {
   final String emoji;
   final double x; // 起始水平位置 0..1
-  final double y; // 起始垂直位置 0..1
   final double delay; // 起始延迟
   final double size;
   final double rotation;
-  final double vx; // 水平速度系数
-  final double vy; // 垂直速度系数（正=向下，负=向上）
-  final double speed; // 整体速度倍率
+  final double drift; // 水平漂移系数
+  final double speed; // 下落速度倍率
   _EmojiParticle({
     required this.emoji,
     required this.x,
-    required this.y,
     required this.delay,
     required this.size,
     required this.rotation,
-    required this.vx,
-    required this.vy,
+    required this.drift,
     required this.speed,
   });
 }

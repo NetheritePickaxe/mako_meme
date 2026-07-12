@@ -34,9 +34,6 @@ class SettingsProvider extends ChangeNotifier {
   // tag 细分：开启后大图详情面板显示双列 tag（情绪+普通）
   bool _tagSubdivision = false;
 
-  // emoji 特效类型：'rain' / 'explosion' / 'both'
-  String _emojiEffectType = 'rain';
-
   // 分类可见性 — 默认仅显示 emoji/gif/image/text 四类
   // 其他（manga/vector/psd/pdf/portrait/cg/character_card/novel）默认隐藏，可在设置中开启
   // 存储为逗号分隔的隐藏类型字符串
@@ -116,12 +113,6 @@ class SettingsProvider extends ChangeNotifier {
 
     // 加载 tag 细分设置
     _tagSubdivision = _storage.getSetting('tagSubdivision') == 'true';
-
-    // 加载 emoji 特效类型
-    final savedEffect = _storage.getSetting('emojiEffectType');
-    if (savedEffect == 'rain' || savedEffect == 'explosion' || savedEffect == 'both') {
-      _emojiEffectType = savedEffect!;
-    }
 
     // 加载分类可见性（未设置时默认仅显示 emoji/gif/image/text）
     final savedHidden = _storage.getSetting('hiddenCategories');
@@ -204,8 +195,6 @@ class SettingsProvider extends ChangeNotifier {
   bool get mobileLongPressIsMenu => _mobileLongPress == 'menu';
 
   bool get tagSubdivision => _tagSubdivision;
-
-  String get emojiEffectType => _emojiEffectType;
 
   Set<String> get hiddenCategories => Set.unmodifiable(_hiddenCategories);
   List<String> get customCategories => List.unmodifiable(_customCategories);
@@ -339,13 +328,6 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setTagSubdivision(bool v) async {
     _tagSubdivision = v;
     await _storage.setSetting('tagSubdivision', v ? 'true' : 'false');
-    notifyListeners();
-  }
-
-  Future<void> setEmojiEffectType(String v) async {
-    if (v != 'rain' && v != 'explosion' && v != 'both') return;
-    _emojiEffectType = v;
-    await _storage.setSetting('emojiEffectType', v);
     notifyListeners();
   }
 
