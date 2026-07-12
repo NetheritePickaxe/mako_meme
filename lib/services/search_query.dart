@@ -79,14 +79,14 @@ class SelectorKey {
       name: 'type',
       description: '类型或文件后缀。中文别名：表情/gif/图片/文字/立绘/CG/角色卡；后缀以 . 开头',
       usage: '[!]type(=|~|≈)(<类型>|<.后缀>|{<类型列表>})',
-      examples: ['type=图片', 'type=.png', 'type=!表情包', 'type={gif,image}'],
+      examples: ['type=图片', 'type=.png', '!type=表情包', 'type={gif,image}'],
       multiValue: true,
     ),
     SelectorKey(
       name: 'tag',
       description: '标签。= 与匹配（含所有值），~ 或匹配（含任一，需{列表}），≈ 模糊或匹配（需{列表}），单值仅 =',
       usage: '[!]tag(=|~|≈)(<标签名>|{<标签列表>})',
-      examples: ['tag=开心', 'tag={开心,喜欢}', 'tag~{开心,喜欢}', 'tag=!讨厌'],
+      examples: ['tag=开心', 'tag={开心,喜欢}', 'tag~{开心,喜欢}', '!tag=讨厌'],
       multiValue: true,
     ),
     SelectorKey(
@@ -274,7 +274,7 @@ class SearchQuery {
     sb.writeln('3. 命令：/命令 [<选择器>] 操作 <参数>');
     sb.writeln();
     sb.writeln('【操作符】(=|~|≈)  = 精确 | ~ 包含或OR | ≈ 模糊');
-    sb.writeln('【反选】!  可置于条件前(!type=表情包)或值前(type=!表情包)');
+    sb.writeln('【反选】!  置于条件前，如 !type=表情包');
     sb.writeln('【范围】<数值>..<数值>  如 100.. (≥) | ..100 (≤) | 50..100');
     sb.writeln('【单位】[cm|mm|in|pt]  默认 px');
     sb.writeln();
@@ -574,11 +574,6 @@ class SearchQuery {
           .toList();
       if (values.isEmpty) return '"$keyStr" 的值列表为空';
     } else {
-      // 支持 ! 前置于值：type=!表情包
-      if (s.startsWith('!')) {
-        s = s.substring(1).trim();
-        if (s.isEmpty) return '"$keyStr" 缺少值';
-      }
       values = [s];
     }
 
@@ -782,11 +777,6 @@ class SearchQuery {
           .where((e) => e.isNotEmpty)
           .toList();
     } else {
-      // 支持 ! 前置于值：type=!表情包 等价于 !type=表情包
-      if (s.startsWith('!')) {
-        negate = !negate;
-        s = s.substring(1).trim();
-      }
       values = [s];
     }
 
