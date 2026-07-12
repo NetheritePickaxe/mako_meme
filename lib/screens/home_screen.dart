@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:ui' as ui;
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:desktop_drop/desktop_drop.dart';
@@ -59,9 +61,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final prov = context.watch<MemeProvider>();
     final l10n = context.watch<LocaleProvider>().l10n;
     final theme = Theme.of(context);
+    final settings = context.watch<SettingsProvider>();
+    final hasBg = settings.hasCustomBg;
 
     return Scaffold(
+      backgroundColor: hasBg ? Colors.transparent : theme.colorScheme.surface,
       appBar: AppBar(
+        backgroundColor: hasBg ? Colors.transparent : theme.colorScheme.surface,
         leading: _buildLeading(prov, l10n),
         title: Text(_getTitle(prov, l10n)),
         actions: _buildActions(prov, l10n),
@@ -71,7 +77,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ) : null,
       ),
       drawer: _currentTab == 0 ? _buildDrawer(context, prov) : null,
-      body: _buildBody(prov, l10n),
+      body: _buildBackgroundedBody(prov, l10n),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentTab,
         onDestinationSelected: _onTabChanged,
@@ -133,6 +139,7 @@ class _HomeScreenState extends State<HomeScreen> {
       PopupMenuButton<String>(
         icon: const Icon(Icons.sort),
         tooltip: l10n.tr('sort'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         onSelected: (v) {
           switch (v) {
             case 'date': prov.setSort(SortBy.date); break;
@@ -181,6 +188,42 @@ class _HomeScreenState extends State<HomeScreen> {
       default:
         return _buildMemesListView(prov, l10n);
     }
+  }
+
+  /// 带自定义背景的 body：背景图 + 模糊 + 暗色遮罩 + 原内容
+  Widget _buildBackgroundedBody(MemeProvider prov, L10n l10n) {
+    final settings = context.watch<SettingsProvider>();
+    final body = _buildBody(prov, l10n);
+
+    if (!settings.hasCustomBg) return body;
+
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    // 遮罩颜色：深色模式用黑色，浅色模式用白色（保证内容可读）
+    final overlayColor = isDark ? Colors.black : Colors.white;
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // 背景图
+        Positioned.fill(
+          child: _CustomBackgroundImage(
+            path: settings.bgImagePath!,
+            blur: settings.bgBlur,
+          ),
+        ),
+        // 暗色/亮色遮罩（保证内容可读）
+        Positioned.fill(
+          child: IgnorePointer(
+            child: ColoredBox(
+              color: overlayColor.withValues(alpha: settings.bgOpacity),
+            ),
+          ),
+        ),
+        // 主内容
+        Positioned.fill(child: body),
+      ],
+    );
   }
 
   /// 表情包/收藏的通用列表视图：搜索栏 + 分类筛选 + 网格
@@ -939,6 +982,75 @@ class _HomeScreenState extends State<HomeScreen> {
           }, child: Text(l10n.tr('save'))),
         ],
       ),
+    );
+  }
+}
+
+/// 自定义背景图：加载图片并应用高斯模糊
+class _CustomBackgroundImage extends StatefulWidget {
+  final String path;
+  final double blur;
+
+  const _CustomBackgroundImage({required this.path, required this.blur});
+
+  @override
+  State<_CustomBackgroundImage> createState() => _CustomBackgroundImageState();
+}
+
+class _CustomBackgroundImageState extends State<_CustomBackgroundImage> {
+  Uint8List? _bytes;
+  File? _file;
+  bool _loaded = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _load();
+  }
+
+  void _load() {
+    if (_loaded) return;
+    _loaded = true;
+    final storage = context.read<StorageService>();
+    if (kIsWeb) {
+      storage.readMemeBytes(widget.path).then((b) {
+        if (mounted) setState(() => _bytes = b);
+      });
+    } else {
+      final f = storage.getMemeFile(widget.path);
+      if (f != null && f.existsSync()) {
+        _file = f;
+      }
+      if (mounted) setState(() {});
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasData = _bytes != null || _file != null;
+    if (!hasData) {
+      return const ColoredBox(color: Colors.transparent);
+    }
+
+    Widget image = _file != null
+        ? Image.file(_file!, fit: BoxFit.cover)
+        : Image.memory(_bytes!, fit: BoxFit.cover);
+
+    // 应用高斯模糊
+    if (widget.blur > 0) {
+      image = ImageFiltered(
+        imageFilter: ui.ImageFilter.blur(
+          sigmaX: widget.blur,
+          sigmaY: widget.blur,
+        ),
+        child: image,
+      );
+    }
+
+    // 略微放大避免模糊后边缘出现透明边
+    return Transform.scale(
+      scale: 1.1,
+      child: image,
     );
   }
 }

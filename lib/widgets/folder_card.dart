@@ -173,6 +173,7 @@ class FolderCard extends StatelessWidget {
     final localPosition = renderBox.globalToLocal(globalPos);
     showMenu(
       context: context,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       position: RelativeRect.fromRect(
         Rect.fromLTWH(localPosition.dx, localPosition.dy, 0, 0),
         Offset.zero & renderBox.size,

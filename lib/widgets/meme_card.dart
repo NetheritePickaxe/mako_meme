@@ -38,6 +38,7 @@ class _MemeCardState extends State<MemeCard> {
   File? _file;             // 原生端使用
   bool _loading = true;
   double _aspectRatio = 1.0;
+  Offset? _lastTapPosition; // 用于长按呼出菜单时定位
 
   @override
   void didChangeDependencies() {
@@ -182,8 +183,10 @@ class _MemeCardState extends State<MemeCard> {
       );
     }
 
-    // 移动端普通模式：点击预览，长按分享（带触觉反馈）
+    // 移动端普通模式：点击预览，长按分享或呼出菜单（按设置）
+    final settings = context.read<SettingsProvider>();
     return GestureDetector(
+      onTapDown: (details) => _lastTapPosition = details.globalPosition,
       onTap: isMulti
           ? () => prov.toggleSelect(widget.meme.id)
           : (widget.previewMode ? _previewSelect : _openViewer),
@@ -192,7 +195,11 @@ class _MemeCardState extends State<MemeCard> {
           ? null
           : () {
               HapticFeedback.mediumImpact();
-              _shareMeme();
+              if (settings.mobileLongPressIsMenu) {
+                _showContextMenu(_lastTapPosition ?? Offset.zero);
+              } else {
+                _shareMeme();
+              }
             },
       child: _buildInner(prov, isSelected, isMulti, theme),
     );
@@ -647,8 +654,12 @@ class _MemeCardState extends State<MemeCard> {
 
   void _showContextMenu(Offset tapPosition) {
     final l10n = context.read<LocaleProvider>().l10n;
+    final m = widget.meme;
+    // 图片类型才可设为背景
+    final canSetBg = m.isImageType && !m.isPdf && m.displayPath.isNotEmpty;
     showMenu(
       context: context,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       position: RelativeRect.fromRect(
         tapPosition & const Size(1, 1),
         Offset.zero & MediaQuery.of(context).size,
@@ -680,6 +691,11 @@ class _MemeCardState extends State<MemeCard> {
           value: 'share',
           child: ListTile(leading: const Icon(Icons.share), title: Text(l10n.tr('share')), dense: true),
         ),
+        if (canSetBg)
+          PopupMenuItem<String>(
+            value: 'set_bg',
+            child: ListTile(leading: const Icon(Icons.wallpaper), title: Text(l10n.tr('set_as_background')), dense: true),
+          ),
         PopupMenuItem<String>(
           value: 'favorite',
           child: ListTile(
@@ -703,12 +719,25 @@ class _MemeCardState extends State<MemeCard> {
         case 'type': _showTypeDialog(); break;
         case 'copy': _copyToClipboard(); break;
         case 'share': _shareMeme(); break;
+        case 'set_bg': _setAsBackground(); break;
         case 'favorite':
           if (mounted) context.read<MemeProvider>().toggleFavorite(widget.meme.id);
           break;
         case 'delete': _confirmDelete(); break;
       }
     });
+  }
+
+  /// 设为主界面背景
+  void _setAsBackground() {
+    final settings = context.read<SettingsProvider>();
+    settings.setBgImagePath(widget.meme.displayPath);
+    final l10n = context.read<LocaleProvider>().l10n;
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.tr('background_set')), duration: const Duration(seconds: 2)),
+      );
+    }
   }
 
   void _showRenameDialog() async {

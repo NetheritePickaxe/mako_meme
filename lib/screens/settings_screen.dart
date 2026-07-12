@@ -68,6 +68,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _landscapePreviewTile(settings, l10n),
             const Divider(indent: 16, endIndent: 16),
           ],
+          if (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS) ...[
+            _mobileLongPressTile(settings, l10n),
+            const Divider(indent: 16, endIndent: 16),
+          ],
           if (defaultTargetPlatform == TargetPlatform.android) ...[
             _monetTile(settings, l10n),
             if (!settings.useMonet) ...[
@@ -77,6 +81,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ] else ...[
             const SizedBox(height: 8),
             _presetPicker(settings, cs, l10n),
+          ],
+          const SizedBox(height: 16),
+
+          _sectionHeader(l10n.tr('background'), cs),
+          _backgroundTile(settings, l10n),
+          if (settings.hasCustomBg) ...[
+            const Divider(indent: 16, endIndent: 16),
+            _bgBlurTile(settings, l10n),
+            const Divider(indent: 16, endIndent: 16),
+            _bgOpacityTile(settings, l10n),
+            const Divider(indent: 16, endIndent: 16),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Colors.red),
+              title: Text(l10n.tr('clear_background'), style: const TextStyle(color: Colors.red)),
+              onTap: () => settings.setBgImagePath(null),
+            ),
           ],
           const SizedBox(height: 16),
 
@@ -409,6 +429,78 @@ class _SettingsScreenState extends State<SettingsScreen> {
       subtitle: Text(l10n.tr('landscape_preview_desc')),
       value: settings.landscapePreview,
       onChanged: (v) => settings.setLandscapePreview(v),
+    );
+  }
+
+  Widget _mobileLongPressTile(SettingsProvider settings, L10n l10n) {
+    return ListTile(
+      leading: const Icon(Icons.touch_app_outlined),
+      title: Text(l10n.tr('long_press_action')),
+      subtitle: Text(settings.mobileLongPressIsMenu
+          ? l10n.tr('long_press_menu')
+          : l10n.tr('long_press_share')),
+      trailing: SegmentedButton<String>(
+        segments: [
+          ButtonSegment(
+            value: 'share',
+            icon: const Icon(Icons.share, size: 18),
+            label: Text(l10n.tr('share')),
+          ),
+          ButtonSegment(
+            value: 'menu',
+            icon: const Icon(Icons.menu, size: 18),
+            label: Text(l10n.tr('menu')),
+          ),
+        ],
+        selected: {settings.mobileLongPress},
+        onSelectionChanged: (s) => settings.setMobileLongPress(s.first),
+      ),
+    );
+  }
+
+  Widget _backgroundTile(SettingsProvider settings, L10n l10n) {
+    final hasBg = settings.hasCustomBg;
+    return ListTile(
+      leading: const Icon(Icons.wallpaper_outlined),
+      title: Text(l10n.tr('custom_background')),
+      subtitle: Text(hasBg ? l10n.tr('background_set_desc') : l10n.tr('background_empty_desc')),
+      trailing: hasBg
+          ? const Icon(Icons.check_circle, color: Colors.green, size: 20)
+          : null,
+    );
+  }
+
+  Widget _bgBlurTile(SettingsProvider settings, L10n l10n) {
+    return ListTile(
+      leading: const Icon(Icons.blur_on),
+      title: Text(l10n.tr('background_blur')),
+      subtitle: Slider(
+        value: settings.bgBlur,
+        min: 0,
+        max: 30,
+        divisions: 30,
+        label: settings.bgBlur.toStringAsFixed(0),
+        onChanged: (v) => settings.setBgBlur(v),
+      ),
+      trailing: Text(settings.bgBlur.toStringAsFixed(0)),
+    );
+  }
+
+  Widget _bgOpacityTile(SettingsProvider settings, L10n l10n) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    return ListTile(
+      leading: Icon(isDark ? Icons.dark_mode : Icons.light_mode),
+      title: Text(l10n.tr('background_dimming')),
+      subtitle: Slider(
+        value: settings.bgOpacity,
+        min: 0,
+        max: 0.9,
+        divisions: 18,
+        label: '${(settings.bgOpacity * 100).round()}%',
+        onChanged: (v) => settings.setBgOpacity(v),
+      ),
+      trailing: Text('${(settings.bgOpacity * 100).round()}%'),
     );
   }
 

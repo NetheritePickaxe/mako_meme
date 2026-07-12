@@ -309,5 +309,17 @@
   "size": "Size",
   "dimensions": "Dimensions",
   "type": "Type",
-  "created_at": "Created"
+  "created_at": "Created",
+  "background": "Background",
+  "custom_background": "Custom Background",
+  "background_set_desc": "Home background set",
+  "background_empty_desc": "Set as background via image context menu",
+  "background_blur": "Background Blur",
+  "background_dimming": "Background Dimming",
+  "clear_background": "Clear Background",
+  "set_as_background": "Set as Home Background",
+  "background_set": "Set as home background",
+  "long_press_action": "Long Press Action",
+  "long_press_menu": "Open Context Menu",
+  "long_press_share": "Share"
 }

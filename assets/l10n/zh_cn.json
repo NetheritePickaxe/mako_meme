@@ -309,5 +309,17 @@
   "size": "大小",
   "dimensions": "尺寸",
   "type": "类型",
-  "created_at": "创建时间"
+  "created_at": "创建时间",
+  "background": "背景",
+  "custom_background": "自定义背景",
+  "background_set_desc": "已设置主界面背景",
+  "background_empty_desc": "在图片右键菜单中设为背景",
+  "background_blur": "背景模糊",
+  "background_dimming": "背景调暗",
+  "clear_background": "清除背景",
+  "set_as_background": "设为主界面背景",
+  "background_set": "已设为主界面背景",
+  "long_press_action": "长按动作",
+  "long_press_menu": "呼出右键菜单",
+  "long_press_share": "分享"
 }
