@@ -399,6 +399,42 @@ class MemeProvider with ChangeNotifier {
     return meme;
   }
 
+  /// 导入立绘/CG（多图合并为精灵图层）
+  Future<Meme> importSpriteFromFiles(
+    List<PlatformFile> files, {
+    String? name,
+    required String type,
+    List<String>? categories,
+  }) async {
+    final meme = await _storage.importSpriteFromFiles(
+      files,
+      name: name,
+      folderId: _folderId,
+      type: type,
+      categories: categories,
+    );
+    await loadAll();
+    return meme;
+  }
+
+  /// 导入立绘/CG（从 krkr pjson + 图片文件）
+  Future<Meme> importSpriteFromPjson(
+    PlatformFile pjsonFile,
+    List<PlatformFile> imageFiles, {
+    String? name,
+    required String type,
+  }) async {
+    final meme = await _storage.importSpriteFromPjson(
+      pjsonFile,
+      imageFiles,
+      name: name,
+      folderId: _folderId,
+      type: type,
+    );
+    await loadAll();
+    return meme;
+  }
+
   /// 同步所有 meme 到 WebDAV
   Future<void> syncAllToWebDav() async {
     if (!_settings.useWebDav || _settings.webDavBaseUrl == null) return;

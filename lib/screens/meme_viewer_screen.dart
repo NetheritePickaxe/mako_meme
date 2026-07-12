@@ -68,6 +68,12 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
   final _LruCache<String, Uint8List?> _mangaBytesCache = _LruCache(3);
   final _LruCache<String, File?> _mangaFileCache = _LruCache(3);
 
+  // 立绘/CG 精灵图层可见性状态：memeId -> {layerZOrder: visible}
+  // 用户切换图层面板后覆盖默认 visible
+  final Map<String, Map<int, bool>> _spriteVisibility = {};
+  // 立绘/CG 图层字节缓存：layerPath -> bytes（web）/ File（native 已用 path 直接读）
+  final _LruCache<String, Uint8List?> _spriteBytesCache = _LruCache(8);
+
   @override
   void initState() {
     super.initState();
@@ -166,6 +172,13 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
               tooltip: l10n.tr('psd_layers'),
               onPressed: () => _showPsdLayersPanel(_meme, l10n),
             ),
+          // 立绘/CG 精灵图层面板按钮
+          if (_meme.isSprite)
+            IconButton(
+              icon: const Icon(Icons.face_retouching_natural),
+              tooltip: l10n.tr('sprite_layers'),
+              onPressed: () => _showSpriteLayersPanel(_meme, l10n),
+            ),
         ],
       ),
       body: PageView.builder(
@@ -216,6 +229,11 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
     // PDF：显示文档图标 + 文件信息 + 外部打开按钮
     if (m.isPdf) {
       return _buildPdfView(theme, m);
+    }
+
+    // 立绘/CG 精灵图层合成视图
+    if (m.isSprite) {
+      return _buildSpriteView(theme, m);
     }
 
     if (m.isImageType) {
@@ -638,6 +656,243 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
       },
     );
   }
+
+  /// 立绘/CG 精灵图层合成视图
+  /// 按可见性叠加所有 visible 图层，支持 InteractiveViewer 缩放
+  Widget _buildSpriteView(ThemeData theme, Meme m) {
+    final layers = m.spriteLayers ?? [];
+    if (layers.isEmpty) {
+      return Center(child: Text(_tr('sprite_no_layers'),
+        style: theme.textTheme.bodyMedium));
+    }
+
+    // 获取当前可见性（用户覆盖优先，否则用图层默认 visible）
+    final visibilityOverrides = _spriteVisibility[m.id] ?? {};
+    final visibleLayers = layers.where((l) {
+      final zOrder = (l['zOrder'] as num?)?.toInt() ?? 0;
+      return visibilityOverrides.containsKey(zOrder)
+          ? visibilityOverrides[zOrder]!
+          : (l['visible'] as bool? ?? false);
+    }).toList()
+      ..sort((a, b) {
+        final za = (a['zOrder'] as num?)?.toInt() ?? 0;
+        final zb = (b['zOrder'] as num?)?.toInt() ?? 0;
+        return za.compareTo(zb);
+      });
+
+    if (visibleLayers.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.visibility_off, size: 48, color: theme.colorScheme.outline),
+            const SizedBox(height: 12),
+            Text(_tr('sprite_no_visible_layer'),
+              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.outline)),
+          ],
+        ),
+      );
+    }
+
+    return Center(
+      child: InteractiveViewer(
+        minScale: 0.3,
+        maxScale: 4.0,
+        child: Stack(
+          alignment: Alignment.center,
+          children: visibleLayers.map((layer) {
+            final path = layer['path'] as String? ?? '';
+            return _buildSpriteLayerImage(theme, path);
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  /// 构建单层精灵图层图片
+  Widget _buildSpriteLayerImage(ThemeData theme, String path) {
+    if (kIsWeb) {
+      return FutureBuilder<Uint8List?>(
+        future: _loadSpriteBytes(path),
+        builder: (ctx, snap) {
+          if (snap.connectionState != ConnectionState.done) {
+            return const SizedBox(
+              width: 200, height: 200,
+              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            );
+          }
+          if (snap.data == null) return const SizedBox.shrink();
+          return Image.memory(snap.data!, fit: BoxFit.contain);
+        },
+      );
+    }
+    final storage = context.read<StorageService>();
+    final f = storage.getMemeFile(path);
+    if (f == null) return const SizedBox.shrink();
+    return Image.file(f, fit: BoxFit.contain);
+  }
+
+  Future<Uint8List?> _loadSpriteBytes(String path) async {
+    final cached = _spriteBytesCache.get(path);
+    if (cached != null) return cached;
+    final storage = context.read<StorageService>();
+    final b = await storage.readMemeBytes(path);
+    _spriteBytesCache.put(path, b);
+    return b;
+  }
+
+  /// 立绘/CG 图层面板：可切换差分可见性
+  void _showSpriteLayersPanel(Meme m, L10n l10n) {
+    final theme = Theme.of(context);
+    final layers = List<Map<String, dynamic>>.from(m.spriteLayers ?? []);
+    // 按类别分组
+    final grouped = <String, List<Map<String, dynamic>>>{};
+    for (final l in layers) {
+      final cat = (l['category'] as String?) ?? 'expression';
+      grouped.putIfAbsent(cat, () => []).add(l);
+    }
+    // 类别排序：base > expression > outfit > accessory > other
+    const catOrder = ['base', 'expression', 'outfit', 'accessory'];
+    final sortedCats = grouped.keys.toList()
+      ..sort((a, b) {
+        final ia = catOrder.indexOf(a);
+        final ib = catOrder.indexOf(b);
+        return (ia == -1 ? 99 : ia).compareTo(ib == -1 ? 99 : ib);
+      });
+
+    // 初始化覆盖状态
+    if (!_spriteVisibility.containsKey(m.id)) {
+      _spriteVisibility[m.id] = {
+        for (final l in layers)
+          ((l['zOrder'] as num?)?.toInt() ?? 0): (l['visible'] as bool? ?? false),
+      };
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return DraggableScrollableSheet(
+              initialChildSize: 0.55,
+              minChildSize: 0.25,
+              maxChildSize: 0.9,
+              expand: false,
+              builder: (ctx, controller) => Container(
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          Icon(Icons.face_retouching_natural,
+                            color: theme.colorScheme.primary, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${l10n.tr('sprite_layers')} (${layers.length})',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const Spacer(),
+                          TextButton.icon(
+                            icon: const Icon(Icons.restart_alt, size: 18),
+                            label: Text(l10n.tr('sprite_reset')),
+                            onPressed: () {
+                              setState(() {
+                                _spriteVisibility[m.id] = {
+                                  for (final l in layers)
+                                    ((l['zOrder'] as num?)?.toInt() ?? 0):
+                                        (l['visible'] as bool? ?? false),
+                                };
+                              });
+                              setSheetState(() {});
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    Expanded(
+                      child: ListView(
+                        controller: controller,
+                        padding: const EdgeInsets.only(bottom: 16),
+                        children: sortedCats.map((cat) {
+                          final catLayers = grouped[cat]!;
+                          return _buildSpriteCategorySection(
+                            theme, l10n, m, cat, catLayers, setSheetState,
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// 立绘/CG 图层面板：单个类别分区
+  Widget _buildSpriteCategorySection(
+    ThemeData theme,
+    L10n l10n,
+    Meme m,
+    String category,
+    List<Map<String, dynamic>> layers,
+    void Function(void Function()) setSheetState,
+  ) {
+    final catLabel = {
+      'base': l10n.tr('sprite_cat_base'),
+      'expression': l10n.tr('sprite_cat_expression'),
+      'outfit': l10n.tr('sprite_cat_outfit'),
+      'accessory': l10n.tr('sprite_cat_accessory'),
+    }[category] ?? category;
+
+    final overrides = _spriteVisibility[m.id]!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: Text(
+            catLabel,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: theme.colorScheme.primary,
+            ),
+          ),
+        ),
+        for (final layer in layers)
+          SwitchListTile(
+            secondary: Icon(
+              category == 'base' ? Icons.person : Icons.layers,
+              size: 20,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            title: Text(layer['name'] as String? ?? ''),
+            value: overrides[(layer['zOrder'] as num?)?.toInt() ?? 0] ?? false,
+            onChanged: (v) {
+              final z = (layer['zOrder'] as num?)?.toInt() ?? 0;
+              setState(() => _spriteVisibility[m.id]![z] = v);
+              setSheetState(() {});
+            },
+          ),
+        const Divider(height: 1, indent: 16, endIndent: 16),
+      ],
+    );
+  }
+
+  /// 简化的 tr 调用（避免在 _buildSpriteView 中重复获取 l10n）
+  String _tr(String key) => context.read<LocaleProvider>().l10n.tr(key);
 
   /// 底部详情面板：可拖动展开/收起
   Widget _buildDraggableDetailPanel(ThemeData theme, MemeProvider prov, Meme m, L10n l10n) {

@@ -16,6 +16,7 @@ import 'storage_platform.dart';
 import 'webdav_service.dart';
 import 'admin_service.dart';
 import 'psd_service.dart';
+import 'sprite_service.dart';
 
 /// 图片宽高信息
 class ImageDimensions {
@@ -950,6 +951,277 @@ class StorageService {
     return meme;
   }
 
+  /// 导入立绘/CG：多图合并为精灵图层
+  /// [files] 第一个为基础层，其余按差分处理（可手动标记类别）
+  /// [type] 必须为 typePortrait 或 typeCg
+  /// [categories] 可选，每层对应的 SpriteCategory（长度需与 files 一致）
+  Future<Meme> importSpriteFromFiles(
+    List<PlatformFile> files, {
+    String? name,
+    String? folderId,
+    required String type,
+    List<String>? categories,
+  }) async {
+    if (files.isEmpty) {
+      throw ArgumentError('files is empty');
+    }
+    if (type != Meme.typePortrait && type != Meme.typeCg) {
+      throw ArgumentError('type must be portrait or cg');
+    }
+
+    final id = _uuid.v4();
+    final now = DateTime.now();
+    final spriteLayers = <Map<String, dynamic>>[];
+    final layerBytesList = <Uint8List>[];
+    final zOrders = <int>[];
+    int totalSize = 0;
+    int imgWidth = 0;
+    int imgHeight = 0;
+
+    for (var i = 0; i < files.length; i++) {
+      final file = files[i];
+      final layerId = _uuid.v4();
+      final ext = _guessExt(file.name);
+      final fileName = '${layerId}_layer$i$ext';
+      final relPath = 'memes/$fileName';
+
+      Uint8List? bytes;
+      if (kIsWeb) {
+        if (file.bytes != null) {
+          await webStorageSetBinary(relPath, file.bytes!);
+          bytes = file.bytes!;
+          totalSize += bytes.length;
+        }
+      } else {
+        final dest = File(p.join(_basePath!, relPath));
+        await dest.create(recursive: true);
+        if (file.path != null) {
+          await File(file.path!).copy(dest.path);
+          totalSize += await dest.length();
+          bytes = await dest.readAsBytes();
+        } else if (file.bytes != null) {
+          await dest.writeAsBytes(file.bytes!);
+          bytes = file.bytes!;
+          totalSize += bytes.length;
+        }
+      }
+
+      // 推断类别
+      final layerName = p.basenameWithoutExtension(file.name);
+      String category;
+      if (categories != null && i < categories.length) {
+        category = categories[i];
+      } else {
+        category = i == 0 ? SpriteCategory.base : SpriteCategory.guess(layerName);
+      }
+
+      spriteLayers.add({
+        'name': layerName,
+        'path': relPath,
+        'category': category,
+        'visible': i == 0, // 默认只显示基础层
+        'zOrder': i,
+      });
+
+      if (bytes != null) {
+        layerBytesList.add(bytes);
+        zOrders.add(i);
+        // 从第一层提取宽高
+        if (i == 0 && bytes.isNotEmpty) {
+          final dims = parseImageDimensionsFromHeader(bytes);
+          if (dims != null) {
+            imgWidth = dims.width;
+            imgHeight = dims.height;
+          }
+        }
+      }
+    }
+
+    // 生成合成预览 PNG（基础层 + 所有默认 visible 的层）
+    String? thumbPath;
+    if (layerBytesList.isNotEmpty) {
+      final visibleBytes = <Uint8List>[];
+      final visibleZOrders = <int>[];
+      for (var i = 0; i < spriteLayers.length; i++) {
+        if (spriteLayers[i]['visible'] == true && i < layerBytesList.length) {
+          visibleBytes.add(layerBytesList[i]);
+          visibleZOrders.add(spriteLayers[i]['zOrder'] as int);
+        }
+      }
+      final previewPng = SpriteService.composePreview(visibleBytes, visibleZOrders);
+      if (previewPng != null) {
+        thumbPath = await _saveThumbPng(id, previewPng);
+      }
+    }
+
+    final meme = Meme(
+      id: id,
+      name: name ?? p.basenameWithoutExtension(files.first.name),
+      filePath: spriteLayers.isNotEmpty ? spriteLayers.first['path'] as String : '',
+      folderId: folderId,
+      tags: const [],
+      createdAt: now,
+      mimeType: 'image/png',
+      fileSize: totalSize,
+      type: type,
+      thumbPath: thumbPath,
+      spriteLayers: spriteLayers,
+      width: imgWidth,
+      height: imgHeight,
+    );
+    await _saveMeme(meme, null);
+    return meme;
+  }
+
+  /// 导入立绘/CG：从 krkr pjson 文件 + 同目录图片
+  /// [pjsonFile] pjson 描述文件
+  /// [imageFiles] pjson 引用的图片文件列表
+  Future<Meme> importSpriteFromPjson(
+    PlatformFile pjsonFile,
+    List<PlatformFile> imageFiles, {
+    String? name,
+    String? folderId,
+    required String type,
+  }) async {
+    if (type != Meme.typePortrait && type != Meme.typeCg) {
+      throw ArgumentError('type must be portrait or cg');
+    }
+
+    // 读取 pjson 内容
+    String? jsonStr;
+    if (pjsonFile.bytes != null) {
+      jsonStr = utf8.decode(pjsonFile.bytes!);
+    } else if (pjsonFile.path != null && !kIsWeb) {
+      jsonStr = await File(pjsonFile.path!).readAsString();
+    }
+    if (jsonStr == null) throw ArgumentError('cannot read pjson content');
+
+    final result = SpriteService.parsePjson(jsonStr);
+    if (result == null || result.layers.isEmpty) {
+      throw ArgumentError('invalid pjson format');
+    }
+
+    // 构建 imageFiles 的查找索引（按文件名匹配）
+    final imageMap = <String, PlatformFile>{};
+    for (final f in imageFiles) {
+      imageMap[p.basename(f.name)] = f;
+      // 同时存不带路径的文件名
+      final baseName = p.basenameWithoutExtension(f.name);
+      imageMap[baseName] = f;
+    }
+
+    final id = _uuid.v4();
+    final now = DateTime.now();
+    final spriteLayers = <Map<String, dynamic>>[];
+    int totalSize = 0;
+    int matchedCount = 0;
+
+    for (final layer in result.layers) {
+      final imageFile = layer['imageFile'] as String;
+      // 尝试多种匹配：完整路径 / basename / basenameWithoutExt
+      PlatformFile? matched;
+      final candidates = [
+        imageFile,
+        p.basename(imageFile),
+        p.basenameWithoutExtension(imageFile),
+      ];
+      for (final c in candidates) {
+        if (imageMap.containsKey(c)) {
+          matched = imageMap[c];
+          break;
+        }
+      }
+      if (matched == null) continue; // 跳过未匹配的图层
+
+      final layerId = _uuid.v4();
+      final ext = _guessExt(matched.name);
+      final fileName = '${layerId}_layer$matchedCount$ext';
+      final relPath = 'memes/$fileName';
+
+      Uint8List? bytes;
+      if (kIsWeb) {
+        if (matched.bytes != null) {
+          await webStorageSetBinary(relPath, matched.bytes!);
+          bytes = matched.bytes!;
+          totalSize += bytes.length;
+        }
+      } else {
+        final dest = File(p.join(_basePath!, relPath));
+        await dest.create(recursive: true);
+        if (matched.path != null) {
+          await File(matched.path!).copy(dest.path);
+          totalSize += await dest.length();
+          bytes = await dest.readAsBytes();
+        } else if (matched.bytes != null) {
+          await dest.writeAsBytes(matched.bytes!);
+          bytes = matched.bytes!;
+          totalSize += bytes.length;
+        }
+      }
+
+      final layerName = layer['name'] as String? ?? p.basenameWithoutExtension(matched.name);
+      final category = layer['category'] as String? ?? SpriteCategory.expression;
+
+      spriteLayers.add({
+        'name': layerName,
+        'path': relPath,
+        'category': category,
+        'visible': matchedCount == 0 || category == SpriteCategory.base,
+        'zOrder': layer['zOrder'] as int? ?? matchedCount,
+      });
+      matchedCount++;
+    }
+
+    if (spriteLayers.isEmpty) {
+      throw ArgumentError('no matched images found in pjson');
+    }
+
+    // 生成合成预览
+    String? thumbPath;
+    final previewBytes = <Uint8List>[];
+    final previewZOrders = <int>[];
+    for (final sl in spriteLayers) {
+      if (sl['visible'] == true) {
+        final relPath = sl['path'] as String;
+        Uint8List? lb;
+        if (kIsWeb) {
+          lb = await readMemeBytes(relPath);
+        } else {
+          final f = File(p.join(_basePath!, relPath));
+          if (await f.exists()) lb = await f.readAsBytes();
+        }
+        if (lb != null) {
+          previewBytes.add(lb);
+          previewZOrders.add(sl['zOrder'] as int);
+        }
+      }
+    }
+    if (previewBytes.isNotEmpty) {
+      final previewPng = SpriteService.composePreview(previewBytes, previewZOrders);
+      if (previewPng != null) {
+        thumbPath = await _saveThumbPng(id, previewPng);
+      }
+    }
+
+    final meme = Meme(
+      id: id,
+      name: name ?? result.name ?? p.basenameWithoutExtension(pjsonFile.name),
+      filePath: spriteLayers.first['path'] as String,
+      folderId: folderId,
+      tags: const [],
+      createdAt: now,
+      mimeType: 'image/png',
+      fileSize: totalSize,
+      type: type,
+      thumbPath: thumbPath,
+      spriteLayers: spriteLayers,
+      width: result.width,
+      height: result.height,
+    );
+    await _saveMeme(meme, null);
+    return meme;
+  }
+
   Future<void> deleteMeme(String id) async {
     if (_memeBox == null) return;
     final meme = _getMeme(id);
@@ -974,6 +1246,30 @@ class StorageService {
         } else {
           await webStorageDelete(page);
         }
+      }
+    }
+
+    // 立绘/CG：删除所有图层文件
+    if (meme.spriteLayers != null) {
+      for (final layer in meme.spriteLayers!) {
+        final layerPath = layer['path'] as String?;
+        if (layerPath == null || layerPath == meme.filePath) continue;
+        if (!kIsWeb) {
+          final f = File(p.join(_basePath!, layerPath));
+          if (await f.exists()) await f.delete();
+        } else {
+          await webStorageDelete(layerPath);
+        }
+      }
+    }
+
+    // 删除缩略图
+    if (meme.thumbPath != null && meme.thumbPath!.isNotEmpty) {
+      if (!kIsWeb) {
+        final f = File(p.join(_basePath!, meme.thumbPath!));
+        if (await f.exists()) await f.delete();
+      } else {
+        await webStorageDelete(meme.thumbPath!);
       }
     }
 

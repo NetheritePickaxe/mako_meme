@@ -418,6 +418,10 @@ class _MemeCardState extends State<MemeCard> {
     if (widget.meme.isPsd && _file == null && _bytes == null) {
       return _formatPlaceholder(Icons.layers, 'PSD');
     }
+    // 立绘/CG 精灵图：未生成预览时的占位
+    if (widget.meme.isSprite && _file == null && _bytes == null) {
+      return _formatPlaceholder(Icons.face_retouching_natural, 'SPRITE');
+    }
     // 普通位图：原生端用 Image.file，Web 端用 Image.memory，都加 cacheWidth
     if (_file != null) {
       return Image.file(

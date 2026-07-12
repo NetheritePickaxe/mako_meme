@@ -692,6 +692,12 @@ class _HomeScreenState extends State<HomeScreen> {
               onTap: () { Navigator.pop(bCtx); _showMangaImportMenu(ctx, prov); },
             ),
             ListTile(
+              leading: const Icon(Icons.accessibility_new),
+              title: Text(l10n.tr('import_sprite')),
+              subtitle: Text(l10n.tr('sprite_desc')),
+              onTap: () { Navigator.pop(bCtx); _showSpriteImportMenu(ctx, prov); },
+            ),
+            ListTile(
               leading: const Icon(Icons.create_new_folder),
               title: Text(l10n.tr('new_folder')),
               onTap: () { Navigator.pop(bCtx); _showCreateFolderDialog(ctx, prov); },
@@ -833,6 +839,180 @@ class _HomeScreenState extends State<HomeScreen> {
       if (ctx.mounted) {
         ScaffoldMessenger.of(ctx).showSnackBar(
           SnackBar(content: Text(l10n.tr('manga_imported', args: {'count': meme.pages.length.toString()}))),
+        );
+      }
+    } catch (e) {
+      if (ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(content: Text(l10n.tr('import_failed'))),
+        );
+      }
+    }
+  }
+
+  /// 立绘/CG 导入子菜单：多图合并 / krkr pjson
+  void _showSpriteImportMenu(BuildContext ctx, MemeProvider prov) {
+    final l10n = context.read<LocaleProvider>().l10n;
+    showModalBottomSheet(
+      context: ctx,
+      builder: (bCtx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.layers),
+              title: Text(l10n.tr('sprite_from_images')),
+              subtitle: Text(l10n.tr('sprite_from_images_desc')),
+              onTap: () { Navigator.pop(bCtx); _importSpriteFromImages(ctx, prov); },
+            ),
+            ListTile(
+              leading: const Icon(Icons.description),
+              title: Text(l10n.tr('sprite_from_pjson')),
+              subtitle: Text(l10n.tr('sprite_from_pjson_desc')),
+              onTap: () { Navigator.pop(bCtx); _importSpriteFromPjson(ctx, prov); },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 多图合并为立绘/CG
+  Future<void> _importSpriteFromImages(BuildContext ctx, MemeProvider prov) async {
+    final l10n = context.read<LocaleProvider>().l10n;
+    final result = await FilePicker.platform.pickFiles(
+      allowMultiple: true,
+      type: FileType.custom,
+      allowedExtensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp'],
+    );
+    if (result == null || result.files.length < 2) {
+      if (ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(content: Text(l10n.tr('sprite_need_multiple'))),
+        );
+      }
+      return;
+    }
+    if (!ctx.mounted) return;
+
+    // 选择类型：立绘 / CG
+    final type = await showDialog<String>(
+      context: ctx,
+      builder: (dCtx) => AlertDialog(
+        title: Text(l10n.tr('select_category')),
+        content: Text(l10n.tr('sprite_select_type')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dCtx), child: Text(l10n.tr('cancel'))),
+          TextButton(
+            onPressed: () => Navigator.pop(dCtx, Meme.typePortrait),
+            child: Text(l10n.tr('type_portrait')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dCtx, Meme.typeCg),
+            child: Text(l10n.tr('type_cg')),
+          ),
+        ],
+      ),
+    );
+    if (type == null || !ctx.mounted) return;
+
+    // 输入名称
+    final name = await showDialog<String>(
+      context: ctx,
+      builder: (dCtx) {
+        final ctrl = TextEditingController(text: result.files.first.name.split('.').first);
+        return AlertDialog(
+          title: Text(l10n.tr('import_sprite')),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${l10n.tr('sprite_layers_count')}: ${result.files.length}'),
+              Text(l10n.tr('sprite_layer_order_hint'),
+                style: TextStyle(fontSize: 12, color: Theme.of(dCtx).colorScheme.outline)),
+              const SizedBox(height: 12),
+              TextField(
+                controller: ctrl,
+                autofocus: true,
+                decoration: InputDecoration(hintText: l10n.tr('sprite_name_hint')),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dCtx), child: Text(l10n.tr('cancel'))),
+            FilledButton(onPressed: () => Navigator.pop(dCtx, ctrl.text.trim()), child: Text(l10n.tr('import'))),
+          ],
+        );
+      },
+    );
+    if (name == null || name.isEmpty || !ctx.mounted) return;
+
+    try {
+      final meme = await prov.importSpriteFromFiles(result.files, name: name, type: type);
+      if (ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(content: Text(l10n.tr('sprite_imported', args: {'count': meme.spriteLayers!.length.toString()}))),
+        );
+      }
+    } catch (e) {
+      if (ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(content: Text(l10n.tr('import_failed'))),
+        );
+      }
+    }
+  }
+
+  /// 从 krkr pjson + 图片导入立绘/CG
+  Future<void> _importSpriteFromPjson(BuildContext ctx, MemeProvider prov) async {
+    final l10n = context.read<LocaleProvider>().l10n;
+    // 1. 选择 pjson 文件
+    final pjsonResult = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['json', 'pjson', 'txt'],
+    );
+    if (pjsonResult == null || pjsonResult.files.isEmpty) return;
+    if (!ctx.mounted) return;
+
+    // 2. 选择图片文件（可多选）
+    final imgResult = await FilePicker.platform.pickFiles(
+      allowMultiple: true,
+      type: FileType.custom,
+      allowedExtensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp'],
+    );
+    if (imgResult == null || imgResult.files.isEmpty) return;
+    if (!ctx.mounted) return;
+
+    // 3. 选择类型
+    final type = await showDialog<String>(
+      context: ctx,
+      builder: (dCtx) => AlertDialog(
+        title: Text(l10n.tr('select_category')),
+        content: Text(l10n.tr('sprite_select_type')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dCtx), child: Text(l10n.tr('cancel'))),
+          TextButton(
+            onPressed: () => Navigator.pop(dCtx, Meme.typePortrait),
+            child: Text(l10n.tr('type_portrait')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dCtx, Meme.typeCg),
+            child: Text(l10n.tr('type_cg')),
+          ),
+        ],
+      ),
+    );
+    if (type == null || !ctx.mounted) return;
+
+    try {
+      final meme = await prov.importSpriteFromPjson(
+        pjsonResult.files.first,
+        imgResult.files,
+        type: type,
+      );
+      if (ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(content: Text(l10n.tr('sprite_imported', args: {'count': meme.spriteLayers!.length.toString()}))),
         );
       }
     } catch (e) {
