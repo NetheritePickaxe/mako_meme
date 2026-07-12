@@ -24,6 +24,7 @@ class MemeProvider with ChangeNotifier {
   SortOrder _order = SortOrder.desc;
   bool _multi = false;
   bool _showFoldersView = false;
+  bool _showFavorites = false;
   final Set<String> _sel = {};
   final Set<String> _selectedFolders = {};
   final Set<String> _tagFilter = {};
@@ -33,6 +34,7 @@ class MemeProvider with ChangeNotifier {
   Set<String> get folderFilter => _folderFilter;
   Set<String> get typeFilter => _typeFilter;
   bool get showFoldersView => _showFoldersView;
+  bool get showFavorites => _showFavorites;
 
   MemeProvider(this._storage, this._settings);
 
@@ -203,6 +205,16 @@ class MemeProvider with ChangeNotifier {
       _folderFilter.clear();
       _apply();
     }
+    notifyListeners();
+  }
+
+  void setShowFavorites(bool v) {
+    _showFavorites = v;
+    if (v) {
+      _folderId = null;
+      _showFoldersView = false;
+    }
+    _apply();
     notifyListeners();
   }
 
@@ -417,6 +429,9 @@ class MemeProvider with ChangeNotifier {
     var list = List<Meme>.from(_all);
     if (_folderId != null) {
       list = list.where((m) => m.folderId == _folderId).toList();
+    }
+    if (_showFavorites) {
+      list = list.where((m) => m.isFavorite).toList();
     }
     if (_tagFilter.isNotEmpty) {
       list = list.where((m) => _tagFilter.every((t) => m.tags.any((tag) => _matchWildcard(tag, t)))).toList();

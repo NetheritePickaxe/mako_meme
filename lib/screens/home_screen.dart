@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:desktop_drop/desktop_drop.dart';
@@ -27,176 +26,257 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   bool _dragOver = false;
+  // 0=表情包, 1=文件夹, 2=收藏, 3=设置
+  int _currentTab = 0;
+
+  void _onTabChanged(int i) {
+    final prov = context.read<MemeProvider>();
+    if (i == 3) {
+      // 设置：打开设置页，不切换标签
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+      return;
+    }
+    setState(() {
+      _currentTab = i;
+      if (i == 0) {
+        prov.setShowFavorites(false);
+        prov.setShowFoldersView(false);
+      } else if (i == 1) {
+        prov.setShowFavorites(false);
+        prov.setShowFoldersView(true);
+      } else if (i == 2) {
+        prov.setShowFoldersView(false);
+        prov.setShowFavorites(true);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final prov = context.watch<MemeProvider>();
     final l10n = context.watch<LocaleProvider>().l10n;
+    final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        leading: Builder(
-          builder: (ctx) {
-            if (prov.folderId != null || prov.showFoldersView) {
-              return IconButton(
-                icon: const Icon(Icons.arrow_back),
-                tooltip: l10n.tr('back'),
-                onPressed: () {
-                  if (prov.folderId != null) {
-                    prov.selectFolder(null);
-                  } else {
-                    prov.setShowFoldersView(false);
-                  }
-                },
-              );
-            }
-            return IconButton(
-              icon: const Icon(Icons.menu),
-              tooltip: l10n.tr('menu'),
-              onPressed: () => Scaffold.of(ctx).openDrawer(),
-            );
-          },
-        ),
+        leading: _buildLeading(prov, l10n),
         title: Text(_getTitle(prov, l10n)),
-        actions: [
-          IconButton(
-            icon: Icon(prov.isMulti ? Icons.close : Icons.checklist),
-            tooltip: prov.isMulti ? l10n.tr('exit_multi_select') : l10n.tr('multi_select'),
-            onPressed: () => prov.toggleMulti(),
-          ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.sort),
-            tooltip: l10n.tr('sort'),
-            onSelected: (v) {
-              switch (v) {
-                case 'date': prov.setSort(SortBy.date); break;
-                case 'name': prov.setSort(SortBy.name); break;
-                case 'size': prov.setSort(SortBy.size); break;
-                case 'order': prov.toggleOrder(); break;
-              }
-            },
-            itemBuilder: (_) => [
-              CheckedPopupMenuItem(value: 'date', checked: prov.sortBy == SortBy.date, child: Text(l10n.tr('sort_by_date'))),
-              CheckedPopupMenuItem(value: 'name', checked: prov.sortBy == SortBy.name, child: Text(l10n.tr('sort_by_name'))),
-              CheckedPopupMenuItem(value: 'size', checked: prov.sortBy == SortBy.size, child: Text(l10n.tr('sort_by_size'))),
-              const PopupMenuDivider(),
-              PopupMenuItem(value: 'order', child: Text(prov.order == SortOrder.asc ? '↑ ${l10n.tr('asc')}' : '↓ ${l10n.tr('desc')}')),
-            ],
-          ),
-        ],
+        actions: _buildActions(prov, l10n),
         bottom: prov.isMulti ? const PreferredSize(
           preferredSize: Size.fromHeight(48),
           child: MultiSelectBar(),
         ) : null,
       ),
-      drawer: _buildDrawer(context, prov),
-      body: DropTarget(
-        onDragDone: (detail) async {
-          final validExts = Meme.supportedExtensions;
-          final files = detail.files.where((f) {
-            return validExts.contains(f.name.split('.').last.toLowerCase());
-          }).toList();
-          if (files.isNotEmpty) {
-            final storage = context.read<StorageService>();
-            final settings = context.read<SettingsProvider>();
-            for (final f in files) {
-              // 直接用 path 流式拷贝，避免一次性读取超大文件导致 OOM
-              await storage.importFile(
-                PlatformFile(
-                  name: f.name,
-                  size: await f.length(),
-                  path: f.path,
-                ),
-                autoClassify: settings.autoClassify,
-                classifyRatio: settings.classifyRatio,
-              );
-            }
-            await prov.loadAll();
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(l10n.tr('imported_images', args: {'count': files.length.toString()})), duration: const Duration(seconds: 2)),
-              );
-            }
+      drawer: _currentTab == 0 ? _buildDrawer(context, prov) : null,
+      body: _buildBody(prov, l10n),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _currentTab,
+        onDestinationSelected: _onTabChanged,
+        destinations: [
+          NavigationDestination(
+            icon: const Icon(Icons.photo_library_outlined),
+            selectedIcon: Icon(Icons.photo_library, color: theme.colorScheme.onSurface),
+            label: l10n.tr('nav_memes'),
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.folder_outlined),
+            selectedIcon: Icon(Icons.folder, color: theme.colorScheme.onSurface),
+            label: l10n.tr('nav_folders'),
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.favorite_border),
+            selectedIcon: Icon(Icons.favorite, color: theme.colorScheme.onSurface),
+            label: l10n.tr('favorites'),
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings, color: theme.colorScheme.onSurface),
+            label: l10n.tr('settings'),
+          ),
+        ],
+      ),
+      floatingActionButton: _buildFab(prov),
+    );
+  }
+
+  Widget _buildLeading(MemeProvider prov, L10n l10n) {
+    // 表情包标签：进入文件夹时显示返回，否则显示菜单
+    if (_currentTab == 0 && prov.folderId != null) {
+      return IconButton(
+        icon: const Icon(Icons.arrow_back),
+        tooltip: l10n.tr('back'),
+        onPressed: () => prov.selectFolder(null),
+      );
+    }
+    if (_currentTab == 0) {
+      return Builder(
+        builder: (ctx) => IconButton(
+          icon: const Icon(Icons.menu),
+          tooltip: l10n.tr('menu'),
+          onPressed: () => Scaffold.of(ctx).openDrawer(),
+        ),
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
+  List<Widget> _buildActions(MemeProvider prov, L10n l10n) {
+    return [
+      IconButton(
+        icon: Icon(prov.isMulti ? Icons.close : Icons.checklist),
+        tooltip: prov.isMulti ? l10n.tr('exit_multi_select') : l10n.tr('multi_select'),
+        onPressed: () => prov.toggleMulti(),
+      ),
+      PopupMenuButton<String>(
+        icon: const Icon(Icons.sort),
+        tooltip: l10n.tr('sort'),
+        onSelected: (v) {
+          switch (v) {
+            case 'date': prov.setSort(SortBy.date); break;
+            case 'name': prov.setSort(SortBy.name); break;
+            case 'size': prov.setSort(SortBy.size); break;
+            case 'order': prov.toggleOrder(); break;
           }
         },
-        onDragEntered: (_) => setState(() => _dragOver = true),
-        onDragExited: (_) => setState(() => _dragOver = false),
-        child: LayoutBuilder(
-          builder: (ctx, constraints) => Stack(
-            children: [
-              Column(
-                children: [
-                  custom.MakoSearchBar(onSearch: (q) => prov.setQuery(q)),
-                  _buildCategoryChips(prov),
-                  if (prov.tagFilter.isNotEmpty || prov.folderFilter.isNotEmpty) _buildFilterChips(prov),
-                  Expanded(
-                    child: _buildMixedGrid(prov),
-                  ),
-                ],
+        itemBuilder: (_) => [
+          CheckedPopupMenuItem(value: 'date', checked: prov.sortBy == SortBy.date, child: Text(l10n.tr('sort_by_date'))),
+          CheckedPopupMenuItem(value: 'name', checked: prov.sortBy == SortBy.name, child: Text(l10n.tr('sort_by_name'))),
+          CheckedPopupMenuItem(value: 'size', checked: prov.sortBy == SortBy.size, child: Text(l10n.tr('sort_by_size'))),
+          const PopupMenuDivider(),
+          PopupMenuItem(value: 'order', child: Text(prov.order == SortOrder.asc ? '↑ ${l10n.tr('asc')}' : '↓ ${l10n.tr('desc')}')),
+        ],
+      ),
+    ];
+  }
+
+  Widget? _buildFab(MemeProvider prov) {
+    final theme = Theme.of(context);
+    if (_currentTab == 0) {
+      return FloatingActionButton(
+        onPressed: () => _showImportMenu(context, prov),
+        backgroundColor: theme.colorScheme.primaryContainer,
+        child: Icon(CupertinoIcons.add, size: 30, color: theme.colorScheme.onPrimaryContainer),
+      );
+    }
+    if (_currentTab == 1) {
+      return FloatingActionButton(
+        onPressed: () => _showCreateFolderDialog(context, prov),
+        backgroundColor: theme.colorScheme.primaryContainer,
+        child: Icon(Icons.create_new_folder_outlined, color: theme.colorScheme.onPrimaryContainer),
+      );
+    }
+    return null;
+  }
+
+  Widget _buildBody(MemeProvider prov, L10n l10n) {
+    switch (_currentTab) {
+      case 1:
+        return _buildFoldersGrid(prov);
+      case 2:
+        return _buildMemesListView(prov, l10n);
+      case 0:
+      default:
+        return _buildMemesListView(prov, l10n);
+    }
+  }
+
+  /// 表情包/收藏的通用列表视图：搜索栏 + 分类筛选 + 网格
+  Widget _buildMemesListView(MemeProvider prov, L10n l10n) {
+    return DropTarget(
+      onDragDone: (detail) async {
+        final validExts = Meme.supportedExtensions;
+        final files = detail.files.where((f) {
+          return validExts.contains(f.name.split('.').last.toLowerCase());
+        }).toList();
+        if (files.isNotEmpty) {
+          final storage = context.read<StorageService>();
+          final settings = context.read<SettingsProvider>();
+          for (final f in files) {
+            await storage.importFile(
+              PlatformFile(
+                name: f.name,
+                size: await f.length(),
+                path: f.path,
               ),
-              if (_dragOver)
-                Positioned.fill(
-                  child: Container(
-                    color: Colors.black45,
-                    child: Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.cloud_upload, size: 48, color: Theme.of(context).colorScheme.primary),
-                            const SizedBox(height: 8),
-                            Text(l10n.tr('drop_to_import'), style: TextStyle(
-                              fontSize: Theme.of(context).textTheme.titleMedium?.fontSize,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black87,
-                            )),
-                          ],
-                        ),
+              autoClassify: settings.autoClassify,
+              classifyRatio: settings.classifyRatio,
+            );
+          }
+          await prov.loadAll();
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(l10n.tr('imported_images', args: {'count': files.length.toString()})), duration: const Duration(seconds: 2)),
+            );
+          }
+        }
+      },
+      onDragEntered: (_) => setState(() => _dragOver = true),
+      onDragExited: (_) => setState(() => _dragOver = false),
+      child: LayoutBuilder(
+        builder: (ctx, constraints) => Stack(
+          children: [
+            Column(
+              children: [
+                custom.MakoSearchBar(onSearch: (q) => prov.setQuery(q)),
+                _buildCategoryChips(prov),
+                if (prov.tagFilter.isNotEmpty || prov.folderFilter.isNotEmpty) _buildFilterChips(prov),
+                Expanded(
+                  child: MemeGrid(memes: prov.memes),
+                ),
+              ],
+            ),
+            if (_dragOver)
+              Positioned.fill(
+                child: Container(
+                  color: Colors.black45,
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.cloud_upload, size: 48, color: Theme.of(context).colorScheme.primary),
+                          const SizedBox(height: 8),
+                          Text(l10n.tr('drop_to_import'), style: TextStyle(
+                            fontSize: Theme.of(context).textTheme.titleMedium?.fontSize,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          )),
+                        ],
                       ),
                     ),
                   ),
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showImportMenu(context, prov),
-        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-        child: Icon(CupertinoIcons.add, size: 30, color: Theme.of(context).colorScheme.onPrimaryContainer),
       ),
     );
   }
 
   String _getTitle(MemeProvider prov, L10n l10n) {
     if (prov.isMulti) return l10n.tr('selected_count', args: {'count': prov.selected.length.toString()});
-    if (prov.showFoldersView) return l10n.tr('browse_folders');
-    if (prov.folderId == null) return 'Mako Meme';
-    return prov.folders.where((f) => f.id == prov.folderId).firstOrNull?.name ?? 'Mako Meme';
-  }
-
-  Widget _buildMixedGrid(MemeProvider prov) {
-    // 进入文件夹：显示该文件夹内的 meme
-    if (prov.folderId != null) {
-      return MemeGrid(memes: prov.memes);
+    switch (_currentTab) {
+      case 1:
+        return l10n.tr('browse_folders');
+      case 2:
+        return l10n.tr('favorites');
+      case 0:
+      default:
+        if (prov.folderId != null) {
+          return prov.folders.where((f) => f.id == prov.folderId).firstOrNull?.name ?? 'Mako Meme';
+        }
+        return 'Mako Meme';
     }
-
-    // 浏览文件夹视图：显示文件夹卡片
-    if (prov.showFoldersView) {
-      return _buildFoldersGrid(prov);
-    }
-
-    // 根视图“全部”：显示所有表情（无视文件夹归属）
-    return MemeGrid(memes: prov.memes);
   }
 
   Widget _buildFoldersGrid(MemeProvider prov) {
     final settings = context.watch<SettingsProvider>();
+    final l10n = context.read<LocaleProvider>().l10n;
     final width = MediaQuery.sizeOf(context).width;
     final cols = settings.gridColumns > 0
         ? settings.gridColumns
@@ -209,7 +289,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Icon(Icons.folder_open, size: 64, color: Theme.of(context).colorScheme.outline),
             const SizedBox(height: 16),
-            Text(l10nForContext().tr('no_memes'), style: TextStyle(fontSize: 18, color: Theme.of(context).colorScheme.outline)),
+            Text(l10n.tr('no_folders'), style: TextStyle(fontSize: 18, color: Theme.of(context).colorScheme.outline)),
           ],
         ),
       );
@@ -227,12 +307,11 @@ class _HomeScreenState extends State<HomeScreen> {
           folder: f,
           count: prov.countInFolder(f.id),
           isActive: prov.folderId == f.id,
+          onSelected: () => setState(() => _currentTab = 0),
         );
       },
     );
   }
-
-  L10n l10nForContext() => context.read<LocaleProvider>().l10n;
 
   Widget _buildDrawer(BuildContext context, MemeProvider prov) {
     final theme = Theme.of(context);
@@ -242,69 +321,91 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 头部：Logo + 统计信息
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
-              color: theme.colorScheme.primaryContainer.withAlpha(80),
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    theme.colorScheme.primaryContainer,
+                    theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
+                  ],
+                ),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Mako Meme', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 4),
-                  Text(l10n.tr('total_memes', args: {'count': prov.allMemesCount.toString()}), style: theme.textTheme.bodySmall),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(Icons.emoji_emotions_outlined, color: theme.colorScheme.primary, size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Text('Mako Meme', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      _drawerStatChip(theme, Icons.photo_library, prov.allMemesCount.toString()),
+                      _drawerStatChip(theme, Icons.folder_outlined, prov.folders.length.toString()),
+                      _drawerStatChip(theme, Icons.favorite, prov.favorites.length.toString()),
+                    ],
+                  ),
                 ],
               ),
             ),
+            // 文件夹快速访问
             Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                children: [
-                  _drawerItem(
-                    icon: Icons.all_inbox,
-                    label: l10n.tr('all_memes'),
-                    count: prov.allMemesCount,
-                    isActive: prov.folderId == null && !prov.showFoldersView,
-                    onTap: () { prov.selectFolder(null); prov.setShowFoldersView(false); Navigator.pop(context); },
-                  ),
-                  _drawerItem(
-                    icon: Icons.folder_outlined,
-                    label: l10n.tr('browse_folders'),
-                    count: prov.folders.length,
-                    isActive: prov.showFoldersView,
-                    onTap: () { prov.setShowFoldersView(true); Navigator.pop(context); },
-                  ),
-                  _drawerItem(
-                    icon: Icons.favorite,
-                    label: l10n.tr('favorites'),
-                    count: prov.favorites.length,
-                    isActive: false,
-                    onTap: () { Navigator.pop(context); },
-                  ),
-                  const Divider(indent: 16, endIndent: 16),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                    child: Text(l10n.tr('folder'), style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurface.withAlpha(120))),
-                  ),
-                  ...prov.folders.map((f) => _drawerItem(
-                    icon: Icons.folder,
-                    label: f.name,
-                    count: prov.countInFolder(f.id),
-                    isActive: prov.folderId == f.id,
-                    onTap: () { prov.selectFolder(f.id); Navigator.pop(context); },
-                    onLongPress: () => _showFolderMenu(context, prov, f),
-                  )),
-                  const Divider(indent: 16, endIndent: 16),
-                  ListTile(
-                    leading: const Icon(Icons.settings, size: 20),
-                    title: Text(l10n.tr('settings')),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
-                    },
-                    dense: true,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                ],
+              child: prov.folders.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.folder_open, size: 56, color: theme.colorScheme.outline),
+                            const SizedBox(height: 12),
+                            Text(l10n.tr('no_folders'), style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.outline)),
+                          ],
+                        ),
+                      ),
+                    )
+                  : ListView(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                          child: Text(l10n.tr('folder'), style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                            fontWeight: FontWeight.w600,
+                          )),
+                        ),
+                        ...prov.folders.map((f) => _drawerFolderItem(context, prov, f)),
+                      ],
+                    ),
+            ),
+            // 底部：新建文件夹
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: ListTile(
+                leading: const Icon(Icons.create_new_folder_outlined),
+                title: Text(l10n.tr('new_folder')),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showCreateFolderDialog(context, prov);
+                },
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
             ),
           ],
@@ -313,25 +414,43 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _drawerItem({
-    required IconData icon,
-    required String label,
-    required int count,
-    required bool isActive,
-    required VoidCallback onTap,
-    Color? iconColor,
-    VoidCallback? onLongPress,
-  }) {
+  Widget _drawerStatChip(ThemeData theme, IconData icon, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+          const SizedBox(width: 4),
+          Text(value, style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+
+  Widget _drawerFolderItem(BuildContext context, MemeProvider prov, MemeFolder folder) {
     final theme = Theme.of(context);
+    final isActive = prov.folderId == folder.id;
     return ListTile(
-      leading: Icon(icon, color: iconColor ?? (isActive ? theme.colorScheme.primary : null), size: 20),
-      title: Text(label, style: TextStyle(
+      leading: Icon(Icons.folder, color: Color(folder.colorValue).withValues(alpha: 0.8), size: 22),
+      title: Text(folder.name, style: TextStyle(
         fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
         color: isActive ? theme.colorScheme.primary : null,
       )),
-      trailing: Text('$count', style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface.withAlpha(120))),
-      onTap: onTap,
-      onLongPress: onLongPress,
+      trailing: Text('${prov.countInFolder(folder.id)}', style: TextStyle(
+        fontSize: 12,
+        color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+      )),
+      onTap: () {
+        prov.selectFolder(folder.id);
+        Navigator.pop(context);
+        setState(() => _currentTab = 0);
+      },
+      onLongPress: () => _showFolderMenu(context, prov, folder),
       dense: true,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
     );

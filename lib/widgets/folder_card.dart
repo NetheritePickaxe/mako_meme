@@ -10,12 +10,15 @@ class FolderCard extends StatelessWidget {
   final MemeFolder folder;
   final int count;
   final bool isActive;
+  /// 选中后回调（在 selectFolder 之后调用）
+  final VoidCallback? onSelected;
 
   const FolderCard({
     super.key,
     required this.folder,
     required this.count,
     this.isActive = false,
+    this.onSelected,
   });
 
   @override
@@ -62,6 +65,7 @@ class FolderCard extends StatelessWidget {
             onTap: () {
               final p = context.read<MemeProvider>();
               p.selectFolder(folder.id);
+              onSelected?.call();
             },
             onSecondaryTapUp: (details) {
               _showFolderContextMenu(details.globalPosition, context, folder);
