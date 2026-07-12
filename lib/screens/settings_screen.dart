@@ -564,130 +564,90 @@ class _SettingsScreenState extends State<SettingsScreen> {
       Meme.typeVector, Meme.typePsd, Meme.typePdf, Meme.typeNovel,
     ];
     final visibleCount = builtinCats.where(settings.isCategoryVisible).length;
-    return ListTile(
+    final cs = Theme.of(context).colorScheme;
+    return ExpansionTile(
       leading: const Icon(Icons.category_outlined),
       title: Text(l10n.tr('category_manage')),
       subtitle: Text('$visibleCount / ${builtinCats.length}'),
-      trailing: const Icon(Icons.chevron_right, size: 20),
-      onTap: () => _showCategoryManageSheet(settings, l10n, builtinCats),
-    );
-  }
-
-  /// 分类管理底部弹窗：圆角卡片 + FilterChip 网格
-  void _showCategoryManageSheet(SettingsProvider settings, L10n l10n, List<String> builtinCats) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setState) {
-            final s = ctx.watch<SettingsProvider>();
-            final cs = Theme.of(ctx).colorScheme;
-            return Container(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(ctx).size.height * 0.75,
-              ),
-              padding: EdgeInsets.only(
-                left: 16, right: 16, bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // 标题栏
-                    Row(
-                      children: [
-                        Icon(Icons.category_outlined, size: 20, color: cs.primary),
-                        const SizedBox(width: 8),
-                        Text(l10n.tr('category_manage'),
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: cs.primary)),
-                        const Spacer(),
-                        TextButton.icon(
-                          icon: const Icon(Icons.add, size: 18),
-                          label: Text(l10n.tr('add_category')),
-                          onPressed: () => _showAddCustomCategoryDialog(settings, l10n),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    // 内置分类 — 圆角卡片容器内放 FilterChip
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: cs.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: builtinCats.map((type) {
-                          final m = Meme(id: '', name: '', createdAt: DateTime.now(), type: type, filePath: '');
-                          final label = l10n.tr(m.typeLabelKey);
-                          final visible = s.isCategoryVisible(type);
-                          return FilterChip(
-                            label: Text(label),
-                            selected: visible,
-                            onSelected: (v) {
-                              s.toggleCategoryVisibility(type);
-                              setState(() {});
-                            },
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            showCheckmark: false,
-                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            visualDensity: VisualDensity.compact,
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    // 自定义分类标题
-                    Text(l10n.tr('custom_categories'),
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: cs.primary)),
-                    const SizedBox(height: 8),
-                    if (s.customCategories.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Text(l10n.tr('no_custom_categories'),
-                          style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
-                      )
-                    else
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: cs.surfaceContainerLow,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: s.customCategories.map((name) {
-                            return Chip(
-                              label: Text(name),
-                              onDeleted: () {
-                                s.removeCustomCategory(name);
-                                setState(() {});
-                              },
-                              deleteIconColor: cs.onSurfaceVariant,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              visualDensity: VisualDensity.compact,
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                  ],
+      shape: const Border(),
+      collapsedShape: const Border(),
+      tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+      childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      children: [
+        // 内置分类 — 圆角卡片容器内放 FilterChip
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: builtinCats.map((type) {
+              final m = Meme(id: '', name: '', createdAt: DateTime.now(), type: type, filePath: '');
+              final label = l10n.tr(m.typeLabelKey);
+              final visible = settings.isCategoryVisible(type);
+              return FilterChip(
+                label: Text(label),
+                selected: visible,
+                onSelected: (v) => settings.toggleCategoryVisibility(type),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
                 ),
-              ),
-            );
-          },
-        );
-      },
+                showCheckmark: false,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
+              );
+            }).toList(),
+          ),
+        ),
+        const SizedBox(height: 12),
+        // 自定义分类标题 + 添加按钮
+        Row(
+          children: [
+            Text(l10n.tr('custom_categories'),
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: cs.primary)),
+            const Spacer(),
+            IconButton(
+              icon: const Icon(Icons.add, size: 18),
+              tooltip: l10n.tr('add_category'),
+              onPressed: () => _showAddCustomCategoryDialog(settings, l10n),
+              visualDensity: VisualDensity.compact,
+            ),
+          ],
+        ),
+        if (settings.customCategories.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Text(l10n.tr('no_custom_categories'),
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+          )
+        else
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: settings.customCategories.map((name) {
+                return Chip(
+                  label: Text(name),
+                  onDeleted: () => settings.removeCustomCategory(name),
+                  deleteIconColor: cs.onSurfaceVariant,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
+                );
+              }).toList(),
+            ),
+          ),
+      ],
     );
   }
 
