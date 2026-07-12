@@ -17,6 +17,7 @@ import '../widgets/mako_search_bar.dart' as custom;
 import '../widgets/multi_select_bar.dart';
 import '../services/storage_service.dart';
 import '../screens/settings_screen.dart';
+import '../screens/text_editor_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -166,8 +167,8 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showImportMenu(context, prov),
-        backgroundColor: Theme.of(context).colorScheme.tertiaryContainer,
-        child: Icon(CupertinoIcons.add, size: 30, color: Theme.of(context).colorScheme.onTertiaryContainer),
+        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+        child: Icon(CupertinoIcons.add, size: 30, color: Theme.of(context).colorScheme.onPrimaryContainer),
       ),
     );
   }
@@ -338,7 +339,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildCategoryChips(MemeProvider prov) {
     final l10n = context.read<LocaleProvider>().l10n;
-    final categories = [
+    final settings = context.watch<SettingsProvider>();
+    final categories = <Map<String, String>>[
       {'type': Meme.typeEmoji, 'label': l10n.tr('cat_emoji')},
       {'type': Meme.typeGif, 'label': l10n.tr('cat_gif')},
       {'type': Meme.typeImage, 'label': l10n.tr('cat_image')},
@@ -349,14 +351,23 @@ class _HomeScreenState extends State<HomeScreen> {
       {'type': Meme.typeVector, 'label': l10n.tr('cat_vector')},
       {'type': Meme.typePsd, 'label': l10n.tr('cat_psd')},
       {'type': Meme.typePdf, 'label': l10n.tr('cat_pdf')},
+      {'type': Meme.typeManga, 'label': l10n.tr('cat_manga')},
+      {'type': Meme.typeNovel, 'label': l10n.tr('cat_novel')},
+      // 用户自定义分类
+      ...settings.customCategories.map((c) => {'type': c, 'label': c}),
     ];
+
+    // 过滤掉隐藏的分类
+    final visibleCategories = categories
+        .where((c) => settings.isCategoryVisible(c['type']!))
+        .toList();
 
     return SizedBox(
       height: 40,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12),
-        itemCount: categories.length + 1,
+        itemCount: visibleCategories.length + 1,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (ctx, i) {
           final cs = Theme.of(ctx).colorScheme;
@@ -373,9 +384,9 @@ class _HomeScreenState extends State<HomeScreen> {
             );
           }
 
-          final cat = categories[i - 1];
-          final type = cat['type'] as String;
-          final label = cat['label'] as String;
+          final cat = visibleCategories[i - 1];
+          final type = cat['type']!;
+          final label = cat['label']!;
           final selected = prov.typeFilter.contains(type);
 
           return _buildRoundedChip(
@@ -475,6 +486,18 @@ class _HomeScreenState extends State<HomeScreen> {
               onTap: () { Navigator.pop(bCtx); _importText(ctx, prov); },
             ),
             ListTile(
+              leading: const Icon(Icons.menu_book),
+              title: Text(l10n.tr('import_novel')),
+              subtitle: Text(l10n.tr('novel_desc')),
+              onTap: () { Navigator.pop(bCtx); _importNovel(ctx, prov); },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: Text(l10n.tr('import_manga')),
+              subtitle: Text(l10n.tr('manga_desc')),
+              onTap: () { Navigator.pop(bCtx); _showMangaImportMenu(ctx, prov); },
+            ),
+            ListTile(
               leading: const Icon(Icons.create_new_folder),
               title: Text(l10n.tr('new_folder')),
               onTap: () { Navigator.pop(bCtx); _showCreateFolderDialog(ctx, prov); },
@@ -509,37 +532,133 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _importText(BuildContext ctx, MemeProvider prov) {
+    _showTextEditor(ctx, prov, type: Meme.typeText);
+  }
+
+  void _importNovel(BuildContext ctx, MemeProvider prov) {
+    _showTextEditor(ctx, prov, type: Meme.typeNovel);
+  }
+
+  /// 漫画导入子菜单：手动多图 / CBZ、ZIP 压缩包
+  void _showMangaImportMenu(BuildContext ctx, MemeProvider prov) {
     final l10n = context.read<LocaleProvider>().l10n;
-    final ctrl = TextEditingController();
-    showDialog(
+    showModalBottomSheet(
       context: ctx,
-      builder: (dCtx) => AlertDialog(
-        title: Text(l10n.tr('import_text')),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          maxLines: 3,
-          decoration: InputDecoration(hintText: l10n.tr('hint_text_or_emoji')),
+      builder: (bCtx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.collections),
+              title: Text(l10n.tr('manga_from_images')),
+              subtitle: Text(l10n.tr('manga_from_images_desc')),
+              onTap: () { Navigator.pop(bCtx); _importMangaFromImages(ctx, prov); },
+            ),
+            ListTile(
+              leading: const Icon(Icons.folder_zip),
+              title: Text(l10n.tr('manga_from_archive')),
+              subtitle: Text(l10n.tr('manga_from_archive_desc')),
+              onTap: () { Navigator.pop(bCtx); _importMangaFromArchive(ctx, prov); },
+            ),
+          ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.paste),
-            tooltip: l10n.tr('paste'),
-            onPressed: () async {
-              final data = await Clipboard.getData(Clipboard.kTextPlain);
-              if (data?.text != null && data!.text!.isNotEmpty) {
-                ctrl.text = data.text!;
-              }
-            },
+      ),
+    );
+  }
+
+  /// 手动多图合并为漫画
+  Future<void> _importMangaFromImages(BuildContext ctx, MemeProvider prov) async {
+    final l10n = context.read<LocaleProvider>().l10n;
+    final result = await FilePicker.platform.pickFiles(
+      allowMultiple: true,
+      type: FileType.custom,
+      allowedExtensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'],
+    );
+    if (result == null || result.files.isEmpty) return;
+    if (!ctx.mounted) return;
+
+    // 让用户输入名称
+    final name = await showDialog<String>(
+      context: ctx,
+      builder: (dCtx) {
+        final ctrl = TextEditingController(text: result.files.first.name.split('.').first);
+        return AlertDialog(
+          title: Text(l10n.tr('import_manga')),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${l10n.tr('manga_pages_count')}: ${result.files.length}'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: ctrl,
+                autofocus: true,
+                decoration: InputDecoration(hintText: l10n.tr('manga_name_hint')),
+              ),
+            ],
           ),
-          TextButton(onPressed: () => Navigator.pop(dCtx), child: Text(l10n.tr('cancel'))),
-          FilledButton(onPressed: () {
-            if (ctrl.text.trim().isNotEmpty) {
-              prov.importText(ctrl.text.trim());
-              Navigator.pop(dCtx);
-            }
-          }, child: Text(l10n.tr('import'))),
-        ],
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dCtx), child: Text(l10n.tr('cancel'))),
+            FilledButton(onPressed: () => Navigator.pop(dCtx, ctrl.text.trim()), child: Text(l10n.tr('import'))),
+          ],
+        );
+      },
+    );
+    if (name == null || name.isEmpty) return;
+    if (!ctx.mounted) return;
+
+    try {
+      await prov.importMangaFromFiles(result.files, name: name);
+      if (ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(content: Text(l10n.tr('manga_imported', args: {'count': result.files.length.toString()}))),
+        );
+      }
+    } catch (e) {
+      if (ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(content: Text(l10n.tr('import_failed'))),
+        );
+      }
+    }
+  }
+
+  /// 从 CBZ/ZIP 压缩包导入漫画
+  Future<void> _importMangaFromArchive(BuildContext ctx, MemeProvider prov) async {
+    final l10n = context.read<LocaleProvider>().l10n;
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['cbz', 'zip'],
+    );
+    if (result == null || result.files.isEmpty) return;
+    if (!ctx.mounted) return;
+    final archive = result.files.first;
+
+    try {
+      final meme = await prov.importMangaFromArchive(archive);
+      if (ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(content: Text(l10n.tr('manga_imported', args: {'count': meme.pages.length.toString()}))),
+        );
+      }
+    } catch (e) {
+      if (ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(content: Text(l10n.tr('import_failed'))),
+        );
+      }
+    }
+  }
+
+  /// 全屏文本/小说编辑器，支持 Markdown 实时预览切换
+  void _showTextEditor(BuildContext ctx, MemeProvider prov, {required String type}) {
+    Navigator.push(
+      ctx,
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => TextEditorScreen(type: type, onSave: (text, title) async {
+          await prov.importText(text, name: title, type: type);
+        }),
       ),
     );
   }

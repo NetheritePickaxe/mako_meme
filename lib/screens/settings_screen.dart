@@ -11,6 +11,7 @@ import '../providers/settings_provider.dart';
 import '../providers/meme_provider.dart';
 import '../providers/locale_provider.dart';
 import '../l10n/l10n.dart';
+import '../models/meme.dart';
 import '../services/storage_service.dart';
 import '../services/update_service.dart';
 import 'keyboard_setup_screen.dart';
@@ -54,7 +55,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(l10n.tr('settings'))),
       body: ListView(
-        padding: EdgeInsets.zero,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         children: [
           _sectionHeader(l10n.tr('appearance'), cs),
           _languageTile(context, l10n),
@@ -83,6 +84,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _autoClassifyTile(settings, l10n),
           const Divider(indent: 16, endIndent: 16),
           _cardDisplayTile(settings, l10n),
+          const Divider(indent: 16, endIndent: 16),
+          _categoryManageTile(settings, l10n),
           const Divider(indent: 16, endIndent: 16),
           ListTile(
             leading: const Icon(Icons.file_download_outlined),
@@ -426,6 +429,106 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Widget _categoryManageTile(SettingsProvider settings, L10n l10n) {
+    // 所有内置分类
+    final builtinCats = <String>[
+      Meme.typeEmoji, Meme.typeGif, Meme.typeImage, Meme.typeText,
+      Meme.typePortrait, Meme.typeCg, Meme.typeCharacterCard,
+      Meme.typeVector, Meme.typePsd, Meme.typePdf, Meme.typeNovel,
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ListTile(
+          leading: const Icon(Icons.category_outlined),
+          title: Text(l10n.tr('category_manage')),
+          subtitle: Text(l10n.tr('category_manage_desc')),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          child: Text(l10n.tr('builtin_categories'),
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.primary)),
+        ),
+        // 内置分类的显示/隐藏开关
+        ...builtinCats.map((type) {
+          final m = Meme(id: '', name: '', createdAt: DateTime.now(), type: type, filePath: '');
+          final label = l10n.tr(m.typeLabelKey);
+          final visible = settings.isCategoryVisible(type);
+          return SwitchListTile(
+            secondary: const Icon(Icons.label_outline, size: 20),
+            title: Text(label),
+            value: visible,
+            onChanged: (v) => settings.toggleCategoryVisibility(type),
+            dense: true,
+          );
+        }),
+        // 自定义分类
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(l10n.tr('custom_categories'),
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.primary)),
+              ),
+              IconButton(
+                icon: const Icon(Icons.add, size: 20),
+                onPressed: () => _showAddCustomCategoryDialog(settings, l10n),
+                tooltip: l10n.tr('add_category'),
+              ),
+            ],
+          ),
+        ),
+        if (settings.customCategories.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Text(l10n.tr('no_custom_categories'),
+              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+          )
+        else
+          ...settings.customCategories.map((name) => ListTile(
+            leading: const Icon(Icons.tag, size: 20),
+            title: Text(name),
+            trailing: IconButton(
+              icon: const Icon(Icons.delete_outline, size: 20),
+              onPressed: () => settings.removeCustomCategory(name),
+            ),
+            dense: true,
+          )),
+      ],
+    );
+  }
+
+  void _showAddCustomCategoryDialog(SettingsProvider settings, L10n l10n) {
+    final ctrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.tr('add_category')),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: InputDecoration(
+            hintText: l10n.tr('category_name_hint'),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(l10n.tr('cancel'))),
+          FilledButton(
+            onPressed: () {
+              if (ctrl.text.trim().isNotEmpty) {
+                settings.addCustomCategory(ctrl.text.trim());
+              }
+              Navigator.pop(ctx);
+            },
+            child: Text(l10n.tr('create')),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _cardDisplayTile(SettingsProvider settings, L10n l10n) {
     return Column(
       children: [
@@ -546,31 +649,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _presetCard(ColorSchemePreset preset, bool selected, ColorScheme cs, VoidCallback onTap) {
+    // 派生 M3 色板，预览 primary / primaryContainer / secondary / tertiary 四色块
+    final previewScheme = ColorScheme.fromSeed(seedColor: preset.seed, brightness: cs.brightness);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          border: selected ? Border.all(color: cs.primary, width: 2) : null,
-          color: selected ? cs.primaryContainer.withValues(alpha: 0.15) : null,
+          border: selected
+              ? Border.all(color: cs.primary, width: 2)
+              : Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
+          color: selected ? cs.primaryContainer.withValues(alpha: 0.12) : null,
         ),
         child: Row(
           children: [
-            // 单种子色圆点 — M3 从此色派生整套色板
-            Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                color: preset.seed,
-                shape: BoxShape.circle,
-                border: Border.all(color: cs.outline.withValues(alpha: 0.3), width: 0.5),
+            // 色卡：四个色块横向排列，直观展示配色方案
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _swatch(previewScheme.primary, 32, 32),
+                  _swatch(previewScheme.primaryContainer, 32, 32),
+                  _swatch(previewScheme.secondary, 32, 32),
+                  _swatch(previewScheme.tertiary, 32, 32),
+                ],
               ),
             ),
-            const SizedBox(width: 14),
-            Expanded(child: Text(preset.name, style: const TextStyle(fontSize: 14))),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                preset.name,
+                style: TextStyle(fontSize: 14, fontWeight: selected ? FontWeight.w600 : FontWeight.normal),
+              ),
+            ),
             if (selected) Icon(Icons.check_circle, color: cs.primary, size: 20),
           ],
         ),
@@ -578,25 +693,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Widget _swatch(Color color, double w, double h) => Container(
+    width: w,
+    height: h,
+    color: color,
+  );
+
   Widget _customPresetCard(SettingsProvider settings, ColorScheme cs, L10n l10n) {
     final selected = settings.presetIndex >= AppTheme.presets.length;
+    final previewScheme = ColorScheme.fromSeed(seedColor: settings.customSeed, brightness: cs.brightness);
     return InkWell(
       onTap: () => _showCustomColorPicker(context, settings, cs, l10n),
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(12),
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10),
-          border: selected ? Border.all(color: cs.onSurface, width: 2) : null,
-          color: selected ? cs.surfaceContainerHighest.withValues(alpha: 0.3) : null,
+          borderRadius: BorderRadius.circular(12),
+          border: selected
+              ? Border.all(color: cs.primary, width: 2)
+              : Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
+          color: selected ? cs.primaryContainer.withValues(alpha: 0.12) : null,
         ),
         child: Row(
           children: [
-            Icon(Icons.edit, size: 18, color: cs.primary),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _swatch(previewScheme.primary, 32, 32),
+                  _swatch(previewScheme.primaryContainer, 32, 32),
+                  _swatch(previewScheme.secondary, 32, 32),
+                  _swatch(previewScheme.tertiary, 32, 32),
+                ],
+              ),
+            ),
             const SizedBox(width: 12),
-            Expanded(child: Text(selected ? l10n.tr('custom_saved') : l10n.tr('custom_color_scheme'), style: const TextStyle(fontSize: 14))),
-            if (selected) Icon(Icons.check_circle, color: cs.primary, size: 20),
+            Expanded(
+              child: Text(
+                selected ? l10n.tr('custom_saved') : l10n.tr('custom_color_scheme'),
+                style: TextStyle(fontSize: 14, fontWeight: selected ? FontWeight.w600 : FontWeight.normal),
+              ),
+            ),
+            Icon(Icons.edit, size: 18, color: cs.primary),
+            if (selected) ...[
+              const SizedBox(width: 8),
+              Icon(Icons.check_circle, color: cs.primary, size: 20),
+            ],
           ],
         ),
       ),
@@ -605,14 +749,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _showCustomColorPicker(BuildContext context, SettingsProvider settings, ColorScheme cs, L10n l10n) {
     final hexCtrl = TextEditingController(
-      text: '#${settings.customSeed.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase()}',
+      text: settings.customSeed.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase().substring(2),
     );
 
     Color currentColor = settings.customSeed;
 
     void setColor(Color c) {
       currentColor = c;
-      hexCtrl.text = '#${c.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase()}';
+      hexCtrl.text = c.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase().substring(2);
     }
 
     showModalBottomSheet(
@@ -630,15 +774,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Text(l10n.tr('custom_color_scheme'),
                 style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
-              SizedBox(
-                width: 240,
-                height: 240,
-                child: _ColorWheel(
-                  initialColor: currentColor,
-                  onColorChanged: (c) {
-                    setModalState(() => setColor(c));
-                  },
-                ),
+              // 色轮 + 预览
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 220,
+                    height: 220,
+                    child: _ColorWheel(
+                      initialColor: currentColor,
+                      onColorChanged: (c) {
+                        setModalState(() => setColor(c));
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  // 当前颜色预览块
+                  Column(
+                    children: [
+                      Text(l10n.tr('preview'), style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
+                      const SizedBox(height: 6),
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: currentColor,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: cs.outline.withValues(alpha: 0.4)),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // 派生色板预览
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _swatch(ColorScheme.fromSeed(seedColor: currentColor, brightness: Brightness.light).primary, 18, 18),
+                                _swatch(ColorScheme.fromSeed(seedColor: currentColor, brightness: Brightness.light).secondary, 18, 18),
+                              ],
+                            ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _swatch(ColorScheme.fromSeed(seedColor: currentColor, brightness: Brightness.dark).primary, 18, 18),
+                                _swatch(ColorScheme.fromSeed(seedColor: currentColor, brightness: Brightness.dark).secondary, 18, 18),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
               Row(
@@ -657,26 +847,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
               const SizedBox(height: 8),
+              // HEX 输入 — 不使用 maxLength 以避免显示计数器
               Row(
                 children: [
-                  const SizedBox(width: 48),
+                  Text('#', style: TextStyle(fontSize: 16, color: cs.onSurfaceVariant, fontFamily: 'monospace')),
+                  const SizedBox(width: 4),
                   Expanded(
                     child: TextField(
                       controller: hexCtrl,
-                      maxLength: 9,
                       textAlign: TextAlign.center,
                       style: const TextStyle(fontFamily: 'monospace'),
                       decoration: InputDecoration(
-                        prefixText: '#',
+                        isDense: true,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                        hintText: 'HEX',
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                        hintText: 'RRGGBB',
+                        counterText: '',
                       ),
-                      keyboardType: TextInputType.number,
+                      maxLength: 6,
+                      keyboardType: TextInputType.text,
+                      textCapitalization: TextCapitalization.characters,
                       onChanged: (v) {
                         final hex = v.replaceAll('#', '');
-                        if (hex.length == 8) {
-                          final parsed = int.tryParse(hex, radix: 16);
+                        if (hex.length == 6) {
+                          final parsed = int.tryParse('FF$hex', radix: 16);
                           if (parsed != null) {
                             setModalState(() => setColor(Color(parsed)));
                           }
@@ -684,7 +878,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       },
                     ),
                   ),
-                  const SizedBox(width: 48),
                 ],
               ),
               const SizedBox(height: 16),
@@ -1231,118 +1424,124 @@ class _ColorWheel extends StatefulWidget {
 }
 
 class _ColorWheelState extends State<_ColorWheel> {
-  Offset _selectedOffset = const Offset(0, -1);
-  late Color _currentColor;
+  late HSVColor _hsv;
 
   @override
   void initState() {
     super.initState();
-    _currentColor = widget.initialColor;
-    _selectedOffset = _colorToOffset(widget.initialColor);
+    _hsv = HSVColor.fromColor(widget.initialColor);
   }
 
-  Offset _colorToOffset(Color color) {
-    final hsl = HSLColor.fromColor(color);
-    final hue = hsl.hue;
-    final sat = hsl.saturation;
-    final angle = (hue * pi / 180) - pi / 2;
-    return Offset(
-      cos(angle) * sat,
-      sin(angle) * sat,
-    );
-  }
-
-  Color _offsetToColor(Offset offset, double lightness) {
-    final distance = offset.distance;
-    final angle = atan2(offset.dy, offset.dx);
-    final saturation = min(distance, 1.0);
-    final hue = ((angle + pi / 2) * 180 / pi) % 360;
-    return HSLColor.fromAHSL(1.0, hue, saturation, lightness).toColor();
-  }
-
-  void _handlePanUpdate(DragUpdateDetails details) {
+  /// 将本地坐标转换为 HSV（hue 0-360, saturation 0-1）
+  /// 仅在圆形范围内有效，超出半径则饱和度截断为 1
+  void _updateFromLocal(Offset localPos) {
     final RenderBox box = context.findRenderObject() as RenderBox;
-    final offset = box.globalToLocal(details.globalPosition);
-    final dx = (offset.dx / box.size.width) * 2 - 1;
-    final dy = (offset.dy / box.size.height) * 2 - 1;
-    final clampedDx = max(-1.0, min(1.0, dx));
-    final clampedDy = max(-1.0, min(1.0, dy));
+    final size = box.size;
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
+    final dx = localPos.dx - center.dx;
+    final dy = localPos.dy - center.dy;
+    final dist = sqrt(dx * dx + dy * dy);
+    // 角度：0 度在顶部（12 点方向），顺时针递增
+    var angle = atan2(dx, -dy) * 180 / pi;
+    if (angle < 0) angle += 360;
+    final saturation = (dist / radius).clamp(0.0, 1.0);
     setState(() {
-      _selectedOffset = Offset(clampedDx, clampedDy);
-      _currentColor = _offsetToColor(_selectedOffset, HSLColor.fromColor(_currentColor).lightness);
+      _hsv = HSVColor.fromAHSV(1.0, angle, saturation, _hsv.value);
+      widget.onColorChanged(_hsv.toColor());
     });
-    widget.onColorChanged(_currentColor);
-  }
-
-  void _handlePanDown(DragDownDetails details) {
-    final RenderBox box = context.findRenderObject() as RenderBox;
-    final offset = box.globalToLocal(details.localPosition);
-    final dx = (offset.dx / box.size.width) * 2 - 1;
-    final dy = (offset.dy / box.size.height) * 2 - 1;
-    setState(() {
-      _selectedOffset = Offset(dx.clamp(-1.0, 1.0), dy.clamp(-1.0, 1.0));
-      _currentColor = _offsetToColor(_selectedOffset, HSLColor.fromColor(_currentColor).lightness);
-    });
-    widget.onColorChanged(_currentColor);
   }
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onPanUpdate: _handlePanUpdate,
-      onPanDown: _handlePanDown,
-      child: CustomPaint(
-        size: const Size(240, 240),
-        painter: _WheelPainter(
-          selectedOffset: _selectedOffset,
-          currentColor: _currentColor,
-        ),
-      ),
+    return LayoutBuilder(
+      builder: (ctx, constraints) {
+        final size = constraints.biggest;
+        return GestureDetector(
+          onPanDown: (d) => _updateFromLocal(d.localPosition),
+          onPanUpdate: (d) => _updateFromLocal(d.localPosition),
+          child: CustomPaint(
+            size: size,
+            painter: _WheelPainter(
+              hsv: _hsv,
+              radius: size.width / 2,
+            ),
+          ),
+        );
+      },
     );
   }
 }
 
 class _WheelPainter extends CustomPainter {
-  final Offset selectedOffset;
-  final Color currentColor;
-  _WheelPainter({required this.selectedOffset, required this.currentColor});
+  final HSVColor hsv;
+  final double radius;
+  _WheelPainter({required this.hsv, required this.radius});
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2;
+    // 用 SweepGradient 绘制色相环（圆盘），颜色从顶部开始顺时针
+    final sweepPaint = Paint()
+      ..shader = SweepGradient(
+        center: Alignment.center,
+        colors: [
+          HSVColor.fromAHSV(1.0, 0, 1.0, 1.0).toColor(),
+          HSVColor.fromAHSV(1.0, 60, 1.0, 1.0).toColor(),
+          HSVColor.fromAHSV(1.0, 120, 1.0, 1.0).toColor(),
+          HSVColor.fromAHSV(1.0, 180, 1.0, 1.0).toColor(),
+          HSVColor.fromAHSV(1.0, 240, 1.0, 1.0).toColor(),
+          HSVColor.fromAHSV(1.0, 300, 1.0, 1.0).toColor(),
+          HSVColor.fromAHSV(1.0, 360, 1.0, 1.0).toColor(),
+        ],
+      ).createShader(Rect.fromCircle(center: center, radius: radius));
+    canvas.drawCircle(center, radius, sweepPaint);
 
-    final paint = Paint()
-      ..strokeWidth = radius * 0.6
-      ..style = PaintingStyle.fill;
+    // 叠加径向白色渐变实现饱和度（中心白→边缘饱和）
+    final satPaint = Paint()
+      ..shader = RadialGradient(
+        center: Alignment.center,
+        radius: 1.0,
+        colors: [Colors.white, Colors.white.withValues(alpha: 0)],
+      ).createShader(Rect.fromCircle(center: center, radius: radius));
+    canvas.drawCircle(center, radius, satPaint);
 
-    for (double angle = 0; angle < 360; angle += 2) {
-      final startAngle = (angle - 90) * pi / 180;
-      final endAngle = (angle - 90 + 2.5) * pi / 180;
-      final hsl = HSLColor.fromAHSL(1.0, angle, 1.0, 0.5);
-      paint.color = hsl.toColor();
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius),
-        startAngle,
-        endAngle,
-        true,
-        paint,
-      );
-    }
-
+    // 选中指示器：在色轮上的位置
+    final angleRad = hsv.hue * pi / 180;
+    final indicatorDist = hsv.saturation * radius;
+    final indicatorPos = Offset(
+      center.dx + indicatorDist * sin(angleRad),
+      center.dy - indicatorDist * cos(angleRad),
+    );
+    // 外圈白边
     canvas.drawCircle(
-      center + Offset(selectedOffset.dx * radius * 0.9, selectedOffset.dy * radius * 0.9),
-      10,
+      indicatorPos,
+      12,
       Paint()
-        ..color = currentColor
+        ..color = Colors.white
+        ..style = PaintingStyle.fill,
+    );
+    // 内圈当前色
+    canvas.drawCircle(
+      indicatorPos,
+      9,
+      Paint()
+        ..color = hsv.toColor()
+        ..style = PaintingStyle.fill,
+    );
+    // 描边
+    canvas.drawCircle(
+      indicatorPos,
+      9,
+      Paint()
+        ..color = Colors.black54
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 3
-        ..colorFilter = ColorFilter.mode(currentColor.withValues(alpha: 0.8), BlendMode.srcATop),
+        ..strokeWidth = 1,
     );
   }
 
   @override
   bool shouldRepaint(covariant _WheelPainter oldDelegate) {
-    return oldDelegate.selectedOffset != selectedOffset || oldDelegate.currentColor != currentColor;
+    return oldDelegate.hsv != hsv;
   }
 }

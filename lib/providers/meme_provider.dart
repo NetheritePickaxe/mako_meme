@@ -259,6 +259,11 @@ class MemeProvider with ChangeNotifier {
     await loadAll();
   }
 
+  Future<void> updateMemeText(String id, String text, {String? name}) async {
+    await _storage.updateMemeText(id, text, name: name);
+    await loadAll();
+  }
+
   Future<void> setMemeType(String id, String type) async {
     await _storage.setMemeType(id, type);
     await loadAll();
@@ -347,8 +352,22 @@ class MemeProvider with ChangeNotifier {
     return memes;
   }
 
-  Future<Meme> importText(String text, {String? name, List<String> tags = const []}) async {
-    final meme = await _storage.importText(text, name: name, folderId: _folderId, tags: tags);
+  Future<Meme> importText(String text, {String? name, List<String> tags = const [], String type = Meme.typeText}) async {
+    final meme = await _storage.importText(text, name: name, folderId: _folderId, tags: tags, type: type);
+    await loadAll();
+    return meme;
+  }
+
+  /// 导入漫画（手动多图合并）
+  Future<Meme> importMangaFromFiles(List<PlatformFile> files, {String? name}) async {
+    final meme = await _storage.importMangaFromFiles(files, name: name, folderId: _folderId);
+    await loadAll();
+    return meme;
+  }
+
+  /// 导入漫画（从 CBZ/ZIP 压缩包）
+  Future<Meme> importMangaFromArchive(PlatformFile file, {String? name}) async {
+    final meme = await _storage.importMangaFromArchive(file, name: name, folderId: _folderId);
     await loadAll();
     return meme;
   }

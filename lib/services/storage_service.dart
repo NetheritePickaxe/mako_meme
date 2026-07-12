@@ -793,7 +793,7 @@ class StorageService {
     }
   }
 
-  Future<Meme> importText(String text, {String? name, String? folderId, List<String> tags = const []}) async {
+  Future<Meme> importText(String text, {String? name, String? folderId, List<String> tags = const [], String type = Meme.typeText}) async {
     final id = _uuid.v4();
     final now = DateTime.now();
     final meme = Meme(
@@ -805,8 +805,146 @@ class StorageService {
       createdAt: now,
       mimeType: '',
       fileSize: text.length,
-      type: 'text',
+      type: type,
       textContent: text,
+    );
+    await _saveMeme(meme, null);
+    return meme;
+  }
+
+  /// 自然排序比较器：page_1.jpg < page_2.jpg < page_10.jpg
+  int _naturalCompare(String a, String b) {
+    final ra = RegExp(r'(\d+|\D+)').allMatches(a).map((m) => m.group(0)!).toList();
+    final rb = RegExp(r'(\d+|\D+)').allMatches(b).map((m) => m.group(0)!).toList();
+    for (var i = 0; i < ra.length && i < rb.length; i++) {
+      final x = ra[i], y = rb[i];
+      final xIsDigit = RegExp(r'^\d+$').hasMatch(x);
+      final yIsDigit = RegExp(r'^\d+$').hasMatch(y);
+      if (xIsDigit && yIsDigit) {
+        final xn = int.parse(x), yn = int.parse(y);
+        if (xn != yn) return xn.compareTo(yn);
+      } else {
+        final cmp = x.toLowerCase().compareTo(y.toLowerCase());
+        if (cmp != 0) return cmp;
+      }
+    }
+    return ra.length.compareTo(rb.length);
+  }
+
+  /// 导入漫画：手动多图合并
+  /// [files] 已按顺序排好（首页在前），将每个文件存入存储，第一页作为封面
+  Future<Meme> importMangaFromFiles(List<PlatformFile> files, {String? name, String? folderId}) async {
+    if (files.isEmpty) {
+      throw ArgumentError('files is empty');
+    }
+    final id = _uuid.v4();
+    final now = DateTime.now();
+    final pagePaths = <String>[];
+    int totalSize = 0;
+
+    for (final file in files) {
+      final pageId = _uuid.v4();
+      final ext = _guessExt(file.name);
+      final fileName = '${pageId}_page${pagePaths.length + 1}$ext';
+      final relPath = 'memes/$fileName';
+
+      if (kIsWeb) {
+        if (file.bytes != null) {
+          await webStorageSetBinary(relPath, file.bytes!);
+          totalSize += file.bytes!.length;
+        }
+      } else {
+        final dest = File(p.join(_basePath!, relPath));
+        await dest.create(recursive: true);
+        if (file.path != null) {
+          await File(file.path!).copy(dest.path);
+          totalSize += await dest.length();
+        } else if (file.bytes != null) {
+          await dest.writeAsBytes(file.bytes!);
+          totalSize += file.bytes!.length;
+        }
+      }
+      pagePaths.add(relPath);
+    }
+
+    final meme = Meme(
+      id: id,
+      name: name ?? p.basenameWithoutExtension(files.first.name),
+      filePath: pagePaths.first,
+      folderId: folderId,
+      tags: const [],
+      createdAt: now,
+      mimeType: 'image/zip',
+      fileSize: totalSize,
+      type: Meme.typeManga,
+      pages: pagePaths,
+    );
+    await _saveMeme(meme, null);
+    return meme;
+  }
+
+  /// 导入漫画：从 CBZ/ZIP 压缩包解压图片
+  /// 按文件名自然排序后作为页面顺序
+  Future<Meme> importMangaFromArchive(PlatformFile file, {String? name, String? folderId}) async {
+    final id = _uuid.v4();
+    final now = DateTime.now();
+    final imageExts = <String>{'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.apng'};
+    final pagePaths = <String>[];
+    int totalSize = 0;
+
+    if (kIsWeb) {
+      final bytes = file.bytes;
+      if (bytes == null) throw ArgumentError('web archive bytes is null');
+      final archive = ZipDecoder().decodeBytes(bytes);
+      final entries = archive.files.where((e) => e.isFile).toList()
+        ..sort((a, b) => _naturalCompare(a.name, b.name));
+      for (final entry in entries) {
+        final ext = p.extension(entry.name).toLowerCase();
+        if (!imageExts.contains(ext)) continue;
+        final pageId = _uuid.v4();
+        final relPath = 'memes/${pageId}_page${pagePaths.length + 1}$ext';
+        final data = entry.content as List<int>;
+        final ub = data is Uint8List ? data : Uint8List.fromList(data);
+        await webStorageSetBinary(relPath, ub);
+        totalSize += ub.length;
+        pagePaths.add(relPath);
+      }
+    } else {
+      if (file.path == null) throw ArgumentError('archive path is null');
+      final inputStream = InputFileStream(file.path!);
+      final archive = ZipDecoder().decodeStream(inputStream);
+      final entries = archive.files.where((e) => e.isFile).toList()
+        ..sort((a, b) => _naturalCompare(a.name, b.name));
+      for (final entry in entries) {
+        final ext = p.extension(entry.name).toLowerCase();
+        if (!imageExts.contains(ext)) continue;
+        final pageId = _uuid.v4();
+        final relPath = 'memes/${pageId}_page${pagePaths.length + 1}$ext';
+        final dest = File(p.join(_basePath!, relPath));
+        await dest.create(recursive: true);
+        final data = entry.content as List<int>;
+        await dest.writeAsBytes(data);
+        totalSize += data.length;
+        pagePaths.add(relPath);
+      }
+      inputStream.close();
+    }
+
+    if (pagePaths.isEmpty) {
+      throw StateError('archive contains no images');
+    }
+
+    final meme = Meme(
+      id: id,
+      name: name ?? p.basenameWithoutExtension(file.name),
+      filePath: pagePaths.first,
+      folderId: folderId,
+      tags: const [],
+      createdAt: now,
+      mimeType: 'image/zip',
+      fileSize: totalSize,
+      type: Meme.typeManga,
+      pages: pagePaths,
     );
     await _saveMeme(meme, null);
     return meme;
@@ -817,12 +955,26 @@ class StorageService {
     final meme = _getMeme(id);
     if (meme == null) return;
 
+    // 删除主文件
     if (!kIsWeb && meme.filePath.isNotEmpty) {
       final file = File(p.join(_basePath!, meme.filePath));
       if (await file.exists()) await file.delete();
     }
     if (kIsWeb && meme.filePath.isNotEmpty) {
       await webStorageDelete(meme.filePath);
+    }
+
+    // 漫画：删除所有页面（filePath 已包含在 pages 中，但遍历以保险）
+    if (meme.isManga) {
+      for (final page in meme.pages) {
+        if (page == meme.filePath) continue;
+        if (!kIsWeb) {
+          final f = File(p.join(_basePath!, page));
+          if (await f.exists()) await f.delete();
+        } else {
+          await webStorageDelete(page);
+        }
+      }
     }
 
     await _memeBox!.delete(id);
@@ -846,6 +998,19 @@ class StorageService {
     final meme = _getMeme(id);
     if (meme == null) return;
     await _memeBox!.put(id, meme.copyWith(name: newName).toMap());
+  }
+
+  /// 更新文本/小说内容（可选更新标题）
+  Future<void> updateMemeText(String id, String text, {String? name}) async {
+    if (_memeBox == null) return;
+    final meme = _getMeme(id);
+    if (meme == null) return;
+    final updated = meme.copyWith(
+      textContent: text,
+      fileSize: text.length,
+      name: name ?? meme.name,
+    );
+    await _memeBox!.put(id, updated.toMap());
   }
 
   Future<void> setMemeType(String id, String type) async {

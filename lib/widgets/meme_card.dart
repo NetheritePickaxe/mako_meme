@@ -543,6 +543,21 @@ class _MemeCardState extends State<MemeCard> {
                     child: Icon(Icons.favorite, size: 14, color: Theme.of(context).colorScheme.onTertiary),
                   ),
                 ),
+              if (widget.meme.isManga)
+                Positioned(top: 6, right: widget.meme.isFavorite ? 30 : 6,
+                  child: Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.65), borderRadius: BorderRadius.circular(8)),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.collections, size: 12, color: Colors.white),
+                        const SizedBox(width: 3),
+                        Text('${widget.meme.pages.length}',
+                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+                ),
               if (isMulti)
                 Positioned(top: 6, left: 6,
                   child: Container(padding: const EdgeInsets.all(2),
@@ -696,6 +711,8 @@ class _MemeCardState extends State<MemeCard> {
       {'type': Meme.typeGif, 'label': l10n.tr('type_gif'), 'icon': Icons.gif},
       {'type': Meme.typeImage, 'label': l10n.tr('type_image'), 'icon': Icons.image},
       {'type': Meme.typeText, 'label': l10n.tr('type_text'), 'icon': Icons.text_fields},
+      {'type': Meme.typeNovel, 'label': l10n.tr('type_novel'), 'icon': Icons.menu_book},
+      {'type': Meme.typeManga, 'label': l10n.tr('type_manga'), 'icon': Icons.photo_library},
       {'type': Meme.typePortrait, 'label': l10n.tr('type_portrait'), 'icon': Icons.portrait},
       {'type': Meme.typeCg, 'label': l10n.tr('type_cg'), 'icon': Icons.photo_library},
       {'type': Meme.typeCharacterCard, 'label': l10n.tr('type_character_card'), 'icon': Icons.person_outline},

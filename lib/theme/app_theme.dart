@@ -27,19 +27,21 @@ class AppTheme {
   static const Color defaultSeed = Color(0xFF6366F1);
 
   /// 预设种子色板
+  /// 顺序：默认 → 5 个主题配色（用户自定义）→ 其他自然命名配色
   static const presets = <ColorSchemePreset>[
     ColorSchemePreset(name: '靛蓝', seed: Color(0xFF6366F1)),
+    // 用户自定义主题配色（置顶）
     ColorSchemePreset(name: '巫女大人', seed: Color(0xFFFBFBFE)),
     ColorSchemePreset(name: '下流忍者', seed: Color(0xFFB8B3E5)),
     ColorSchemePreset(name: '幼刀丛雨', seed: Color(0xFFBCD5AA)),
     ColorSchemePreset(name: '世界之大', seed: Color(0xFFFCF06B)),
     ColorSchemePreset(name: '田心屋', seed: Color(0xFFFFB1B5)),
-    ColorSchemePreset(name: '森人板卡', seed: Color(0xFF9CD7E2)),
-    ColorSchemePreset(name: '翠绿', seed: Color(0xFF2E7D32)),
-    ColorSchemePreset(name: '焦糖', seed: Color(0xFF8D6E63)),
-    ColorSchemePreset(name: '深海', seed: Color(0xFF1565C0)),
-    ColorSchemePreset(name: '暮紫', seed: Color(0xFF7B1FA2)),
-    ColorSchemePreset(name: '夕阳', seed: Color(0xFFEF6C00)),
+    // 其他自然命名配色
+    ColorSchemePreset(name: '林荫', seed: Color(0xFF2E7D32)),
+    ColorSchemePreset(name: '琥珀', seed: Color(0xFF8D6E63)),
+    ColorSchemePreset(name: '潮汐', seed: Color(0xFF1565C0)),
+    ColorSchemePreset(name: '星云', seed: Color(0xFF7B1FA2)),
+    ColorSchemePreset(name: '暮霞', seed: Color(0xFFEF6C00)),
   ];
 
   /// 生成 M3 ColorScheme。
@@ -47,14 +49,20 @@ class AppTheme {
   static ColorScheme _scheme(Color seed, Brightness brightness, {bool pureBlack = false}) {
     var scheme = ColorScheme.fromSeed(seedColor: seed, brightness: brightness);
     if (brightness == Brightness.dark && pureBlack) {
+      // 纯黑模式：所有 surface 系列强制为黑色/近黑，与普通深色明显区分
       scheme = scheme.copyWith(
         surface: Colors.black,
-        onSurface: Colors.white,
+        onSurface: Colors.grey.shade50,
+        onSurfaceVariant: Colors.grey.shade400,
         surfaceContainerLowest: Colors.black,
-        surfaceContainerLow: const Color(0xFF0A0A0A),
-        surfaceContainer: const Color(0xFF121212),
-        surfaceContainerHigh: const Color(0xFF1A1A1A),
-        surfaceContainerHighest: const Color(0xFF222222),
+        surfaceContainerLow: const Color(0xFF050505),
+        surfaceContainer: const Color(0xFF0D0D0D),
+        surfaceContainerHigh: const Color(0xFF141414),
+        surfaceContainerHighest: const Color(0xFF1C1C1C),
+        inverseSurface: Colors.grey.shade100,
+        onInverseSurface: Colors.black,
+        scrim: Colors.black,
+        shadow: Colors.black.withValues(alpha: 0.75),
       );
     }
     return scheme;
@@ -86,7 +94,7 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: isDark
-            ? (pureBlack ? const Color(0xFF1A1A1A) : Colors.grey.shade900)
+            ? (pureBlack ? const Color(0xFF1C1C1C) : Colors.grey.shade900)
             : Colors.grey.shade100,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -94,6 +102,15 @@ class AppTheme {
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       ),
+      drawerTheme: isDark && pureBlack
+          ? const DrawerThemeData(backgroundColor: Colors.black)
+          : null,
+      navigationBarTheme: isDark && pureBlack
+          ? NavigationBarThemeData(backgroundColor: Colors.black)
+          : null,
+      bottomAppBarTheme: isDark && pureBlack
+          ? const BottomAppBarThemeData(color: Colors.black)
+          : null,
       // 让 FAB / Chip / 按钮 / 对话框 / 导航栏 统一走 M3 默认 + 圆角
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         elevation: 2,

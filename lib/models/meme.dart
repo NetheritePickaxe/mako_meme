@@ -9,10 +9,12 @@ class Meme {
   static const String typeVector = 'vector';   // SVG 矢量图
   static const String typePsd = 'psd';          // PSD 多图层
   static const String typePdf = 'pdf';          // PDF 文档
+  static const String typeNovel = 'novel';       // 小说（长文本）
+  static const String typeManga = 'manga';       // 漫画（多页图片）
 
   static const List<String> allTypes = [
     typeEmoji, typeGif, typeImage, typeText, typePortrait, typeCg,
-    typeCharacterCard, typeVector, typePsd, typePdf,
+    typeCharacterCard, typeVector, typePsd, typePdf, typeNovel, typeManga,
   ];
 
   /// 所有支持的图片/文档格式扩展名（不含点，小写）
@@ -23,7 +25,8 @@ class Meme {
 
   bool get isImageType => type == typeImage || type == typeGif ||
       type == typePortrait || type == typeCg || type == typeCharacterCard ||
-      type == typeVector || type == typePsd || type == typePdf;
+      type == typeVector || type == typePsd || type == typePdf || type == typeNovel ||
+      type == typeManga;
 
   /// 是否为动画类型（GIF / APNG）
   bool get isAnimated => type == typeGif || mimeType == 'image/apng';
@@ -36,6 +39,15 @@ class Meme {
 
   /// 是否为 PDF
   bool get isPdf => type == typePdf;
+
+  /// 是否为漫画（多页图片）
+  bool get isManga => type == typeManga;
+
+  /// 是否为小说（长文本）
+  bool get isNovel => type == typeNovel;
+
+  /// 是否为文本类（文本或小说）
+  bool get isTextLike => type == typeText || type == typeNovel;
 
   /// 实际显示用路径：有缩略图（PSD/ICO/TIF 转换的 PNG）时用 thumbPath，否则用 filePath
   String get displayPath => thumbPath ?? filePath;
@@ -60,6 +72,8 @@ class Meme {
       case typeVector: return 'type_vector';
       case typePsd: return 'type_psd';
       case typePdf: return 'type_pdf';
+      case typeNovel: return 'type_novel';
+      case typeManga: return 'type_manga';
       default: return 'type_image';
     }
   }
@@ -83,6 +97,8 @@ class Meme {
   final String? thumbPath;
   /// PSD 图层信息（名称/可见性/边界），用于查看器图层面板
   final List<Map<String, dynamic>>? psdLayers;
+  /// 漫画多页路径列表（每页为相对存储路径，filePath 为首页/封面）
+  final List<String> pages;
 
   Meme({
     required this.id,
@@ -102,6 +118,7 @@ class Meme {
     this.height = 0,
     this.thumbPath,
     this.psdLayers,
+    this.pages = const [],
   });
 
   Map<String, dynamic> toMap() => {
@@ -122,6 +139,7 @@ class Meme {
     'height': height,
     'thumbPath': thumbPath,
     'psdLayers': psdLayers,
+    'pages': pages,
   };
 
   factory Meme.fromMap(Map<String, dynamic> map) => Meme(
@@ -145,6 +163,9 @@ class Meme {
         ? List<Map<String, dynamic>>.from(
             (map['psdLayers'] as List).map((e) => Map<String, dynamic>.from(e as Map)))
         : null,
+    pages: map['pages'] != null
+        ? List<String>.from(map['pages'] as List)
+        : const [],
   );
 
   Meme copyWith({
@@ -165,6 +186,7 @@ class Meme {
     int? height,
     String? thumbPath,
     List<Map<String, dynamic>>? psdLayers,
+    List<String>? pages,
   }) => Meme(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -183,5 +205,6 @@ class Meme {
     height: height ?? this.height,
     thumbPath: thumbPath ?? this.thumbPath,
     psdLayers: psdLayers ?? this.psdLayers,
+    pages: pages ?? this.pages,
   );
 }

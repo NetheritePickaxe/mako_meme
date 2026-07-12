@@ -13,6 +13,7 @@ import '../providers/meme_provider.dart';
 import '../providers/locale_provider.dart';
 import '../l10n/l10n.dart';
 import '../services/storage_service.dart';
+import 'text_editor_screen.dart';
 import 'character_card_editor_screen.dart';
 
 /// 是否为移动平台
@@ -61,6 +62,11 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
   // LRU 缓存：最多保留 3 项，避免来回滑动时内存累积导致 OOM
   final _LruCache<int, Uint8List?> _bytesCache = _LruCache(3);
   final _LruCache<int, File?> _fileCache = _LruCache(3);
+
+  // 漫画内部页面滑动
+  int _mangaPageIndex = 0;
+  final _LruCache<String, Uint8List?> _mangaBytesCache = _LruCache(3);
+  final _LruCache<String, File?> _mangaFileCache = _LruCache(3);
 
   @override
   void initState() {
@@ -143,7 +149,9 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
               overflow: TextOverflow.ellipsis,
             ),
             Text(
-              '${_currentIndex + 1} / ${widget.memes.length}',
+              _meme.isManga
+                  ? '${_currentIndex + 1} / ${widget.memes.length}  ·  ${l10n.tr('manga_page_label')} ${_mangaPageIndex + 1} / ${_meme.pages.length}'
+                  : '${_currentIndex + 1} / ${widget.memes.length}',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
               ),
@@ -164,7 +172,10 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
         physics: const BouncingScrollPhysics(),
         controller: _controller,
         itemCount: widget.memes.length,
-        onPageChanged: (i) => setState(() => _currentIndex = i),
+        onPageChanged: (i) => setState(() {
+          _currentIndex = i;
+          _mangaPageIndex = 0;
+        }),
         itemBuilder: (ctx, i) {
           final m = widget.memes[i];
           // 使用 Stack 让面板覆盖在图片上方，避免 Column 无界高度导致 DraggableScrollableSheet 失效
@@ -187,9 +198,16 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
   /// - SVG: SvgPicture + InteractiveViewer（矢量无限缩放）
   /// - GIF/APNG: Image + InteractiveViewer（保持动画播放）
   /// - PSD: 显示合成预览（thumbPath）
+  /// - 漫画: PageView 内部滑动 + PhotoView 单页缩放
   /// - 普通位图: PhotoView（支持手势缩放）
   Widget _buildImageArea(Meme m, int i) {
     final theme = Theme.of(context);
+
+    // 漫画：内置 PageView 滑动多页
+    if (m.isManga) {
+      return _buildMangaReader(theme, m);
+    }
+
     _ensureBytes(i);
     final bytes = _bytesCache.get(i);
     final file = _fileCache.get(i);
@@ -261,6 +279,11 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
       );
     }
 
+    // 小说：可滚动的长文阅读器，支持 Markdown 渲染
+    if (m.isNovel) {
+      return _buildNovelReader(theme, m);
+    }
+
     // 文字表情居中显示
     return Center(
       child: Padding(
@@ -270,6 +293,151 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
           style: theme.textTheme.headlineMedium,
           textAlign: TextAlign.center,
         ),
+      ),
+    );
+  }
+
+  /// 漫画阅读器：内置 PageView，左右滑动切换页面
+  /// 单页使用 PhotoView 支持手势缩放
+  Widget _buildMangaReader(ThemeData theme, Meme m) {
+    final l10n = context.read<LocaleProvider>().l10n;
+    final pages = m.pages;
+    if (pages.isEmpty) {
+      return Center(
+        child: Text(l10n.tr('manga_no_pages'), style: theme.textTheme.bodyLarge),
+      );
+    }
+    return PageView.builder(
+      itemCount: pages.length,
+      onPageChanged: (i) => setState(() => _mangaPageIndex = i),
+      itemBuilder: (ctx, pageIdx) {
+        final pagePath = pages[pageIdx];
+        _ensureMangaPageBytes(pagePath);
+        final bytes = _mangaBytesCache.get(pagePath);
+        final file = _mangaFileCache.get(pagePath);
+
+        if (bytes == null && file == null) {
+          return Center(
+            child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.primary),
+          );
+        }
+
+        return Stack(
+          children: [
+            PhotoView(
+              imageProvider: file != null ? FileImage(file) : MemoryImage(bytes!),
+              minScale: PhotoViewComputedScale.contained,
+              maxScale: PhotoViewComputedScale.covered * 2,
+              backgroundDecoration: BoxDecoration(color: theme.colorScheme.surface),
+              loadingBuilder: (_, event) => Center(
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: theme.colorScheme.primary,
+                  value: event == null ? null : event.cumulativeBytesLoaded /
+                      (event.expectedTotalBytes ?? 1),
+                ),
+              ),
+              errorBuilder: (_, error, ___) => _errorWidget(theme, error),
+            ),
+            // 右下角页码指示器
+            Positioned(
+              bottom: 12,
+              right: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '${pageIdx + 1} / ${pages.length}',
+                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// 加载漫画单页字节（按页面路径缓存）
+  Future<void> _ensureMangaPageBytes(String pagePath) async {
+    if (_mangaBytesCache.containsKey(pagePath) || _mangaFileCache.containsKey(pagePath)) return;
+    if (pagePath.isEmpty) {
+      _mangaBytesCache.put(pagePath, null);
+      return;
+    }
+    try {
+      final storage = context.read<StorageService>();
+      if (kIsWeb) {
+        final b = await storage.readMemeBytes(pagePath);
+        if (mounted) setState(() => _mangaBytesCache.put(pagePath, b));
+      } else {
+        final f = storage.getMemeFile(pagePath);
+        final exists = f != null && await f.exists();
+        if (mounted) setState(() => _mangaFileCache.put(pagePath, exists ? f : null));
+      }
+    } catch (_) {}
+  }
+
+  /// 小说阅读器：可滚动，支持 Markdown 段落渲染
+  Widget _buildNovelReader(ThemeData theme, Meme m) {
+    final l10n = context.read<LocaleProvider>().l10n;
+    final content = m.textContent ?? '';
+    if (content.isEmpty) {
+      return Center(child: Text(l10n.tr('no_text_content'), style: theme.textTheme.bodyLarge));
+    }
+    final lines = content.split('\n');
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: lines.asMap().entries.map((e) {
+          final line = e.value;
+          final ts = theme.textTheme;
+          if (line.startsWith('# ')) {
+            return Padding(
+              padding: const EdgeInsets.only(top: 24, bottom: 12),
+              child: Text(line.substring(2), style: ts.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+            );
+          }
+          if (line.startsWith('## ')) {
+            return Padding(
+              padding: const EdgeInsets.only(top: 20, bottom: 10),
+              child: Text(line.substring(3), style: ts.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+            );
+          }
+          if (line.startsWith('### ')) {
+            return Padding(
+              padding: const EdgeInsets.only(top: 16, bottom: 8),
+              child: Text(line.substring(4), style: ts.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+            );
+          }
+          if (line.trim() == '---' || line.trim() == '***') {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Divider(color: theme.colorScheme.outlineVariant),
+            );
+          }
+          if (line.startsWith('> ')) {
+            return Padding(
+              padding: const EdgeInsets.only(left: 16, bottom: 8),
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border(left: BorderSide(color: theme.colorScheme.primary, width: 3)),
+                ),
+                padding: const EdgeInsets.only(left: 12),
+                child: Text(line.substring(2), style: ts.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontStyle: FontStyle.italic, height: 1.8)),
+              ),
+            );
+          }
+          if (line.trim().isEmpty) return const SizedBox(height: 12);
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(line, style: ts.bodyLarge?.copyWith(height: 1.8)),
+          );
+        }).toList(),
       ),
     );
   }
@@ -571,6 +739,8 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                       color: m.isFavorite ? Colors.red : null,
                     ),
                     _actionButton(theme, l10n.tr('select_category'), Icons.label_outline, _showTypeDialog),
+                    if (m.isTextLike)
+                      _actionButton(theme, l10n.tr('edit'), Icons.edit_note, () => _editText(m)),
                     _actionButton(theme, l10n.tr('rename'), Icons.edit, _rename),
                     _actionButton(theme, l10n.tr('delete'), Icons.delete_outline, _confirmDelete, color: Colors.red),
                   ],
@@ -649,6 +819,10 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
         return l10n.tr('type_gif');
       case Meme.typeText:
         return l10n.tr('type_text');
+      case Meme.typeNovel:
+        return l10n.tr('type_novel');
+      case Meme.typeManga:
+        return l10n.tr('type_manga');
       case Meme.typePortrait:
         return l10n.tr('type_portrait');
       case Meme.typeCg:
@@ -667,7 +841,10 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
       case Meme.typeGif:
         return Icons.gif;
       case Meme.typeText:
+      case Meme.typeNovel:
         return Icons.text_fields;
+      case Meme.typeManga:
+        return Icons.photo_library;
       case Meme.typePortrait:
         return Icons.portrait;
       case Meme.typeCg:
@@ -753,6 +930,25 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
     }
   }
 
+  /// 编辑文本/小说内容 — 打开全屏编辑器
+  void _editText(Meme m) {
+    final prov = context.read<MemeProvider>();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => TextEditorScreen(
+          type: m.type,
+          initialText: m.textContent,
+          initialTitle: m.name,
+          onSave: (text, title) async {
+            await prov.updateMemeText(m.id, text, name: title);
+          },
+        ),
+      ),
+    );
+  }
+
   void _editCharacterCard() {
     Navigator.push(
       context,
@@ -769,6 +965,8 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
       {'type': Meme.typeGif, 'label': l10n.tr('type_gif'), 'icon': Icons.gif},
       {'type': Meme.typeImage, 'label': l10n.tr('type_image'), 'icon': Icons.image},
       {'type': Meme.typeText, 'label': l10n.tr('type_text'), 'icon': Icons.text_fields},
+      {'type': Meme.typeNovel, 'label': l10n.tr('type_novel'), 'icon': Icons.menu_book},
+      {'type': Meme.typeManga, 'label': l10n.tr('type_manga'), 'icon': Icons.photo_library},
       {'type': Meme.typePortrait, 'label': l10n.tr('type_portrait'), 'icon': Icons.portrait},
       {'type': Meme.typeCg, 'label': l10n.tr('type_cg'), 'icon': Icons.photo_library},
       {'type': Meme.typeCharacterCard, 'label': l10n.tr('type_character_card'), 'icon': Icons.person_outline},

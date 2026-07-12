@@ -19,6 +19,15 @@ class SettingsProvider extends ChangeNotifier {
   bool _showCardType = false;
   bool _showCardExt = false;
 
+  // 分类可见性 — 默认隐藏特殊功能分类（角色卡/立绘/CG/小说）
+  // 存储为逗号分隔的隐藏类型字符串
+  Set<String> _hiddenCategories = {
+    'portrait', 'cg', 'character_card', 'novel',
+  };
+
+  // 用户自定义分类（纯标签，无特殊功能）
+  List<String> _customCategories = [];
+
   // WebDAV 配置
   bool _useWebDav = false;
   String? _webDavBaseUrl;
@@ -70,6 +79,17 @@ class SettingsProvider extends ChangeNotifier {
     _showCardType = _storage.getSetting('showCardType') == 'true';
     _showCardExt = _storage.getSetting('showCardExt') == 'true';
 
+    // 加载分类可见性（未设置时默认隐藏 portrait/cg/character_card）
+    final savedHidden = _storage.getSetting('hiddenCategories');
+    if (savedHidden != null && savedHidden.isNotEmpty) {
+      _hiddenCategories = savedHidden.split(',').where((s) => s.isNotEmpty).toSet();
+    }
+    // 加载自定义分类
+    final savedCustom = _storage.getSetting('customCategories');
+    if (savedCustom != null && savedCustom.isNotEmpty) {
+      _customCategories = savedCustom.split(',').where((s) => s.isNotEmpty).toList();
+    }
+
     // 加载 WebDAV 配置
     _useWebDav = _storage.getSetting('useWebDav') == 'true';
     _webDavBaseUrl = _storage.getSetting('webDavBaseUrl');
@@ -101,6 +121,12 @@ class SettingsProvider extends ChangeNotifier {
   bool get showCardTags => _showCardTags;
   bool get showCardType => _showCardType;
   bool get showCardExt => _showCardExt;
+
+  Set<String> get hiddenCategories => Set.unmodifiable(_hiddenCategories);
+  List<String> get customCategories => List.unmodifiable(_customCategories);
+
+  /// 判断某分类是否在主界面分类栏中可见
+  bool isCategoryVisible(String type) => !_hiddenCategories.contains(type);
   Color get customSeed => _customSeed;
   int get presetIndex => _presetIndex;
 
@@ -187,6 +213,30 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setShowCardExt(bool v) async {
     _showCardExt = v;
     await _storage.setSetting('showCardExt', v.toString());
+    notifyListeners();
+  }
+
+  Future<void> toggleCategoryVisibility(String type) async {
+    if (_hiddenCategories.contains(type)) {
+      _hiddenCategories.remove(type);
+    } else {
+      _hiddenCategories.add(type);
+    }
+    await _storage.setSetting('hiddenCategories', _hiddenCategories.join(','));
+    notifyListeners();
+  }
+
+  Future<void> addCustomCategory(String name) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty || _customCategories.contains(trimmed)) return;
+    _customCategories = [..._customCategories, trimmed];
+    await _storage.setSetting('customCategories', _customCategories.join(','));
+    notifyListeners();
+  }
+
+  Future<void> removeCustomCategory(String name) async {
+    _customCategories = _customCategories.where((c) => c != name).toList();
+    await _storage.setSetting('customCategories', _customCategories.join(','));
     notifyListeners();
   }
 
