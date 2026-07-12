@@ -83,6 +83,7 @@ class _MakoSearchBarState extends State<MakoSearchBar> {
 
   void _showHelpDialog(String text) {
     final theme = Theme.of(context);
+    final l10n = context.read<LocaleProvider>().l10n;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -90,7 +91,7 @@ class _MakoSearchBarState extends State<MakoSearchBar> {
           children: [
             Icon(Icons.help_outline, color: theme.colorScheme.primary),
             const SizedBox(width: 8),
-            const Text('搜索帮助'),
+            Text(l10n.tr('search_help_title')),
           ],
         ),
         content: SizedBox(
@@ -110,55 +111,86 @@ class _MakoSearchBarState extends State<MakoSearchBar> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('关闭'),
+            child: Text(l10n.tr('close')),
           ),
         ],
       ),
     );
   }
 
-  /// 点击补全项时，替换当前正在输入的部分
+  /// 判断当前输入是否为命令模式（/ 开头且解析为 CommandSearch）
+  bool _isCommandMode(String v) {
+    final q = v.trim();
+    if (!q.startsWith('/')) return false;
+    final prov = context.read<MemeProvider>();
+    return SearchQuery.parse(q, prov.folders) is CommandSearch;
+  }
+
+  /// 点击补全项时，替换当前正在输入的最后一个片段
   void _applySuggestion(SearchSuggestion s) {
     final text = _controller.text;
-    final selection = _controller.selection;
+    final q = text.trim();
 
-    // 如果光标在末尾（常见情况），简化处理
-    if (selection.baseOffset == text.length) {
-      // 提取 / 之后，去掉方括号
-      var afterSlash = text.substring(text.startsWith('/') ? 1 : 0);
-      afterSlash = afterSlash.replaceAll('[', '').replaceAll(']', '');
-
-      // 按逗号分割，取最后一部分
-      final parts = SearchQuery.getSuggestionsRawParts(text);
-
-      if (parts.length > 1) {
-        // 替换最后一部分
-        final before = parts.sublist(0, parts.length - 1).join(',');
-        // 判断是否有方括号
-        final hasBracket = text.contains('[');
-        final prefix = text.startsWith('/') ? '/' : '';
-        final openBracket = hasBracket ? '[' : '';
-        final closeBracket = hasBracket ? ']' : '';
-        final newText = '$prefix$openBracket$before,$s.insert$closeBracket';
-        _controller.text = newText;
-        _controller.selection = TextSelection.collapsed(offset: newText.length - (hasBracket ? 1 : 0));
+    String newText;
+    if (q.startsWith('/')) {
+      // 命令模式：按空白拆分，替换最后一个片段
+      final parts = text.split(RegExp(r'\s+'));
+      if (parts.isEmpty) {
+        newText = s.insert;
       } else {
-        // 只有一部分，整体替换
-        final hasBracket = text.contains('[');
-        final prefix = text.startsWith('/') ? '/' : '';
-        final openBracket = hasBracket ? '[' : '';
-        final closeBracket = hasBracket ? ']' : '';
-        final newText = '$prefix$openBracket${s.insert}$closeBracket';
-        _controller.text = newText;
-        _controller.selection = TextSelection.collapsed(offset: newText.length - (hasBracket ? 1 : 0));
+        parts[parts.length - 1] = s.insert;
+        newText = parts.join(' ');
+      }
+    } else if (q.startsWith('[')) {
+      // 选择器模式：按逗号拆分（忽略 {}），替换最后一个片段
+      final parts = SearchQuery.getSuggestionsRawParts(text);
+      if (parts.length <= 1) {
+        newText = '[${s.insert}]';
+      } else {
+        final before = parts.sublist(0, parts.length - 1).join(',');
+        newText = '[$before,${s.insert}]';
       }
     } else {
-      // 光标不在末尾，简单追加
-      _controller.text = text + s.insert;
-      _controller.selection = TextSelection.collapsed(offset: _controller.text.length);
+      newText = s.insert;
     }
 
+    _controller.text = newText;
+    _controller.selection = TextSelection.collapsed(offset: newText.length);
     _onChanged(_controller.text);
+  }
+
+  Future<void> _onSubmitted(String v) async {
+    if (_error != null) return;
+    final q = v.trim();
+    if (q.isEmpty) {
+      widget.onSearch(v);
+      return;
+    }
+
+    // 命令模式：执行命令
+    if (_isCommandMode(q)) {
+      final prov = context.read<MemeProvider>();
+      final msg = await prov.executeCommand(q);
+      // 清空搜索框
+      _controller.clear();
+      _suggestions = [];
+      _lastHelpShown = '';
+      _error = null;
+      widget.onSearch('');
+      setState(() {});
+      if (mounted && msg != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
+    widget.onSearch(v);
   }
 
   @override
@@ -167,6 +199,7 @@ class _MakoSearchBarState extends State<MakoSearchBar> {
     final l10n = context.watch<LocaleProvider>().l10n;
     final hasError = _error != null;
     final errorColor = theme.colorScheme.error;
+    final isCmd = _isCommandMode(_controller.text);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -179,8 +212,12 @@ class _MakoSearchBarState extends State<MakoSearchBar> {
               hintText: l10n.tr('search_hint'),
               hintStyle: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
               prefixIcon: Icon(
-                hasError ? Icons.error_outline : Icons.search,
-                color: hasError ? errorColor : theme.colorScheme.onSurfaceVariant,
+                hasError
+                    ? Icons.error_outline
+                    : (isCmd ? Icons.terminal : Icons.search),
+                color: hasError
+                    ? errorColor
+                    : (isCmd ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant),
               ),
               suffixIcon: _controller.text.isNotEmpty
                   ? IconButton(
@@ -198,16 +235,24 @@ class _MakoSearchBarState extends State<MakoSearchBar> {
               filled: true,
               fillColor: hasError
                   ? errorColor.withValues(alpha: 0.08)
-                  : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                  : (isCmd
+                      ? theme.colorScheme.primary.withValues(alpha: 0.06)
+                      : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5)),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(28),
-                borderSide: BorderSide(color: hasError ? errorColor : theme.colorScheme.outline),
+                borderSide: BorderSide(
+                  color: hasError
+                      ? errorColor
+                      : (isCmd ? theme.colorScheme.primary : theme.colorScheme.outline),
+                ),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(28),
                 borderSide: BorderSide(
-                  color: hasError ? errorColor : theme.colorScheme.outline,
-                  width: hasError ? 1.5 : 1,
+                  color: hasError
+                      ? errorColor
+                      : (isCmd ? theme.colorScheme.primary : theme.colorScheme.outline),
+                  width: isCmd || hasError ? 1.5 : 1,
                 ),
               ),
               focusedBorder: OutlineInputBorder(
@@ -220,11 +265,28 @@ class _MakoSearchBarState extends State<MakoSearchBar> {
             ),
             style: TextStyle(color: theme.colorScheme.onSurface),
             onChanged: _onChanged,
-            onSubmitted: (v) {
-              if (_error == null) widget.onSearch(v);
-            },
+            onSubmitted: _onSubmitted,
           ),
         ),
+        // 命令模式提示
+        if (isCmd && !hasError)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(28, 0, 16, 4),
+            child: Row(
+              children: [
+                Icon(Icons.play_arrow, size: 14, color: theme.colorScheme.primary),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    l10n.tr('command_mode_hint'),
+                    style: TextStyle(fontSize: 12, color: theme.colorScheme.primary),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
         // 错误提示
         if (hasError)
           Padding(

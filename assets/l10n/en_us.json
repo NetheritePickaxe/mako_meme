@@ -1,5 +1,8 @@
 {
   "search_hint": "Search / #tag @folder *wildcard",
+  "search_help_title": "Search Help",
+  "close": "Close",
+  "command_mode_hint": "Command mode: press Enter to execute",
   "menu": "Menu",
   "multi_select": "Multi-select",
   "exit_multi_select": "Exit multi-select",

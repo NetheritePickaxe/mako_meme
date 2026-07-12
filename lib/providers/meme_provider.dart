@@ -83,6 +83,51 @@ class MemeProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  /// 当前查询是否为命令（用于搜索栏判断是否在输入命令）
+  bool get isCommandQuery =>
+      _query.trim().startsWith('/') &&
+      SearchQuery.parse(_query, _folders) is CommandSearch;
+
+  /// 执行命令，返回结果消息（用于 snackbar 提示）
+  /// 仅支持 CommandSearch 类型，其他返回 null
+  Future<String?> executeCommand(String query) async {
+    final result = SearchQuery.parse(query, _folders);
+    if (result is! CommandSearch) return null;
+
+    if (result.command == 'tag') {
+      if (result.action.isEmpty) {
+        return '缺少操作（add 或 remove）';
+      }
+      if (result.args.isEmpty) {
+        return '缺少标签名';
+      }
+      final matcher = result.asMatcher(_folders);
+      final targets = _all.where(matcher).toList();
+      if (targets.isEmpty) return '没有匹配的表情包';
+
+      final tags = result.args;
+      if (result.action == 'add') {
+        for (final meme in targets) {
+          for (final tag in tags) {
+            await _storage.addTagToMeme(meme.id, tag);
+          }
+        }
+      } else if (result.action == 'remove') {
+        for (final meme in targets) {
+          for (final tag in tags) {
+            await _storage.removeTagFromMeme(meme.id, tag);
+          }
+        }
+      }
+      await loadAll();
+      final op = result.action == 'add' ? '添加' : '移除';
+      return '已对 ${targets.length} 个表情包$op标签: ${tags.join(", ")}';
+    }
+
+    if (result.command == 'help') return null;
+    return '未知命令: ${result.command}';
+  }
+
   void toggleTag(String tag) {
     _tagFilter.contains(tag) ? _tagFilter.remove(tag) : _tagFilter.add(tag);
     _apply();
@@ -364,8 +409,12 @@ class MemeProvider with ChangeNotifier {
       list = list.where((m) => _typeFilter.contains(m.type)).toList();
     }
     if (_query.isNotEmpty) {
-      final matcher = SearchQuery.parse(_query, _folders);
-      list = list.where(matcher).toList();
+      final result = SearchQuery.parse(_query, _folders);
+      // 命令不参与筛选（在 executeCommand 中执行），普通搜索和选择器正常筛选
+      if (result is! CommandSearch) {
+        final matcher = result.asMatcher(_folders);
+        list = list.where(matcher).toList();
+      }
     }
 
     list.sort((a, b) {

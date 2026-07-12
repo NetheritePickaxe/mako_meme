@@ -728,6 +728,25 @@ class StorageService {
     }
   }
 
+  Future<void> addTagToMeme(String id, String tag) async {
+    if (_memeBox == null) return;
+    final meme = _getMeme(id);
+    if (meme == null) return;
+    if (meme.tags.contains(tag)) return;
+    await _memeBox!.put(id, meme.copyWith(tags: [...meme.tags, tag]).toMap());
+  }
+
+  Future<void> removeTagFromMeme(String id, String tag) async {
+    if (_memeBox == null) return;
+    final meme = _getMeme(id);
+    if (meme == null) return;
+    if (!meme.tags.contains(tag)) return;
+    await _memeBox!.put(
+      id,
+      meme.copyWith(tags: meme.tags.where((t) => t != tag).toList()).toMap(),
+    );
+  }
+
   // ======================== Folder CRUD ========================
 
   Future<MemeFolder> createFolder(String name) async {
