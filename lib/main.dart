@@ -7,6 +7,7 @@ import 'providers/meme_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/locale_provider.dart';
 import 'services/admin_service.dart';
+import 'services/image_tool_service.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
 
@@ -25,6 +26,7 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => SettingsProvider(storage)),
         Provider.value(value: storage),
         Provider.value(value: AdminService()),
+        Provider.value(value: ImageToolService(storage)),
       ],
       child: const MakoMemeApp(),
     ),

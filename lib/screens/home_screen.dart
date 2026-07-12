@@ -21,6 +21,7 @@ import '../widgets/meme_preview_panel.dart';
 import '../services/storage_service.dart';
 import '../screens/settings_screen.dart';
 import '../screens/text_editor_screen.dart';
+import '../screens/tools_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -64,6 +65,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _openSettings() {
     Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+  }
+
+  void _openTools() {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const ToolsScreen()));
   }
 
   @override
@@ -682,6 +687,15 @@ class _HomeScreenState extends State<HomeScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   ListTile(
+                    leading: const Icon(Icons.build_outlined),
+                    title: Text(l10n.tr('tools')),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _openTools();
+                    },
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  ListTile(
                     leading: const Icon(Icons.settings_outlined),
                     title: Text(l10n.tr('settings')),
                     onTap: () {
@@ -882,7 +896,54 @@ class _HomeScreenState extends State<HomeScreen> {
             ListTile(
               leading: const Icon(Icons.image),
               title: Text(l10n.tr('import_images')),
-              subtitle: const Text('JPG / PNG / GIF / WebP / BMP'),
+              subtitle: Text(l10n.tr('import_images_desc')),
+              trailing: PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert),
+                tooltip: l10n.tr('more_options'),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                onSelected: (v) {
+                  Navigator.pop(bCtx);
+                  if (v == 'manga') {
+                    _showMangaImportMenu(ctx, prov);
+                  } else if (v == 'sprite') {
+                    _showSpriteImportMenu(ctx, prov);
+                  } else if (v == 'novel') {
+                    _importNovel(ctx, prov);
+                  } else {
+                    _importFiles(ctx, prov);
+                  }
+                },
+                itemBuilder: (_) => [
+                  PopupMenuItem(value: 'normal', child: ListTile(
+                    leading: const Icon(Icons.photo, size: 20),
+                    title: Text(l10n.tr('import_as_images'),
+                      style: const TextStyle(fontSize: 14)),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                  )),
+                  PopupMenuItem(value: 'manga', child: ListTile(
+                    leading: const Icon(Icons.photo_library, size: 20),
+                    title: Text(l10n.tr('import_as_manga'),
+                      style: const TextStyle(fontSize: 14)),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                  )),
+                  PopupMenuItem(value: 'sprite', child: ListTile(
+                    leading: const Icon(Icons.accessibility_new, size: 20),
+                    title: Text(l10n.tr('import_as_sprite'),
+                      style: const TextStyle(fontSize: 14)),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                  )),
+                  PopupMenuItem(value: 'novel', child: ListTile(
+                    leading: const Icon(Icons.menu_book, size: 20),
+                    title: Text(l10n.tr('import_as_novel'),
+                      style: const TextStyle(fontSize: 14)),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                  )),
+                ],
+              ),
               onTap: () { Navigator.pop(bCtx); _importFiles(ctx, prov); },
             ),
             ListTile(
@@ -890,24 +951,6 @@ class _HomeScreenState extends State<HomeScreen> {
               title: Text(l10n.tr('import_text')),
               subtitle: Text(l10n.tr('plain_text_or_emoji')),
               onTap: () { Navigator.pop(bCtx); _importText(ctx, prov); },
-            ),
-            ListTile(
-              leading: const Icon(Icons.menu_book),
-              title: Text(l10n.tr('import_novel')),
-              subtitle: Text(l10n.tr('novel_desc')),
-              onTap: () { Navigator.pop(bCtx); _importNovel(ctx, prov); },
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: Text(l10n.tr('import_manga')),
-              subtitle: Text(l10n.tr('manga_desc')),
-              onTap: () { Navigator.pop(bCtx); _showMangaImportMenu(ctx, prov); },
-            ),
-            ListTile(
-              leading: const Icon(Icons.accessibility_new),
-              title: Text(l10n.tr('import_sprite')),
-              subtitle: Text(l10n.tr('sprite_desc')),
-              onTap: () { Navigator.pop(bCtx); _showSpriteImportMenu(ctx, prov); },
             ),
             ListTile(
               leading: const Icon(Icons.create_new_folder),

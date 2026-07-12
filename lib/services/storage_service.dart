@@ -543,6 +543,9 @@ class StorageService {
     }
   }
 
+  /// 公共保存接口：供外部服务（如 ImageToolService）保存新生成的 meme
+  Future<void> saveMeme(Meme meme) => _saveMeme(meme, null);
+
   Future<Uint8List?> readMemeBytes(String filePath) async {
     if (kIsWeb) {
       return await webStorageGetBinary(filePath);
