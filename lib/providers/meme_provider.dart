@@ -55,6 +55,10 @@ class MemeProvider with ChangeNotifier {
   Set<String> get selectedFolders => _selectedFolders;
   Set<String> get tagFilter => _tagFilter;
 
+  /// 当前选中的 Meme 列表（基于 _all 匹配 selected id）
+  List<Meme> get selectedMemes =>
+      _all.where((m) => _sel.contains(m.id)).toList();
+
   List<String> get allTags {
     final s = <String>{};
     for (final m in _all) {

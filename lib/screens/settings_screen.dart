@@ -14,6 +14,7 @@ import '../l10n/l10n.dart';
 import '../models/meme.dart';
 import '../services/storage_service.dart';
 import '../services/update_service.dart';
+import 'keyboard_setup_screen.dart';
 import '../services/webdav_service.dart';
 import '../theme/app_theme.dart';
 
@@ -150,6 +151,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
           const SizedBox(height: 16),
 
+          _sectionHeader(l10n.tr('keyboard_setup'), cs),
+          ListTile(
+            leading: const Icon(Icons.keyboard_outlined),
+            title: Text(l10n.tr('keyboard_setup')),
+            subtitle: Text(l10n.tr('keyboard_setup_desc')),
+            trailing: const Icon(Icons.chevron_right, size: 20),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const KeyboardSetupScreen()),
+            ),
+          ),
+          const Divider(indent: 16, endIndent: 16),
+          _emojiEffectTile(settings, l10n),
+
+          const SizedBox(height: 16),
           _sectionHeader(l10n.tr('about'), cs),
           ListTile(
             leading: const Icon(Icons.info_outline),
@@ -735,6 +751,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _emojiEffectTile(SettingsProvider settings, L10n l10n) {
+    final cs = Theme.of(context).colorScheme;
+    final options = [
+      ('rain', l10n.tr('effect_rain'), Icons.cloudy_snowing),
+      ('explosion', l10n.tr('effect_explosion'), Icons.burst_mode),
+      ('both', l10n.tr('effect_both'), Icons.swap_vert),
+    ];
+    final currentLabel = options.firstWhere((o) => o.$1 == settings.emojiEffectType,
+        orElse: () => options.first).$2;
+    return ListTile(
+      leading: const Icon(Icons.celebration_outlined),
+      title: Text(l10n.tr('emoji_effect')),
+      subtitle: Text('$currentLabel · ${l10n.tr('emoji_effect_desc')}',
+          maxLines: 2, overflow: TextOverflow.ellipsis),
+      trailing: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: DropdownButton<String>(
+          value: settings.emojiEffectType,
+          underline: const SizedBox(),
+          isDense: true,
+          style: Theme.of(context).textTheme.bodyLarge,
+          borderRadius: BorderRadius.circular(16),
+          items: options
+              .map((o) => DropdownMenuItem(value: o.$1, child: Text(o.$2)))
+              .toList(),
+          onChanged: (val) {
+            if (val != null) settings.setEmojiEffectType(val);
+          },
+        ),
+      ),
     );
   }
 
