@@ -14,7 +14,6 @@ import '../l10n/l10n.dart';
 import '../models/meme.dart';
 import '../services/storage_service.dart';
 import '../services/update_service.dart';
-import 'keyboard_setup_screen.dart';
 import '../services/webdav_service.dart';
 import '../theme/app_theme.dart';
 
@@ -151,21 +150,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
           const SizedBox(height: 16),
 
-          const SizedBox(height: 16),
-
-          _sectionHeader(l10n.tr('keyboard_setup'), cs),
-          ListTile(
-            leading: const Icon(Icons.keyboard_outlined),
-            title: Text(l10n.tr('keyboard_setup')),
-            subtitle: Text(l10n.tr('keyboard_setup_desc')),
-            trailing: const Icon(Icons.chevron_right, size: 20),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const KeyboardSetupScreen()),
-            ),
-          ),
-
-          const SizedBox(height: 16),
           _sectionHeader(l10n.tr('about'), cs),
           ListTile(
             leading: const Icon(Icons.info_outline),
@@ -700,36 +684,55 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _cardDisplayTile(SettingsProvider settings, L10n l10n) {
-    return Column(
+    final cs = Theme.of(context).colorScheme;
+    final enabledCount = [
+      settings.showCardName,
+      settings.showCardTags,
+      settings.showCardType,
+      settings.showCardExt,
+    ].where((v) => v).length;
+    return ExpansionTile(
+      leading: const Icon(Icons.view_carousel_outlined),
+      title: Text(l10n.tr('card_display')),
+      subtitle: Text('$enabledCount / 4'),
+      shape: const Border(),
+      collapsedShape: const Border(),
+      tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+      childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       children: [
-        ListTile(
-          leading: const Icon(Icons.view_carousel_outlined),
-          title: Text(l10n.tr('card_display')),
-          subtitle: Text(l10n.tr('card_display_desc')),
-        ),
-        SwitchListTile(
-          secondary: const Icon(Icons.label_outline),
-          title: Text(l10n.tr('card_show_name')),
-          value: settings.showCardName,
-          onChanged: (v) => settings.setShowCardName(v),
-        ),
-        SwitchListTile(
-          secondary: const Icon(Icons.tag),
-          title: Text(l10n.tr('card_show_tags')),
-          value: settings.showCardTags,
-          onChanged: (v) => settings.setShowCardTags(v),
-        ),
-        SwitchListTile(
-          secondary: const Icon(Icons.category_outlined),
-          title: Text(l10n.tr('card_show_type')),
-          value: settings.showCardType,
-          onChanged: (v) => settings.setShowCardType(v),
-        ),
-        SwitchListTile(
-          secondary: const Icon(Icons.extension),
-          title: Text(l10n.tr('card_show_ext')),
-          value: settings.showCardExt,
-          onChanged: (v) => settings.setShowCardExt(v),
+        Container(
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            children: [
+              SwitchListTile(
+                secondary: const Icon(Icons.label_outline),
+                title: Text(l10n.tr('card_show_name')),
+                value: settings.showCardName,
+                onChanged: (v) => settings.setShowCardName(v),
+              ),
+              SwitchListTile(
+                secondary: const Icon(Icons.tag),
+                title: Text(l10n.tr('card_show_tags')),
+                value: settings.showCardTags,
+                onChanged: (v) => settings.setShowCardTags(v),
+              ),
+              SwitchListTile(
+                secondary: const Icon(Icons.category_outlined),
+                title: Text(l10n.tr('card_show_type')),
+                value: settings.showCardType,
+                onChanged: (v) => settings.setShowCardType(v),
+              ),
+              SwitchListTile(
+                secondary: const Icon(Icons.extension),
+                title: Text(l10n.tr('card_show_ext')),
+                value: settings.showCardExt,
+                onChanged: (v) => settings.setShowCardExt(v),
+              ),
+            ],
+          ),
         ),
       ],
     );

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
@@ -69,6 +70,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _openTools() {
     Navigator.push(context, MaterialPageRoute(builder: (_) => const ToolsScreen()));
+  }
+
+  /// 点击侧边栏 Logo：关闭抽屉并弹出满屏 emoji 特效
+  void _showEmojiEffect(BuildContext ctx) {
+    Navigator.pop(ctx); // 关闭抽屉
+    showDialog(
+      context: ctx,
+      barrierColor: Colors.transparent,
+      barrierDismissible: true,
+      builder: (_) => const _EmojiRainOverlay(),
+    );
   }
 
   @override
@@ -615,13 +627,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Row(
                     children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: Image.asset(
-                          'assets/icon_foreground.png',
-                          width: 38,
-                          height: 38,
-                          fit: BoxFit.cover,
+                      GestureDetector(
+                        onTap: () => _showEmojiEffect(context),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.asset(
+                            'assets/icon_foreground.png',
+                            width: 38,
+                            height: 38,
+                            fit: BoxFit.cover,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -1485,4 +1500,117 @@ class _CustomBackgroundImageState extends State<_CustomBackgroundImage> {
       child: image,
     );
   }
+}
+
+/// 满屏 emoji 雨特效（🥰😍😘）
+/// 点击任意位置或动画结束后自动关闭
+class _EmojiRainOverlay extends StatefulWidget {
+  const _EmojiRainOverlay();
+
+  @override
+  State<_EmojiRainOverlay> createState() => _EmojiRainOverlayState();
+}
+
+class _EmojiRainOverlayState extends State<_EmojiRainOverlay>
+    with TickerProviderStateMixin {
+  late AnimationController _controller;
+  final List<_EmojiParticle> _particles = [];
+  static const _emojis = ['🥰', '😍', '😘'];
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3500),
+    );
+    final rng = Random();
+    for (int i = 0; i < 36; i++) {
+      _particles.add(_EmojiParticle(
+        emoji: _emojis[rng.nextInt(_emojis.length)],
+        x: rng.nextDouble(),
+        delay: rng.nextDouble() * 0.4,
+        size: 28.0 + rng.nextDouble() * 28.0,
+        rotation: (rng.nextDouble() - 0.5) * 2.0,
+        drift: (rng.nextDouble() - 0.5) * 0.25,
+        speed: 0.8 + rng.nextDouble() * 0.4,
+      ));
+    }
+    _controller.forward().then((_) {
+      if (mounted) Navigator.of(context).maybePop();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    return GestureDetector(
+      onTap: () => Navigator.of(context).maybePop(),
+      child: Material(
+        type: MaterialType.transparency,
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (ctx, _) {
+            return Stack(
+              children: _particles.map((p) {
+                // 单粒子归一化进度（含 delay 与 speed）
+                double t = (_controller.value - p.delay) * p.speed;
+                if (t <= 0) return const SizedBox.shrink();
+                if (t > 1) t = 1;
+                final y = -60.0 + t * (size.height + 120);
+                final x = p.x * size.width + p.drift * size.width * t;
+                final opacity = t < 0.08
+                    ? t / 0.08
+                    : (t > 0.85 ? (1 - t) / 0.15 : 1.0);
+                final angle = p.rotation * t * pi * 2;
+                return Positioned(
+                  left: x,
+                  top: y,
+                  child: Opacity(
+                    opacity: opacity.clamp(0.0, 1.0),
+                    child: Transform.rotate(
+                      angle: angle,
+                      child: Text(
+                        p.emoji,
+                        style: TextStyle(
+                          fontSize: p.size,
+                          decoration: TextDecoration.none,
+                          fontWeight: FontWeight.normal,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _EmojiParticle {
+  final String emoji;
+  final double x; // 水平位置 0..1
+  final double delay; // 起始延迟 0..0.4
+  final double size;
+  final double rotation;
+  final double drift; // 水平漂移系数
+  final double speed; // 下落速度倍率
+  _EmojiParticle({
+    required this.emoji,
+    required this.x,
+    required this.delay,
+    required this.size,
+    required this.rotation,
+    required this.drift,
+    required this.speed,
+  });
 }

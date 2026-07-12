@@ -32,6 +32,7 @@
   "make_apng": "生成 APNG",
   "import_images_desc": "JPG / PNG / GIF / WebP / BMP",
   "more_options": "更多选项",
+  "open": "打开",
   "import_as_images": "作为图片导入",
   "import_as_manga": "合并为漫画",
   "import_as_sprite": "合并为立绘",

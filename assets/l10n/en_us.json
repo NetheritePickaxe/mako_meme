@@ -32,6 +32,7 @@
   "make_apng": "Make APNG",
   "import_images_desc": "JPG / PNG / GIF / WebP / BMP",
   "more_options": "More options",
+  "open": "Open",
   "import_as_images": "Import as images",
   "import_as_manga": "Merge as manga",
   "import_as_sprite": "Merge as sprite",

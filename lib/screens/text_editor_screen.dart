@@ -58,6 +58,28 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
     }
   }
 
+  /// 粘贴剪贴板内容：插入到光标位置（有选区时替换选区，无选区时追加到末尾）
+  Future<void> _pasteAtCursor() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    if (data?.text == null || data!.text!.isEmpty) return;
+    final pasteText = data.text!;
+    final sel = _textCtrl.selection;
+    final text = _textCtrl.text;
+    String newText;
+    int pos;
+    if (sel.isValid) {
+      // 有选区或有效光标：在光标位置插入（选区则替换选区）
+      newText = text.substring(0, sel.start) + pasteText + text.substring(sel.end);
+      pos = sel.start + pasteText.length;
+    } else {
+      // 无有效光标：追加到末尾
+      newText = text + pasteText;
+      pos = newText.length;
+    }
+    _textCtrl.text = newText;
+    _textCtrl.selection = TextSelection(baseOffset: pos, extentOffset: pos);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.read<LocaleProvider>().l10n;
@@ -65,80 +87,78 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
     final isNovel = widget.type == 'novel';
 
     if (_expanded) {
-      // 全屏模式：Markdown 工具栏位于底部
-      return Dialog(
-        insetPadding: EdgeInsets.zero,
-        child: Scaffold(
-          appBar: AppBar(
-            title: Text(isNovel ? l10n.tr('import_novel') : l10n.tr('import_text')),
-            actions: [
-              IconButton(
-                icon: Icon(_previewMode ? Icons.edit : Icons.visibility_outlined),
-                tooltip: _previewMode ? l10n.tr('edit_mode') : l10n.tr('preview_mode'),
-                onPressed: () => setState(() => _previewMode = !_previewMode),
-              ),
-              IconButton(
-                icon: const Icon(Icons.paste),
-                tooltip: l10n.tr('paste'),
-                onPressed: () async {
-                  final data = await Clipboard.getData(Clipboard.kTextPlain);
-                  if (data?.text != null && data!.text!.isNotEmpty) {
-                    _textCtrl.text = data.text!;
-                  }
-                },
-              ),
-              IconButton(
-                icon: const Icon(Icons.fullscreen_exit),
-                tooltip: l10n.tr('collapse'),
-                onPressed: () => setState(() => _expanded = false),
-              ),
-              IconButton(
-                icon: _saving
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.check),
-                tooltip: l10n.tr('save'),
-                onPressed: _saving ? null : _save,
-              ),
-            ],
-          ),
-          body: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: TextField(
-                  controller: _titleCtrl,
-                  decoration: InputDecoration(
-                    hintText: l10n.tr('title_hint'),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      // 全屏模式：直接使用 Scaffold 填满整屏（含状态栏区域）
+      final isDark = theme.brightness == Brightness.dark;
+      return AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+          statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+        ),
+        child: Material(
+          type: MaterialType.transparency,
+          child: Scaffold(
+            appBar: AppBar(
+              title: Text(isNovel ? l10n.tr('import_novel') : l10n.tr('import_text')),
+              actions: [
+                IconButton(
+                  icon: Icon(_previewMode ? Icons.edit : Icons.visibility_outlined),
+                  tooltip: _previewMode ? l10n.tr('edit_mode') : l10n.tr('preview_mode'),
+                  onPressed: () => setState(() => _previewMode = !_previewMode),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.fullscreen_exit),
+                  tooltip: l10n.tr('collapse'),
+                  onPressed: () => setState(() => _expanded = false),
+                ),
+                IconButton(
+                  icon: _saving
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.check),
+                  tooltip: l10n.tr('save'),
+                  onPressed: _saving ? null : _save,
+                ),
+              ],
+            ),
+            body: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: TextField(
+                    controller: _titleCtrl,
+                    decoration: InputDecoration(
+                      hintText: l10n.tr('title_hint'),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
                   ),
                 ),
-              ),
-              Expanded(
-                child: _previewMode
-                    ? _buildMarkdownPreview(theme)
-                    : Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: TextField(
-                          controller: _textCtrl,
-                          maxLines: null,
-                          expands: true,
-                          textAlignVertical: TextAlignVertical.top,
-                          style: TextStyle(
-                            fontSize: isNovel ? 16 : 18,
-                            height: isNovel ? 1.8 : 1.5,
-                          ),
-                          decoration: InputDecoration(
-                            hintText: isNovel ? l10n.tr('novel_hint') : l10n.tr('hint_text_or_emoji'),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                            contentPadding: const EdgeInsets.all(16),
+                Expanded(
+                  child: _previewMode
+                      ? _buildMarkdownPreview(theme)
+                      : Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: TextField(
+                            controller: _textCtrl,
+                            maxLines: null,
+                            expands: true,
+                            textAlignVertical: TextAlignVertical.top,
+                            style: TextStyle(
+                              fontSize: isNovel ? 16 : 18,
+                              height: isNovel ? 1.8 : 1.5,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: isNovel ? l10n.tr('novel_hint') : l10n.tr('hint_text_or_emoji'),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                              contentPadding: const EdgeInsets.all(16),
+                            ),
                           ),
                         ),
-                      ),
-              ),
-              // 底部 Markdown 工具栏（图标式，仅编辑模式）
-              if (!_previewMode) _buildMarkdownToolbar(theme),
-            ],
+                ),
+                // 底部 Markdown 工具栏（图标式，仅编辑模式）
+                if (!_previewMode) _buildMarkdownToolbar(theme),
+              ],
+            ),
           ),
         ),
       );
@@ -199,8 +219,14 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
             ),
             const SizedBox(height: 12),
             Row(
-              mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                // 左下角粘贴按钮
+                IconButton(
+                  icon: const Icon(Icons.content_paste),
+                  tooltip: l10n.tr('paste'),
+                  onPressed: _pasteAtCursor,
+                ),
+                const Spacer(),
                 TextButton(
                   onPressed: () => Navigator.pop(context),
                   child: Text(l10n.tr('cancel')),

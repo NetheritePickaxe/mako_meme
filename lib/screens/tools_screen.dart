@@ -6,8 +6,9 @@ import '../providers/meme_provider.dart';
 import '../services/image_tool_service.dart';
 import '../services/storage_service.dart';
 import '../models/meme.dart';
+import 'keyboard_setup_screen.dart';
 
-/// 工具页：图片格式转换、尺寸修改、多图转 GIF/APNG
+/// 工具页：图片格式转换、尺寸修改、多图转 GIF/APNG、表情包输入法
 class ToolsScreen extends StatefulWidget {
   const ToolsScreen({super.key});
 
@@ -21,7 +22,7 @@ class _ToolsScreenState extends State<ToolsScreen> with TickerProviderStateMixin
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -38,10 +39,12 @@ class _ToolsScreenState extends State<ToolsScreen> with TickerProviderStateMixin
         title: Text(l10n.tr('tools')),
         bottom: TabBar(
           controller: _tabController,
+          isScrollable: true,
           tabs: [
             Tab(icon: const Icon(Icons.swap_horiz), text: l10n.tr('tool_convert')),
             Tab(icon: const Icon(Icons.aspect_ratio), text: l10n.tr('tool_resize')),
             Tab(icon: const Icon(Icons.animation), text: l10n.tr('tool_to_gif')),
+            Tab(icon: const Icon(Icons.keyboard_outlined), text: l10n.tr('keyboard_setup')),
           ],
         ),
       ),
@@ -51,6 +54,69 @@ class _ToolsScreenState extends State<ToolsScreen> with TickerProviderStateMixin
           _ConvertTab(),
           _ResizeTab(),
           _AnimationTab(),
+          _ImeTab(),
+        ],
+      ),
+    );
+  }
+}
+
+// ===================== 表情包输入法 =====================
+
+class _ImeTab extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.watch<LocaleProvider>().l10n;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isAndroid = !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+
+    if (!isAndroid) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.desktop_access_disabled, size: 64, color: cs.outline),
+              const SizedBox(height: 16),
+              Text(l10n.tr('keyboard_feature_unavailable'),
+                  style: TextStyle(color: cs.outline), textAlign: TextAlign.center),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  Icon(Icons.keyboard_outlined, size: 48, color: cs.primary),
+                  const SizedBox(height: 12),
+                  Text(l10n.tr('keyboard_setup'),
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  Text(l10n.tr('keyboard_setup_desc'),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13)),
+                  const SizedBox(height: 20),
+                  FilledButton.icon(
+                    onPressed: () => Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const KeyboardSetupScreen())),
+                    icon: const Icon(Icons.arrow_forward),
+                    label: Text(l10n.tr('open')),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
