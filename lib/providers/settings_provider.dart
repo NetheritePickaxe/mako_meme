@@ -12,6 +12,7 @@ class SettingsProvider extends ChangeNotifier {
   int _gridColumns = 0; // 0 = 自动
   bool _autoClassify = true; // 导入时按画幅自动归类
   double _classifyRatio = 1.1; // 宽高比阈值，<=此值视为正方形(表情)
+  bool _landscapePreview = false; // 横屏模式：左侧大图预览
 
   // 卡片显示选项
   bool _showCardName = false;
@@ -72,6 +73,7 @@ class SettingsProvider extends ChangeNotifier {
     _autoClassify = _storage.getSetting('autoClassify') != 'false';
     final savedRatio = double.tryParse(_storage.getSetting('classifyRatio') ?? '');
     if (savedRatio != null && savedRatio > 0.5 && savedRatio < 3.0) _classifyRatio = savedRatio;
+    _landscapePreview = _storage.getSetting('landscapePreview') == 'true';
 
     // 加载卡片显示选项
     _showCardName = _storage.getSetting('showCardName') == 'true';
@@ -117,6 +119,7 @@ class SettingsProvider extends ChangeNotifier {
   int get gridColumns => _gridColumns;
   bool get autoClassify => _autoClassify;
   double get classifyRatio => _classifyRatio;
+  bool get landscapePreview => _landscapePreview;
   bool get showCardName => _showCardName;
   bool get showCardTags => _showCardTags;
   bool get showCardType => _showCardType;
@@ -189,6 +192,12 @@ class SettingsProvider extends ChangeNotifier {
     if (v < 0.5 || v > 3.0) return;
     _classifyRatio = v;
     await _storage.setSetting('classifyRatio', v.toString());
+    notifyListeners();
+  }
+
+  Future<void> setLandscapePreview(bool v) async {
+    _landscapePreview = v;
+    await _storage.setSetting('landscapePreview', v.toString());
     notifyListeners();
   }
 

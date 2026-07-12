@@ -16,8 +16,18 @@ import '../screens/meme_viewer_screen.dart';
 class MemeCard extends StatefulWidget {
   final Meme meme;
   final void Function(Meme dragged, Meme target)? onReorder;
+  /// 横屏预览模式：点击卡片选中预览（替代默认的复制/打开行为）
+  final bool previewMode;
+  /// 当前是否被选中预览
+  final bool isPreviewSelected;
 
-  const MemeCard({super.key, required this.meme, this.onReorder});
+  const MemeCard({
+    super.key,
+    required this.meme,
+    this.onReorder,
+    this.previewMode = false,
+    this.isPreviewSelected = false,
+  });
 
   @override
   State<MemeCard> createState() => _MemeCardState();
@@ -144,7 +154,10 @@ class _MemeCardState extends State<MemeCard> {
         ),
         onDragStarted: () => HapticFeedback.mediumImpact(),
         child: GestureDetector(
-          onTap: isMulti ? () => prov.toggleSelect(widget.meme.id) : _copyToClipboard,
+          onTap: isMulti
+              ? () => prov.toggleSelect(widget.meme.id)
+              : (widget.previewMode ? _previewSelect : _copyToClipboard),
+          onDoubleTap: widget.previewMode && !isMulti ? _openViewer : null,
           onSecondaryTapUp: (details) => _showContextMenu(details.globalPosition),
           child: _buildInner(prov, isSelected, isMulti, theme),
         ),
@@ -171,7 +184,10 @@ class _MemeCardState extends State<MemeCard> {
 
     // 移动端普通模式：点击预览，长按分享（带触觉反馈）
     return GestureDetector(
-      onTap: isMulti ? () => prov.toggleSelect(widget.meme.id) : _openViewer,
+      onTap: isMulti
+          ? () => prov.toggleSelect(widget.meme.id)
+          : (widget.previewMode ? _previewSelect : _openViewer),
+      onDoubleTap: widget.previewMode && !isMulti ? _openViewer : null,
       onLongPress: isMulti
           ? null
           : () {
@@ -180,6 +196,12 @@ class _MemeCardState extends State<MemeCard> {
             },
       child: _buildInner(prov, isSelected, isMulti, theme),
     );
+  }
+
+  /// 横屏预览模式：点击卡片更新预览面板
+  void _previewSelect() {
+    final prov = context.read<MemeProvider>();
+    prov.setPreviewMeme(widget.meme);
   }
 
   /// 包裹拖放目标，用于排序：拖入另一张卡片时触发 onReorder
@@ -440,7 +462,11 @@ class _MemeCardState extends State<MemeCard> {
         duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          border: isSelected ? Border.all(color: Theme.of(context).colorScheme.primary, width: 3) : null,
+          border: isSelected
+              ? Border.all(color: Theme.of(context).colorScheme.primary, width: 3)
+              : widget.isPreviewSelected
+                  ? Border.all(color: Theme.of(context).colorScheme.tertiary, width: 2)
+                  : null,
           boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4, offset: const Offset(0, 2))],
         ),
         child: ClipRRect(
@@ -496,7 +522,11 @@ class _MemeCardState extends State<MemeCard> {
         duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          border: isSelected ? Border.all(color: Theme.of(context).colorScheme.primary, width: 3) : null,
+          border: isSelected
+              ? Border.all(color: Theme.of(context).colorScheme.primary, width: 3)
+              : widget.isPreviewSelected
+                  ? Border.all(color: Theme.of(context).colorScheme.tertiary, width: 2)
+                  : null,
           boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4, offset: const Offset(0, 2))],
         ),
         child: ClipRRect(

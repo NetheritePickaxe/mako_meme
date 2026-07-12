@@ -301,5 +301,13 @@
   "manga_no_pages": "No pages",
   "nav_memes": "Memes",
   "nav_folders": "Folders",
-  "no_folders": "No folders yet"
+  "no_folders": "No folders yet",
+  "landscape_preview": "Landscape Preview Mode",
+  "landscape_preview_desc": "Show large preview on the left in widescreen; click a card to preview",
+  "preview_empty": "No preview selected",
+  "preview_empty_hint": "Click a card on the right to preview",
+  "size": "Size",
+  "dimensions": "Dimensions",
+  "type": "Type",
+  "created_at": "Created"
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:provider/provider.dart';
 import '../models/meme.dart';
+import '../providers/meme_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/locale_provider.dart';
 import 'meme_card.dart';
@@ -10,12 +11,14 @@ class MemeGrid extends StatelessWidget {
   final List<Meme> memes;
   final double spacing;
   final void Function(Meme dragged, Meme target)? onReorder;
+  final bool previewMode;
 
   const MemeGrid({
     super.key,
     required this.memes,
     this.spacing = 8.0,
     this.onReorder,
+    this.previewMode = false,
   });
 
   int _resolveCols(BuildContext context) {
@@ -46,6 +49,9 @@ class MemeGrid extends StatelessWidget {
     }
 
     final cols = _resolveCols(context);
+    final previewMemeId = previewMode
+        ? context.watch<MemeProvider>().previewMeme?.id
+        : null;
 
     // 统一使用瀑布流布局，支持文字自适应高度 + 图片变高
     return MasonryGridView.count(
@@ -57,6 +63,8 @@ class MemeGrid extends StatelessWidget {
       itemBuilder: (ctx, i) => MemeCard(
         meme: memes[i],
         onReorder: onReorder,
+        previewMode: previewMode,
+        isPreviewSelected: previewMemeId == memes[i].id,
       ),
     );
   }

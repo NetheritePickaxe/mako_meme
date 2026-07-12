@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:desktop_drop/desktop_drop.dart';
@@ -14,6 +15,7 @@ import '../widgets/meme_grid.dart';
 import '../widgets/folder_card.dart';
 import '../widgets/mako_search_bar.dart' as custom;
 import '../widgets/multi_select_bar.dart';
+import '../widgets/meme_preview_panel.dart';
 import '../services/storage_service.dart';
 import '../screens/settings_screen.dart';
 import '../screens/text_editor_screen.dart';
@@ -36,6 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
       Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
       return;
     }
+    prov.clearPreviewMeme();
     setState(() {
       _currentTab = i;
       if (i == 0) {
@@ -182,6 +185,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// 表情包/收藏的通用列表视图：搜索栏 + 分类筛选 + 网格
   Widget _buildMemesListView(MemeProvider prov, L10n l10n) {
+    final settings = context.watch<SettingsProvider>();
+    // 横屏预览模式：桌面/Web + 宽屏 + 设置开启
+    final isLandscape = _isDesktopOrWeb() &&
+        settings.landscapePreview &&
+        MediaQuery.sizeOf(context).width >= 900;
+
     return DropTarget(
       onDragDone: (detail) async {
         final validExts = Meme.supportedExtensions;
@@ -190,7 +199,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }).toList();
         if (files.isNotEmpty) {
           final storage = context.read<StorageService>();
-          final settings = context.read<SettingsProvider>();
+          final settingsProvider = context.read<SettingsProvider>();
           for (final f in files) {
             await storage.importFile(
               PlatformFile(
@@ -198,8 +207,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 size: await f.length(),
                 path: f.path,
               ),
-              autoClassify: settings.autoClassify,
-              classifyRatio: settings.classifyRatio,
+              autoClassify: settingsProvider.autoClassify,
+              classifyRatio: settingsProvider.classifyRatio,
             );
           }
           await prov.loadAll();
@@ -215,13 +224,29 @@ class _HomeScreenState extends State<HomeScreen> {
       child: LayoutBuilder(
         builder: (ctx, constraints) => Stack(
           children: [
-            Column(
+            Row(
               children: [
-                custom.MakoSearchBar(onSearch: (q) => prov.setQuery(q)),
-                _buildCategoryChips(prov),
-                if (prov.tagFilter.isNotEmpty || prov.folderFilter.isNotEmpty) _buildFilterChips(prov),
+                // 左侧预览面板
+                if (isLandscape)
+                  MemePreviewPanel(
+                    meme: prov.previewMeme,
+                    onClose: () => prov.clearPreviewMeme(),
+                  ),
+                // 右侧主内容
                 Expanded(
-                  child: MemeGrid(memes: prov.memes),
+                  child: Column(
+                    children: [
+                      custom.MakoSearchBar(onSearch: (q) => prov.setQuery(q)),
+                      _buildCategoryChips(prov),
+                      if (prov.tagFilter.isNotEmpty || prov.folderFilter.isNotEmpty) _buildFilterChips(prov),
+                      Expanded(
+                        child: MemeGrid(
+                          memes: prov.memes,
+                          previewMode: isLandscape,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -256,6 +281,13 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  /// 是否为桌面端或 Web
+  bool _isDesktopOrWeb() {
+    if (kIsWeb) return true;
+    final p = defaultTargetPlatform;
+    return p == TargetPlatform.windows || p == TargetPlatform.macOS || p == TargetPlatform.linux;
   }
 
   String _getTitle(MemeProvider prov, L10n l10n) {

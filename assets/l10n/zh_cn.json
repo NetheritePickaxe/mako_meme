@@ -301,5 +301,13 @@
   "manga_no_pages": "没有页面",
   "nav_memes": "表情包",
   "nav_folders": "文件夹",
-  "no_folders": "暂无文件夹"
+  "no_folders": "暂无文件夹",
+  "landscape_preview": "横屏预览模式",
+  "landscape_preview_desc": "宽屏时左侧显示大图预览，点击卡片预览",
+  "preview_empty": "未选择预览",
+  "preview_empty_hint": "点击右侧卡片以预览",
+  "size": "大小",
+  "dimensions": "尺寸",
+  "type": "类型",
+  "created_at": "创建时间"
 }

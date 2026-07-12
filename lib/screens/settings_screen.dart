@@ -64,6 +64,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const Divider(indent: 16, endIndent: 16),
           _gridColumnsTile(settings, l10n),
           const Divider(indent: 16, endIndent: 16),
+          if (_isDesktopOrWeb()) ...[
+            _landscapePreviewTile(settings, l10n),
+            const Divider(indent: 16, endIndent: 16),
+          ],
           if (defaultTargetPlatform == TargetPlatform.android) ...[
             _monetTile(settings, l10n),
             if (!settings.useMonet) ...[
@@ -388,6 +392,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
         }),
         onChanged: (v) { if (v != null) settings.setGridColumns(v); },
       ),
+    );
+  }
+
+  /// 是否为桌面端或 Web（用于决定是否显示横屏预览选项）
+  bool _isDesktopOrWeb() {
+    if (kIsWeb) return true;
+    final p = defaultTargetPlatform;
+    return p == TargetPlatform.windows || p == TargetPlatform.macOS || p == TargetPlatform.linux;
+  }
+
+  Widget _landscapePreviewTile(SettingsProvider settings, L10n l10n) {
+    return SwitchListTile(
+      secondary: const Icon(Icons.view_sidebar_outlined),
+      title: Text(l10n.tr('landscape_preview')),
+      subtitle: Text(l10n.tr('landscape_preview_desc')),
+      value: settings.landscapePreview,
+      onChanged: (v) => settings.setLandscapePreview(v),
     );
   }
 

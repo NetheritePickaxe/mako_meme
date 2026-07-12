@@ -25,6 +25,7 @@ class MemeProvider with ChangeNotifier {
   bool _multi = false;
   bool _showFoldersView = false;
   bool _showFavorites = false;
+  Meme? _previewMeme;
   final Set<String> _sel = {};
   final Set<String> _selectedFolders = {};
   final Set<String> _tagFilter = {};
@@ -35,6 +36,7 @@ class MemeProvider with ChangeNotifier {
   Set<String> get typeFilter => _typeFilter;
   bool get showFoldersView => _showFoldersView;
   bool get showFavorites => _showFavorites;
+  Meme? get previewMeme => _previewMeme;
 
   MemeProvider(this._storage, this._settings);
 
@@ -215,6 +217,19 @@ class MemeProvider with ChangeNotifier {
       _showFoldersView = false;
     }
     _apply();
+    notifyListeners();
+  }
+
+  /// 设置当前预览的 meme（横屏预览模式）
+  void setPreviewMeme(Meme? meme) {
+    _previewMeme = meme;
+    notifyListeners();
+  }
+
+  /// 清除预览选中（如切换标签、过滤变化时）
+  void clearPreviewMeme() {
+    if (_previewMeme == null) return;
+    _previewMeme = null;
     notifyListeners();
   }
 
