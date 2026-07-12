@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
 import '../models/meme.dart';
 import '../providers/meme_provider.dart';
@@ -86,15 +87,17 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
     return target > 4096 ? 4096 : target;
   }
 
-  /// 实际显示路径：PSD 用合成预览，其他用原路径
-  String _displayPath(Meme m) {
-    if (m.isPsd && m.thumbPath != null) return m.thumbPath!;
-    return m.filePath;
-  }
+  /// 实际显示路径：有缩略图（PSD/ICO/TIF）时用 thumbPath，否则用 filePath
+  String _displayPath(Meme m) => m.displayPath;
 
   Future<void> _ensureBytes(int index) async {
     if (_bytesCache.containsKey(index) || _fileCache.containsKey(index)) return;
     final m = widget.memes[index];
+    // PDF 不需要加载图片字节（显示图标 + 外部打开）
+    if (m.isPdf) {
+      _bytesCache.put(index, null);
+      return;
+    }
     final path = _displayPath(m);
     if (!m.isImageType || path.isEmpty) {
       _bytesCache.put(index, null);
@@ -192,6 +195,11 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
     final file = _fileCache.get(i);
     final hasData = bytes != null || file != null;
 
+    // PDF：显示文档图标 + 文件信息 + 外部打开按钮
+    if (m.isPdf) {
+      return _buildPdfView(theme, m);
+    }
+
     if (m.isImageType) {
       if (!hasData) {
         return Center(
@@ -286,6 +294,63 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
       ],
     ),
   );
+
+  /// PDF 查看器：显示文件图标 + 信息 + 外部打开按钮
+  /// 不内置 PDF 渲染引擎以避免增加包体，用户可点击按钮用系统应用打开
+  Widget _buildPdfView(ThemeData theme, Meme m) {
+    final l10n = context.read<LocaleProvider>().l10n;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.picture_as_pdf, size: 80, color: theme.colorScheme.primary),
+            const SizedBox(height: 16),
+            Text(
+              m.name,
+              style: theme.textTheme.titleMedium,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${m.extension.toUpperCase()} · ${m.fileSize > 0 ? '${(m.fileSize / 1024).toStringAsFixed(0)} KB' : ''}',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
+            ),
+            const SizedBox(height: 24),
+            if (!kIsWeb)
+              FilledButton.icon(
+                onPressed: () => _openPdfExternally(m),
+                icon: const Icon(Icons.open_in_new),
+                label: Text(l10n.tr('open_externally')),
+              ),
+            if (kIsWeb)
+              Text(
+                l10n.tr('pdf_web_hint'),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+                textAlign: TextAlign.center,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openPdfExternally(Meme m) async {
+    final storage = context.read<StorageService>();
+    final file = storage.getMemeFile(m.filePath);
+    if (file == null) return;
+    final uri = Uri.file(file.path);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
+  }
 
   /// PSD 图层面板
   void _showPsdLayersPanel(Meme m, L10n l10n) {

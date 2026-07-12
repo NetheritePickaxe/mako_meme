@@ -8,15 +8,22 @@ class Meme {
   static const String typeCharacterCard = 'character_card';
   static const String typeVector = 'vector';   // SVG 矢量图
   static const String typePsd = 'psd';          // PSD 多图层
+  static const String typePdf = 'pdf';          // PDF 文档
 
   static const List<String> allTypes = [
     typeEmoji, typeGif, typeImage, typeText, typePortrait, typeCg,
-    typeCharacterCard, typeVector, typePsd,
+    typeCharacterCard, typeVector, typePsd, typePdf,
+  ];
+
+  /// 所有支持的图片/文档格式扩展名（不含点，小写）
+  static const List<String> supportedExtensions = [
+    'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp',
+    'svg', 'apng', 'psd', 'ico', 'tif', 'tiff', 'pdf',
   ];
 
   bool get isImageType => type == typeImage || type == typeGif ||
       type == typePortrait || type == typeCg || type == typeCharacterCard ||
-      type == typeVector || type == typePsd;
+      type == typeVector || type == typePsd || type == typePdf;
 
   /// 是否为动画类型（GIF / APNG）
   bool get isAnimated => type == typeGif || mimeType == 'image/apng';
@@ -26,6 +33,36 @@ class Meme {
 
   /// 是否为 PSD
   bool get isPsd => type == typePsd;
+
+  /// 是否为 PDF
+  bool get isPdf => type == typePdf;
+
+  /// 实际显示用路径：有缩略图（PSD/ICO/TIF 转换的 PNG）时用 thumbPath，否则用 filePath
+  String get displayPath => thumbPath ?? filePath;
+
+  /// 文件后缀名（小写，不含点），如 "png"、"jpg"
+  String get extension {
+    final dot = filePath.lastIndexOf('.');
+    if (dot == -1 || dot == filePath.length - 1) return '';
+    return filePath.substring(dot + 1).toLowerCase();
+  }
+
+  /// 类型对应的 i18n 键名
+  String get typeLabelKey {
+    switch (type) {
+      case typeEmoji: return 'type_emoji';
+      case typeGif: return 'type_gif';
+      case typeText: return 'type_text';
+      case typeImage: return 'type_image';
+      case typePortrait: return 'type_portrait';
+      case typeCg: return 'type_cg';
+      case typeCharacterCard: return 'type_character_card';
+      case typeVector: return 'type_vector';
+      case typePsd: return 'type_psd';
+      case typePdf: return 'type_pdf';
+      default: return 'type_image';
+    }
+  }
 
   final String id;
   final String name;

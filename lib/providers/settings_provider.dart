@@ -13,6 +13,12 @@ class SettingsProvider extends ChangeNotifier {
   bool _autoClassify = true; // 导入时按画幅自动归类
   double _classifyRatio = 1.1; // 宽高比阈值，<=此值视为正方形(表情)
 
+  // 卡片显示选项
+  bool _showCardName = false;
+  bool _showCardTags = false;
+  bool _showCardType = false;
+  bool _showCardExt = false;
+
   // WebDAV 配置
   bool _useWebDav = false;
   String? _webDavBaseUrl;
@@ -58,6 +64,12 @@ class SettingsProvider extends ChangeNotifier {
     final savedRatio = double.tryParse(_storage.getSetting('classifyRatio') ?? '');
     if (savedRatio != null && savedRatio > 0.5 && savedRatio < 3.0) _classifyRatio = savedRatio;
 
+    // 加载卡片显示选项
+    _showCardName = _storage.getSetting('showCardName') == 'true';
+    _showCardTags = _storage.getSetting('showCardTags') == 'true';
+    _showCardType = _storage.getSetting('showCardType') == 'true';
+    _showCardExt = _storage.getSetting('showCardExt') == 'true';
+
     // 加载 WebDAV 配置
     _useWebDav = _storage.getSetting('useWebDav') == 'true';
     _webDavBaseUrl = _storage.getSetting('webDavBaseUrl');
@@ -85,6 +97,10 @@ class SettingsProvider extends ChangeNotifier {
   int get gridColumns => _gridColumns;
   bool get autoClassify => _autoClassify;
   double get classifyRatio => _classifyRatio;
+  bool get showCardName => _showCardName;
+  bool get showCardTags => _showCardTags;
+  bool get showCardType => _showCardType;
+  bool get showCardExt => _showCardExt;
   Color get customSeed => _customSeed;
   int get presetIndex => _presetIndex;
 
@@ -147,6 +163,30 @@ class SettingsProvider extends ChangeNotifier {
     if (v < 0.5 || v > 3.0) return;
     _classifyRatio = v;
     await _storage.setSetting('classifyRatio', v.toString());
+    notifyListeners();
+  }
+
+  Future<void> setShowCardName(bool v) async {
+    _showCardName = v;
+    await _storage.setSetting('showCardName', v.toString());
+    notifyListeners();
+  }
+
+  Future<void> setShowCardTags(bool v) async {
+    _showCardTags = v;
+    await _storage.setSetting('showCardTags', v.toString());
+    notifyListeners();
+  }
+
+  Future<void> setShowCardType(bool v) async {
+    _showCardType = v;
+    await _storage.setSetting('showCardType', v.toString());
+    notifyListeners();
+  }
+
+  Future<void> setShowCardExt(bool v) async {
+    _showCardExt = v;
+    await _storage.setSetting('showCardExt', v.toString());
     notifyListeners();
   }
 

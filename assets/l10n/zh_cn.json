@@ -248,5 +248,15 @@
   "enable_accessibility": "启用无障碍服务",
   "open_ime_settings": "输入法设置",
   "open_accessibility_settings": "无障碍设置",
-  "keyboard_feature_unavailable": "此功能仅 Android 可用"
+  "keyboard_feature_unavailable": "此功能仅 Android 可用",
+  "type_pdf": "PDF",
+  "cat_pdf": "PDF",
+  "card_display": "卡片显示",
+  "card_display_desc": "自定义卡片下方显示的信息",
+  "card_show_name": "显示名称",
+  "card_show_tags": "显示标签",
+  "card_show_type": "显示类型",
+  "card_show_ext": "显示后缀",
+  "open_externally": "外部打开",
+  "pdf_web_hint": "Web 端暂不支持 PDF 预览，请下载后查看"
 }

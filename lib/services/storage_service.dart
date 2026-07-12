@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 import 'package:archive/archive_io.dart';
 import 'package:hive/hive.dart';
+import 'package:image/image.dart' as img;
 import '../models/meme.dart';
 import '../models/folder.dart';
 import 'character_card_service.dart';
@@ -438,7 +439,27 @@ class StorageService {
       meme = await _processPsdImport(meme, file, bytes, fileHash);
     }
 
+    // ICO/TIF 转 PNG：Flutter 原生不支持这两种格式，导入时转换为 PNG 缩略图
+    if (const ['.ico', '.tif', '.tiff'].contains(ext)) {
+      meme = await _processRasterConversion(meme, file, bytes, fileHash);
+    }
+
     return meme;
+  }
+
+  /// 保存缩略图 PNG 字节到存储，返回存储路径
+  /// native: memes/{id}_thumb.png，web: memes/{id}_thumb
+  Future<String> _saveThumbPng(String memeId, Uint8List pngBytes) async {
+    if (kIsWeb) {
+      final thumbPath = 'memes/${memeId}_thumb';
+      await webStorageSetBinary(thumbPath, pngBytes);
+      return thumbPath;
+    }
+    final thumbPath = 'memes/${memeId}_thumb.png';
+    final dest = File(p.join(_basePath!, thumbPath));
+    await dest.create(recursive: true);
+    await dest.writeAsBytes(pngBytes);
+    return thumbPath;
   }
 
   /// PSD 导入后处理：解析图层，生成合成预览 PNG
@@ -460,17 +481,9 @@ class StorageService {
       final result = PsdService.parse(psdBytes);
       if (result == null) return meme;
 
-      // 保存合成预览 PNG
       String? thumbPath;
-      if (result.compositePng != null && !kIsWeb) {
-        final thumbName = '${meme.id}_composite.png';
-        thumbPath = 'memes/$thumbName';
-        final dest = File(p.join(_basePath!, thumbPath));
-        await dest.create(recursive: true);
-        await dest.writeAsBytes(result.compositePng!);
-      } else if (result.compositePng != null && kIsWeb) {
-        thumbPath = 'memes/${meme.id}_composite';
-        await webStorageSetBinary(thumbPath, result.compositePng!);
+      if (result.compositePng != null) {
+        thumbPath = await _saveThumbPng(meme.id, result.compositePng!);
       }
 
       final updated = meme.copyWith(
@@ -478,6 +491,41 @@ class StorageService {
         psdLayers: result.layers,
         width: result.width,
         height: result.height,
+      );
+      await _saveMeme(updated, fileHash);
+      return updated;
+    } catch (_) {
+      return meme;
+    }
+  }
+
+  /// ICO/TIF 转 PNG：Flutter Image 原生不支持解码这两种格式，
+  /// 导入时用 image 包解码并转 PNG，存为 thumbPath
+  Future<Meme> _processRasterConversion(
+    Meme meme,
+    PlatformFile file,
+    Uint8List? inMemoryBytes,
+    String? fileHash,
+  ) async {
+    try {
+      Uint8List? sourceBytes;
+      if (inMemoryBytes != null) {
+        sourceBytes = inMemoryBytes;
+      } else if (file.path != null && !kIsWeb) {
+        sourceBytes = await File(file.path!).readAsBytes();
+      }
+      if (sourceBytes == null) return meme;
+
+      final decoded = img.decodeImage(sourceBytes);
+      if (decoded == null) return meme;
+
+      final png = Uint8List.fromList(img.encodePng(decoded));
+      final thumbPath = await _saveThumbPng(meme.id, png);
+
+      final updated = meme.copyWith(
+        thumbPath: thumbPath,
+        width: decoded.width,
+        height: decoded.height,
       );
       await _saveMeme(updated, fileHash);
       return updated;
@@ -1332,6 +1380,9 @@ class StorageService {
       case '.bmp': return 'image/bmp';
       case '.svg': return 'image/svg+xml';
       case '.psd': return 'image/vnd.adobe.photoshop';
+      case '.ico': return 'image/x-icon';
+      case '.tif': case '.tiff': return 'image/tiff';
+      case '.pdf': return 'application/pdf';
       default: return 'image/png';
     }
   }
@@ -1348,7 +1399,8 @@ class StorageService {
       case '.apng': return Meme.typeGif; // APNG 当动图处理
       case '.svg': return Meme.typeVector;
       case '.psd': return Meme.typePsd;
-      default: return Meme.typeImage;
+      case '.pdf': return Meme.typePdf;
+      default: return Meme.typeImage; // ico/tif/bmp/png/jpg/webp 均为普通图片
     }
   }
 }

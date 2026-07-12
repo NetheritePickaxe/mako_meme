@@ -9,6 +9,7 @@ import 'package:file_picker/file_picker.dart';
 import '../models/meme.dart';
 import '../providers/meme_provider.dart';
 import '../providers/locale_provider.dart';
+import '../providers/settings_provider.dart';
 import '../services/storage_service.dart';
 import '../screens/meme_viewer_screen.dart';
 
@@ -34,18 +35,18 @@ class _MemeCardState extends State<MemeCard> {
     _loadBytes();
   }
 
-  /// 实际用于显示的路径：PSD 用合成预览，其他用原路径
-  String get _displayPath {
-    if (widget.meme.isPsd && widget.meme.thumbPath != null) {
-      return widget.meme.thumbPath!;
-    }
-    return widget.meme.filePath;
-  }
+  /// 实际用于显示的路径：有缩略图（PSD/ICO/TIF）时用 thumbPath，否则用 filePath
+  String get _displayPath => widget.meme.displayPath;
 
   void _loadBytes() {
     if (!_loading) return;
-    final storage = context.read<StorageService>();
     final m = widget.meme;
+    // PDF 不需要加载图片字节
+    if (m.isPdf) {
+      _loading = false;
+      return;
+    }
+    final storage = context.read<StorageService>();
     if (m.isImageType && _displayPath.isNotEmpty) {
       if (kIsWeb) {
         // Web：读 bytes
@@ -217,17 +218,87 @@ class _MemeCardState extends State<MemeCard> {
   }
 
   /// 表情卡片固定 1:1，文字卡片自适应高度，图片卡片按真实宽高比
+  /// 当设置中开启了卡片信息显示时，在图片下方追加信息栏
   Widget _buildAspectRatioCard(MemeProvider prov, bool isSelected, bool isMulti, ThemeData theme) {
     final ratio = _effectiveAspectRatio;
+    final settings = context.watch<SettingsProvider>();
+    final showInfo = settings.showCardName || settings.showCardTags ||
+        settings.showCardType || settings.showCardExt;
+
     if (ratio.isNaN) {
       // 文字卡片：由内容决定高度，不强制比例
       return _buildCard(context, prov, isSelected, isMulti, theme);
     }
-    return AspectRatio(
+
+    final card = AspectRatio(
       aspectRatio: ratio,
       child: _buildCard(context, prov, isSelected, isMulti, theme),
     );
+
+    if (!showInfo || widget.meme.type == Meme.typeText) return card;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        card,
+        _buildInfoBar(theme, settings),
+      ],
+    );
   }
+
+  /// 卡片下方信息栏：根据设置显示名称、标签、类型、后缀
+  Widget _buildInfoBar(ThemeData theme, SettingsProvider settings) {
+    final l10n = context.read<LocaleProvider>().l10n;
+    final m = widget.meme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+      ),
+      child: Wrap(
+        spacing: 4,
+        runSpacing: 2,
+        children: [
+          if (settings.showCardName)
+            Text(
+              m.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+          if (settings.showCardTags && m.tags.isNotEmpty)
+            Text(
+              m.tags.map((t) => '#$t').join(' '),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.primary,
+              ),
+            ),
+          if (settings.showCardType)
+            _infoChip(l10n.tr(m.typeLabelKey), theme.colorScheme.secondaryContainer, theme.colorScheme.onSecondaryContainer),
+          if (settings.showCardExt && m.extension.isNotEmpty)
+            _infoChip(m.extension.toUpperCase(), theme.colorScheme.tertiaryContainer, theme.colorScheme.onTertiaryContainer),
+        ],
+      ),
+    );
+  }
+
+  Widget _infoChip(String label, Color bg, Color fg) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+    decoration: BoxDecoration(
+      color: bg,
+      borderRadius: BorderRadius.circular(4),
+    ),
+    child: Text(
+      label,
+      style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: fg),
+    ),
+  );
 
   Widget _buildFeedback() {
     // 文字卡片：反馈显示文字
@@ -290,8 +361,12 @@ class _MemeCardState extends State<MemeCard> {
     );
   }
 
-  /// 统一的缩略图渲染：SVG 用 SvgPicture，其他用 Image.file/memory（带 cacheWidth 防止 OOM）
+  /// 统一的缩略图渲染：PDF 显示图标，SVG 用 SvgPicture，其他用 Image.file/memory（带 cacheWidth 防止 OOM）
   Widget _buildThumbnail({required BoxFit fit}) {
+    // PDF：显示文档图标
+    if (widget.meme.isPdf) {
+      return _formatPlaceholder(Icons.picture_as_pdf, 'PDF');
+    }
     // SVG 矢量图：用 flutter_svg 渲染，无限缩放不失真
     if (widget.meme.isVector) {
       if (_file != null) {
@@ -312,7 +387,7 @@ class _MemeCardState extends State<MemeCard> {
     }
     // PSD 没有合成预览时的占位
     if (widget.meme.isPsd && _file == null && _bytes == null) {
-      return _psdPlaceholder();
+      return _formatPlaceholder(Icons.layers, 'PSD');
     }
     // 普通位图：原生端用 Image.file，Web 端用 Image.memory，都加 cacheWidth
     if (_file != null) {
@@ -343,15 +418,16 @@ class _MemeCardState extends State<MemeCard> {
     ),
   );
 
-  Widget _psdPlaceholder() => Container(
+  /// 通用格式占位符：图标 + 格式标签
+  Widget _formatPlaceholder(IconData icon, String label) => Container(
     color: Colors.grey.shade100,
-    child: const Center(
+    child: Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.layers, color: Colors.grey, size: 32),
-          SizedBox(height: 4),
-          Text('PSD', style: TextStyle(fontSize: 10, color: Colors.grey)),
+          Icon(icon, color: Colors.grey, size: 32),
+          const SizedBox(height: 4),
+          Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
         ],
       ),
     ),
@@ -428,7 +504,9 @@ class _MemeCardState extends State<MemeCard> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              if (widget.meme.isImageType && _loading)
+              if (widget.meme.isPdf)
+                _buildThumbnail(fit: BoxFit.cover)
+              else if (widget.meme.isImageType && _loading)
                 const Center(child: CircularProgressIndicator(strokeWidth: 2))
               else if (widget.meme.isImageType && (_file != null || _bytes != null))
                 _buildThumbnail(fit: BoxFit.cover)
@@ -621,6 +699,9 @@ class _MemeCardState extends State<MemeCard> {
       {'type': Meme.typePortrait, 'label': l10n.tr('type_portrait'), 'icon': Icons.portrait},
       {'type': Meme.typeCg, 'label': l10n.tr('type_cg'), 'icon': Icons.photo_library},
       {'type': Meme.typeCharacterCard, 'label': l10n.tr('type_character_card'), 'icon': Icons.person_outline},
+      {'type': Meme.typeVector, 'label': l10n.tr('type_vector'), 'icon': Icons.grain},
+      {'type': Meme.typePsd, 'label': l10n.tr('type_psd'), 'icon': Icons.layers},
+      {'type': Meme.typePdf, 'label': l10n.tr('type_pdf'), 'icon': Icons.picture_as_pdf},
     ];
 
     showDialog(
@@ -675,26 +756,16 @@ class _MemeCardState extends State<MemeCard> {
 
   String _typeLabel(String type) {
     final l10n = context.read<LocaleProvider>().l10n;
-    switch (type) {
-      case Meme.typeEmoji: return l10n.tr('type_emoji');
-      case Meme.typeGif: return l10n.tr('type_gif');
-      case Meme.typeText: return l10n.tr('type_text');
-      case Meme.typePortrait: return l10n.tr('type_portrait');
-      case Meme.typeCg: return l10n.tr('type_cg');
-      case Meme.typeCharacterCard: return l10n.tr('type_character_card');
-      case Meme.typeVector: return l10n.tr('type_vector');
-      case Meme.typePsd: return l10n.tr('type_psd');
-      default: return '';
-    }
+    // Meme.typeLabelKey 是实例 getter，此处用 widget.meme 的类型
+    return type == widget.meme.type
+        ? l10n.tr(widget.meme.typeLabelKey)
+        : l10n.tr('type_image');
   }
 
   void _reimport() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: [
-        'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp',
-        'svg', 'apng', 'psd',
-      ],
+      allowedExtensions: Meme.supportedExtensions,
     );
     if (result != null && result.files.isNotEmpty && mounted) {
       final file = result.files.first;

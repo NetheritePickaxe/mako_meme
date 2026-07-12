@@ -248,5 +248,15 @@
   "enable_accessibility": "Enable Accessibility",
   "open_ime_settings": "Input Method Settings",
   "open_accessibility_settings": "Accessibility Settings",
-  "keyboard_feature_unavailable": "This feature is Android-only"
+  "keyboard_feature_unavailable": "This feature is Android-only",
+  "type_pdf": "PDF",
+  "cat_pdf": "PDF",
+  "card_display": "Card Display",
+  "card_display_desc": "Customize info shown below cards",
+  "card_show_name": "Show Name",
+  "card_show_tags": "Show Tags",
+  "card_show_type": "Show Type",
+  "card_show_ext": "Show Extension",
+  "open_externally": "Open Externally",
+  "pdf_web_hint": "PDF preview is not available on Web. Please download to view."
 }

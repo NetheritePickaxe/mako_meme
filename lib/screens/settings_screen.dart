@@ -82,6 +82,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
           _autoClassifyTile(settings, l10n),
           const Divider(indent: 16, endIndent: 16),
+          _cardDisplayTile(settings, l10n),
+          const Divider(indent: 16, endIndent: 16),
           ListTile(
             leading: const Icon(Icons.file_download_outlined),
             title: Text(l10n.tr('import_data')),
@@ -420,6 +422,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onTap: () => _reclassifyAll(context, settings, l10n),
           ),
         ],
+      ],
+    );
+  }
+
+  Widget _cardDisplayTile(SettingsProvider settings, L10n l10n) {
+    return Column(
+      children: [
+        ListTile(
+          leading: const Icon(Icons.view_carousel_outlined),
+          title: Text(l10n.tr('card_display')),
+          subtitle: Text(l10n.tr('card_display_desc')),
+        ),
+        SwitchListTile(
+          secondary: const Icon(Icons.label_outline),
+          title: Text(l10n.tr('card_show_name')),
+          value: settings.showCardName,
+          onChanged: (v) => settings.setShowCardName(v),
+        ),
+        SwitchListTile(
+          secondary: const Icon(Icons.tag),
+          title: Text(l10n.tr('card_show_tags')),
+          value: settings.showCardTags,
+          onChanged: (v) => settings.setShowCardTags(v),
+        ),
+        SwitchListTile(
+          secondary: const Icon(Icons.category_outlined),
+          title: Text(l10n.tr('card_show_type')),
+          value: settings.showCardType,
+          onChanged: (v) => settings.setShowCardType(v),
+        ),
+        SwitchListTile(
+          secondary: const Icon(Icons.extension),
+          title: Text(l10n.tr('card_show_ext')),
+          value: settings.showCardExt,
+          onChanged: (v) => settings.setShowCardExt(v),
+        ),
       ],
     );
   }
