@@ -57,4 +57,24 @@ class ImeStatusService {
       return false;
     }
   }
+
+  /// 弹出系统输入法切换选择器（快速切换到本应用 IME）。
+  static Future<bool> showImePicker() async {
+    if (kIsWeb || !Platform.isAndroid) return false;
+    try {
+      return await _channel.invokeMethod<bool>('showImePicker') ?? false;
+    } on PlatformException catch (_) {
+      return false;
+    }
+  }
+
+  /// 写入 IME 主题配色（JSON），供输入法服务读取并应用。
+  static Future<bool> updateImeTheme(String json) async {
+    if (kIsWeb || !Platform.isAndroid) return false;
+    try {
+      return await _channel.invokeMethod<bool>('updateImeTheme', {'json': json}) ?? false;
+    } on PlatformException catch (_) {
+      return false;
+    }
+  }
 }

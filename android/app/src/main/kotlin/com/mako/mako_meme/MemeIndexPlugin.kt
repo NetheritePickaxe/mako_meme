@@ -2,9 +2,12 @@ package com.mako.mako_meme
 
 import android.content.Context
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.text.TextUtils
 import android.util.Log
+import android.view.inputmethod.InputMethodManager
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -23,12 +26,15 @@ import java.io.File
  *   isAccessibilityEnabled() → Boolean        无障碍服务是否已启用
  *   openImeSettings() → void                  跳转到系统输入法设置页
  *   openAccessibilitySettings() → void        跳转到系统无障碍设置页
+ *   showImePicker() → void                    弹出系统输入法切换选择器
+ *   updateImeTheme(json: String) → Boolean    写入 IME 主题配色文件，供输入法读取
  */
 class MemeIndexPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
 
     companion object {
         private const val CHANNEL = "mako_meme/native"
         private const val INDEX_FILE = "meme_index.json"
+        private const val THEME_FILE = "ime_theme.json"
         private const val TAG = "MemeIndexPlugin"
 
         /** 本应用的 IME 服务组件名（全限定）。 */
@@ -106,6 +112,33 @@ class MemeIndexPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                     result.success(true)
                 }.getOrElse { result.success(false) }
             }
+            "showImePicker" -> {
+                if (ctx == null) { result.success(false); return }
+                // showInputMethodPicker 必须在主线程调用
+                Handler(Looper.getMainLooper()).post {
+                    runCatching {
+                        val imm = ctx.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+                        imm.showInputMethodPicker()
+                        result.success(true)
+                    }.getOrElse {
+                        Log.e(TAG, "showImePicker failed", it as Throwable)
+                        result.success(false)
+                    }
+                }
+            }
+            "updateImeTheme" -> {
+                if (ctx == null) { result.success(false); return }
+                val json = call.argument<String>("json") ?: ""
+                if (json.isEmpty()) { result.success(false); return }
+                runCatching {
+                    File(ctx.filesDir, THEME_FILE).writeText(json)
+                    Log.d(TAG, "IME theme updated: ${json.length} bytes")
+                    result.success(true)
+                }.getOrElse {
+                    Log.e(TAG, "Failed to write IME theme", it)
+                    result.success(false)
+                }
+            }
             else -> result.notImplemented()
         }
     }
@@ -117,7 +150,8 @@ class MemeIndexPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             ctx.contentResolver,
             Settings.Secure.ENABLED_INPUT_METHODS
         ) ?: return false
-        return imeIds.split(";").any { it == IME_FLATTENED }
+        // 精确匹配，或匹配同包名前缀（兼容子类型后缀等情况）
+        return imeIds.split(";").any { it == IME_FLATTENED || it.startsWith("com.mako.mako_meme/") }
     }
 
     /** 检查本应用 IME 是否为当前默认输入法。 */

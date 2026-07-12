@@ -359,5 +359,12 @@
   "tag_name": "Tag name",
   "no_moods": "No mood tags",
   "no_moods_hint": "Add mood tags to memes in the detail panel",
-  "items_count": "items"
+  "items_count": "items",
+  "expand": "Expand",
+  "collapse": "Collapse",
+  "refresh": "Refresh",
+  "switch_to_ime": "Switch to this IME",
+  "test_input_title": "Test Input",
+  "test_input_desc": "Tap the input box to bring up the current IME keyboard",
+  "test_input_hint": "Type here to test..."
 }

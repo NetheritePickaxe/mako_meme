@@ -1,5 +1,8 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../services/storage_service.dart';
+import '../services/ime_status_service.dart';
 import '../theme/app_theme.dart';
 
 class SettingsProvider extends ChangeNotifier {
@@ -31,9 +34,11 @@ class SettingsProvider extends ChangeNotifier {
   // tag 细分：开启后大图详情面板显示双列 tag（情绪+普通）
   bool _tagSubdivision = false;
 
-  // 分类可见性 — 默认隐藏特殊功能分类（角色卡/立绘/CG/小说）
+  // 分类可见性 — 默认仅显示 emoji/gif/image/text 四类
+  // 其他（manga/vector/psd/pdf/portrait/cg/character_card/novel）默认隐藏，可在设置中开启
   // 存储为逗号分隔的隐藏类型字符串
   Set<String> _hiddenCategories = {
+    'manga', 'vector', 'psd', 'pdf',
     'portrait', 'cg', 'character_card', 'novel',
   };
 
@@ -109,7 +114,7 @@ class SettingsProvider extends ChangeNotifier {
     // 加载 tag 细分设置
     _tagSubdivision = _storage.getSetting('tagSubdivision') == 'true';
 
-    // 加载分类可见性（未设置时默认隐藏 portrait/cg/character_card）
+    // 加载分类可见性（未设置时默认仅显示 emoji/gif/image/text）
     final savedHidden = _storage.getSetting('hiddenCategories');
     if (savedHidden != null && savedHidden.isNotEmpty) {
       _hiddenCategories = savedHidden.split(',').where((s) => s.isNotEmpty).toSet();
@@ -129,6 +134,35 @@ class SettingsProvider extends ChangeNotifier {
     // 加载存储位置配置
     _storageLocation = _storage.getSetting('storageLocation') ?? 'app';
     _customStoragePath = _storage.getSetting('customStoragePath');
+
+    // 初始同步 IME 主题配色
+    _syncImeTheme();
+  }
+
+  /// 将当前主题配色同步到 IME 服务（仅 Android）。
+  /// IME 读取 filesDir/ime_theme.json 应用配色。
+  void _syncImeTheme() {
+    if (kIsWeb || !Platform.isAndroid) return;
+    // 判断当前是否为深色模式（system 模式按系统值）
+    final isDark = _themeMode == ThemeMode.dark ||
+        (_themeMode == ThemeMode.system &&
+            WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark);
+    final scheme = ColorScheme.fromSeed(
+      seedColor: seedColor,
+      brightness: isDark ? Brightness.dark : Brightness.light,
+    );
+    final json = '{'
+        '"dark":$isDark,'
+        '"bg":${isDark ? 0xFF1A1A1A : 0xFFF5F5F5},'
+        '"surface":${(isDark ? scheme.surfaceContainer : scheme.surface).toARGB32()},'
+        '"accent":${scheme.primary.toARGB32()},'
+        '"onAccent":${scheme.onPrimary.toARGB32()},'
+        '"text":${(isDark ? 0xFFEEEEEE : 0xFF222222)},'
+        '"subText":${(isDark ? 0xFFAAAAAA : 0xFF666666)},'
+        '"tabBg":${scheme.primary.toARGB32()},'
+        '"tabText":${scheme.onPrimary.toARGB32()}'
+        '}';
+    ImeStatusService.updateImeTheme(json);
   }
 
   // WebDAV getters
@@ -198,12 +232,14 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setThemeMode(ThemeMode mode) async {
     _themeMode = mode;
     await _storage.setSetting('themeMode', mode.name);
+    _syncImeTheme();
     notifyListeners();
   }
 
   Future<void> setUseMonet(bool v) async {
     _useMonet = v;
     await _storage.setSetting('useMonet', v.toString());
+    _syncImeTheme();
     notifyListeners();
   }
 
@@ -324,6 +360,7 @@ class SettingsProvider extends ChangeNotifier {
     _useMonet = false;
     await _storage.setSetting('presetIndex', index.toString());
     await _storage.setSetting('useMonet', 'false');
+    _syncImeTheme();
     notifyListeners();
   }
 
@@ -334,6 +371,7 @@ class SettingsProvider extends ChangeNotifier {
     await _storage.setSetting('presetIndex', _presetIndex.toString());
     await _storage.setSetting('useMonet', 'false');
     await _storage.setSetting('customSeed', '#${seed.toARGB32().toRadixString(16).padLeft(8, '0')}');
+    _syncImeTheme();
     notifyListeners();
   }
 

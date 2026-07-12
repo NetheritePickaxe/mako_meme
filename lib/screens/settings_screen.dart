@@ -192,23 +192,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _storageLocationTile(SettingsProvider settings, L10n l10n) {
+    final isCustom = settings.storageLocation == 'custom' && settings.customStoragePath != null;
     return Column(
       children: [
         ListTile(
           leading: const Icon(Icons.folder_outlined),
           title: Text(l10n.tr('storage_location')),
           subtitle: Text(
-            settings.storageLocation == 'custom' && settings.customStoragePath != null
+            isCustom
                 ? settings.customStoragePath!
                 : l10n.tr('app_data'),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: SegmentedButton<String>(
+          trailing: SegmentedButton<String>(
             segments: [
-              ButtonSegment(value: 'app', label: Text(l10n.tr('app_data'))),
-              ButtonSegment(value: 'custom', label: Text(l10n.tr('custom_folder'))),
+              ButtonSegment(value: 'app', icon: const Icon(Icons.storage, size: 18)),
+              ButtonSegment(value: 'custom', icon: const Icon(Icons.folder_open, size: 18)),
             ],
             selected: {settings.storageLocation},
             onSelectionChanged: (v) async {
@@ -246,8 +246,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
         ),
-        if (settings.storageLocation == 'custom' && settings.customStoragePath != null) ...[
-          const SizedBox(height: 8),
+        if (isCustom) ...[
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
@@ -446,16 +445,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ButtonSegment(
             value: 'share',
             icon: const Icon(Icons.share, size: 18),
-            label: Text(l10n.tr('share')),
           ),
           ButtonSegment(
             value: 'menu',
             icon: const Icon(Icons.menu, size: 18),
-            label: Text(l10n.tr('menu')),
           ),
         ],
         selected: {settings.mobileLongPress},
         onSelectionChanged: (s) => settings.setMobileLongPress(s.first),
+        showSelectedIcon: false,
+        style: ButtonStyle(
+          visualDensity: VisualDensity.compact,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
       ),
     );
   }
@@ -791,18 +793,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         child: Row(
           children: [
-            // 色卡：四个色块横向排列，直观展示配色方案
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _swatch(previewScheme.primary, 32, 32),
-                  _swatch(previewScheme.primaryContainer, 32, 32),
-                  _swatch(previewScheme.secondary, 32, 32),
-                  _swatch(previewScheme.tertiary, 32, 32),
-                ],
-              ),
+            // 色卡：四个圆角方形色块横向排列，直观展示配色方案
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _swatch(previewScheme.primary),
+                const SizedBox(width: 4),
+                _swatch(previewScheme.primaryContainer),
+                const SizedBox(width: 4),
+                _swatch(previewScheme.secondary),
+                const SizedBox(width: 4),
+                _swatch(previewScheme.tertiary),
+              ],
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -818,10 +820,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _swatch(Color color, double w, double h) => Container(
-    width: w,
-    height: h,
-    color: color,
+  /// 圆角方形色卡
+  Widget _swatch(Color color, [double size = 30]) => Container(
+    width: size,
+    height: size,
+    decoration: BoxDecoration(
+      color: color,
+      borderRadius: BorderRadius.circular(size * 0.23),
+      border: Border.all(color: Colors.black.withValues(alpha: 0.08), width: 0.5),
+    ),
   );
 
   Widget _customPresetCard(SettingsProvider settings, ColorScheme cs, L10n l10n) {
@@ -842,17 +849,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         child: Row(
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _swatch(previewScheme.primary, 32, 32),
-                  _swatch(previewScheme.primaryContainer, 32, 32),
-                  _swatch(previewScheme.secondary, 32, 32),
-                  _swatch(previewScheme.tertiary, 32, 32),
-                ],
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _swatch(previewScheme.primary),
+                const SizedBox(width: 4),
+                _swatch(previewScheme.primaryContainer),
+                const SizedBox(width: 4),
+                _swatch(previewScheme.secondary),
+                const SizedBox(width: 4),
+                _swatch(previewScheme.tertiary),
+              ],
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -929,27 +936,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      // 派生色板预览
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: Column(
-                          children: [
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _swatch(ColorScheme.fromSeed(seedColor: currentColor, brightness: Brightness.light).primary, 18, 18),
-                                _swatch(ColorScheme.fromSeed(seedColor: currentColor, brightness: Brightness.light).secondary, 18, 18),
-                              ],
-                            ),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _swatch(ColorScheme.fromSeed(seedColor: currentColor, brightness: Brightness.dark).primary, 18, 18),
-                                _swatch(ColorScheme.fromSeed(seedColor: currentColor, brightness: Brightness.dark).secondary, 18, 18),
-                              ],
-                            ),
-                          ],
-                        ),
+                      // 派生色板预览（圆角方形）
+                      Column(
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _swatch(ColorScheme.fromSeed(seedColor: currentColor, brightness: Brightness.light).primary, 18),
+                              const SizedBox(width: 3),
+                              _swatch(ColorScheme.fromSeed(seedColor: currentColor, brightness: Brightness.light).secondary, 18),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _swatch(ColorScheme.fromSeed(seedColor: currentColor, brightness: Brightness.dark).primary, 18),
+                              const SizedBox(width: 3),
+                              _swatch(ColorScheme.fromSeed(seedColor: currentColor, brightness: Brightness.dark).secondary, 18),
+                            ],
+                          ),
+                        ],
                       ),
                     ],
                   ),

@@ -61,6 +61,7 @@ class MemeGrid extends StatelessWidget {
       padding: EdgeInsets.all(spacing),
       itemCount: memes.length,
       itemBuilder: (ctx, i) => MemeCard(
+        key: ValueKey(memes[i].id),
         meme: memes[i],
         onReorder: onReorder,
         previewMode: previewMode,

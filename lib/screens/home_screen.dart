@@ -547,13 +547,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primary.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(10),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.asset(
+                          'assets/icon_foreground.png',
+                          width: 38,
+                          height: 38,
+                          fit: BoxFit.cover,
                         ),
-                        child: Icon(Icons.emoji_emotions_outlined, color: theme.colorScheme.primary, size: 22),
                       ),
                       const SizedBox(width: 12),
                       Text('Mako Meme', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
@@ -1158,16 +1159,13 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  /// 全屏文本/小说编辑器，支持 Markdown 实时预览切换
+  /// 文本/小说编辑弹窗（紧凑弹窗 + 展开按钮）
   void _showTextEditor(BuildContext ctx, MemeProvider prov, {required String type}) {
-    Navigator.push(
-      ctx,
-      MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => TextEditorScreen(type: type, onSave: (text, title) async {
-          await prov.importText(text, name: title, type: type);
-        }),
-      ),
+    showDialog(
+      context: ctx,
+      builder: (_) => TextEditorScreen(type: type, onSave: (text, title) async {
+        await prov.importText(text, name: title, type: type);
+      }),
     );
   }
 

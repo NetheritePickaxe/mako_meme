@@ -359,5 +359,12 @@
   "tag_name": "标签名称",
   "no_moods": "暂无情绪标签",
   "no_moods_hint": "在大图详情面板中给表情包添加情绪标签",
-  "items_count": "项"
+  "items_count": "项",
+  "expand": "展开",
+  "collapse": "收起",
+  "refresh": "刷新",
+  "switch_to_ime": "切换到本输入法",
+  "test_input_title": "测试输入",
+  "test_input_desc": "点击输入框可唤起当前输入法键盘",
+  "test_input_hint": "在此输入测试..."
 }

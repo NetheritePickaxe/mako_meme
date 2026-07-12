@@ -3,10 +3,10 @@ import 'package:flutter/services.dart';
 import '../providers/locale_provider.dart';
 import 'package:provider/provider.dart';
 
-/// 全屏文本/小说编辑器
-/// - 支持 Markdown 语法编辑
-/// - 支持编辑/预览切换
-/// - 支持标题
+/// 文本/小说编辑弹窗
+/// - 默认为小弹窗（紧凑模式）
+/// - 点击展开按钮切换为全屏编辑模式
+/// - 全屏模式下底部显示图标式 Markdown 快捷按钮
 class TextEditorScreen extends StatefulWidget {
   final String type;
   final Future<void> Function(String text, String? title) onSave;
@@ -30,6 +30,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
   late TextEditingController _titleCtrl;
   bool _previewMode = false;
   bool _saving = false;
+  bool _expanded = false;
 
   @override
   void initState() {
@@ -63,107 +64,192 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
     final theme = Theme.of(context);
     final isNovel = widget.type == 'novel';
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(isNovel ? l10n.tr('import_novel') : l10n.tr('import_text')),
-        actions: [
-          // 编辑/预览切换
-          IconButton(
-            icon: Icon(_previewMode ? Icons.edit : Icons.visibility_outlined),
-            tooltip: _previewMode ? l10n.tr('edit_mode') : l10n.tr('preview_mode'),
-            onPressed: () => setState(() => _previewMode = !_previewMode),
+    if (_expanded) {
+      // 全屏模式：Markdown 工具栏位于底部
+      return Dialog(
+        insetPadding: EdgeInsets.zero,
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text(isNovel ? l10n.tr('import_novel') : l10n.tr('import_text')),
+            actions: [
+              IconButton(
+                icon: Icon(_previewMode ? Icons.edit : Icons.visibility_outlined),
+                tooltip: _previewMode ? l10n.tr('edit_mode') : l10n.tr('preview_mode'),
+                onPressed: () => setState(() => _previewMode = !_previewMode),
+              ),
+              IconButton(
+                icon: const Icon(Icons.paste),
+                tooltip: l10n.tr('paste'),
+                onPressed: () async {
+                  final data = await Clipboard.getData(Clipboard.kTextPlain);
+                  if (data?.text != null && data!.text!.isNotEmpty) {
+                    _textCtrl.text = data.text!;
+                  }
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.fullscreen_exit),
+                tooltip: l10n.tr('collapse'),
+                onPressed: () => setState(() => _expanded = false),
+              ),
+              IconButton(
+                icon: _saving
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.check),
+                tooltip: l10n.tr('save'),
+                onPressed: _saving ? null : _save,
+              ),
+            ],
           ),
-          IconButton(
-            icon: const Icon(Icons.paste),
-            tooltip: l10n.tr('paste'),
-            onPressed: () async {
-              final data = await Clipboard.getData(Clipboard.kTextPlain);
-              if (data?.text != null && data!.text!.isNotEmpty) {
-                _textCtrl.text = data.text!;
-              }
-            },
+          body: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: TextField(
+                  controller: _titleCtrl,
+                  decoration: InputDecoration(
+                    hintText: l10n.tr('title_hint'),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: _previewMode
+                    ? _buildMarkdownPreview(theme)
+                    : Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: TextField(
+                          controller: _textCtrl,
+                          maxLines: null,
+                          expands: true,
+                          textAlignVertical: TextAlignVertical.top,
+                          style: TextStyle(
+                            fontSize: isNovel ? 16 : 18,
+                            height: isNovel ? 1.8 : 1.5,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: isNovel ? l10n.tr('novel_hint') : l10n.tr('hint_text_or_emoji'),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            contentPadding: const EdgeInsets.all(16),
+                          ),
+                        ),
+                      ),
+              ),
+              // 底部 Markdown 工具栏（图标式，仅编辑模式）
+              if (!_previewMode) _buildMarkdownToolbar(theme),
+            ],
           ),
-          IconButton(
-            icon: _saving
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.check),
-            tooltip: l10n.tr('save'),
-            onPressed: _saving ? null : _save,
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // 标题输入
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: TextField(
+        ),
+      );
+    }
+
+    // 紧凑弹窗模式
+    return Dialog(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.text_fields, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  isNovel ? l10n.tr('import_novel') : l10n.tr('import_text'),
+                  style: theme.textTheme.titleMedium,
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.fullscreen),
+                  tooltip: l10n.tr('expand'),
+                  onPressed: () => setState(() => _expanded = true),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            TextField(
               controller: _titleCtrl,
               decoration: InputDecoration(
                 hintText: l10n.tr('title_hint'),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                isDense: true,
               ),
             ),
-          ),
-          // Markdown 工具栏（仅编辑模式）
-          if (!_previewMode) _buildMarkdownToolbar(theme),
-          // 内容区
-          Expanded(
-            child: _previewMode
-                ? _buildMarkdownPreview(theme)
-                : Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: TextField(
-                      controller: _textCtrl,
-                      maxLines: null,
-                      expands: true,
-                      textAlignVertical: TextAlignVertical.top,
-                      style: TextStyle(
-                        fontSize: isNovel ? 16 : 18,
-                        height: isNovel ? 1.8 : 1.5,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: isNovel ? l10n.tr('novel_hint') : l10n.tr('hint_text_or_emoji'),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        contentPadding: const EdgeInsets.all(16),
-                      ),
-                    ),
-                  ),
-          ),
-        ],
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 200,
+              child: TextField(
+                controller: _textCtrl,
+                maxLines: null,
+                expands: true,
+                textAlignVertical: TextAlignVertical.top,
+                style: TextStyle(
+                  fontSize: isNovel ? 16 : 18,
+                  height: isNovel ? 1.8 : 1.5,
+                ),
+                decoration: InputDecoration(
+                  hintText: isNovel ? l10n.tr('novel_hint') : l10n.tr('hint_text_or_emoji'),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  contentPadding: const EdgeInsets.all(12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(l10n.tr('cancel')),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: _saving ? null : _save,
+                  child: _saving
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : Text(l10n.tr('save')),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  /// Markdown 快捷工具栏
+  /// 图标式 Markdown 工具栏（位于底部）
+  /// 仿照主流 Markdown 编辑器，使用图标而非文字标签
   Widget _buildMarkdownToolbar(ThemeData theme) {
-    final l10n = context.read<LocaleProvider>().l10n;
-    final tools = [
-      ('# ', l10n.tr('md_h1')),
-      ('## ', l10n.tr('md_h2')),
-      ('### ', l10n.tr('md_h3')),
-      ('**', l10n.tr('md_bold')),
-      ('*', l10n.tr('md_italic')),
-      ('~~', l10n.tr('md_strike')),
-      ('- ', l10n.tr('md_list')),
-      ('> ', l10n.tr('md_quote')),
-      ('`', l10n.tr('md_code')),
-      ('\n```\n', l10n.tr('md_codeblock')),
+    final tools = <(String, IconData, String)>[
+      ('# ', Icons.looks_one_outlined, 'H1'),
+      ('## ', Icons.looks_two_outlined, 'H2'),
+      ('### ', Icons.looks_3_outlined, 'H3'),
+      ('**', Icons.format_bold, 'Bold'),
+      ('*', Icons.format_italic, 'Italic'),
+      ('~~', Icons.format_strikethrough, 'Strikethrough'),
+      ('- ', Icons.format_list_bulleted, 'List'),
+      ('> ', Icons.format_quote, 'Quote'),
+      ('`', Icons.code, 'Code'),
+      ('\n```\n', Icons.data_object, 'CodeBlock'),
     ];
     return Container(
-      height: 44,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5)),
+        color: theme.colorScheme.surfaceContainerLow,
+      ),
+      height: 48,
       child: ListView(
         scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 4),
         children: tools.map((t) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
-            child: ActionChip(
-              label: Text(t.$2),
-              visualDensity: VisualDensity.compact,
-              onPressed: () => _insertMarkdown(t.$1),
-            ),
+          return IconButton(
+            icon: Icon(t.$2),
+            tooltip: t.$3,
+            visualDensity: VisualDensity.compact,
+            onPressed: () => _insertMarkdown(t.$1),
           );
         }).toList(),
       ),
@@ -204,8 +290,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
     final spans = <Widget>[];
 
     for (var i = 0; i < lines.length; i++) {
-      final line = lines[i];
-      spans.add(_renderLine(line, theme, i + 1));
+      spans.add(_renderLine(lines[i], theme, i + 1));
     }
 
     return SingleChildScrollView(

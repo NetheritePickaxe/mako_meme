@@ -46,6 +46,20 @@ class _MemeCardState extends State<MemeCard> {
     _loadBytes();
   }
 
+  /// meme 更新时（如 thumbPath 变化），重置状态重新加载
+  @override
+  void didUpdateWidget(covariant MemeCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.meme.id != widget.meme.id ||
+        oldWidget.meme.displayPath != widget.meme.displayPath) {
+      _bytes = null;
+      _file = null;
+      _loading = true;
+      _aspectRatio = 1.0;
+      _loadBytes();
+    }
+  }
+
   /// 实际用于显示的路径：有缩略图（PSD/ICO/TIF）时用 thumbPath，否则用 filePath
   String get _displayPath => widget.meme.displayPath;
 

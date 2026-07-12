@@ -6,6 +6,7 @@ import '../l10n/l10n.dart';
 import '../services/ime_status_service.dart';
 
 /// 表情包输入法引导页：检测 IME / 无障碍服务状态，提供跳转设置入口。
+/// 包含输入法切换按钮和测试输入框。
 class KeyboardSetupScreen extends StatefulWidget {
   const KeyboardSetupScreen({super.key});
 
@@ -66,7 +67,17 @@ class _KeyboardSetupScreenState extends State<KeyboardSetupScreen> with WidgetsB
     final cs = theme.colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.tr('keyboard_setup'))),
+      appBar: AppBar(
+        title: Text(l10n.tr('keyboard_setup')),
+        actions: [
+          if (_isAndroid)
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: l10n.tr('refresh'),
+              onPressed: _refreshStatus,
+            ),
+        ],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
           : !_isAndroid
@@ -89,6 +100,18 @@ class _KeyboardSetupScreenState extends State<KeyboardSetupScreen> with WidgetsB
                       actionLabel: _imeEnabled ? l10n.tr('open_ime_settings') : l10n.tr('enable_ime'),
                       onAction: () => ImeStatusService.openImeSettings(),
                     ),
+                    // 输入法已启用时显示「切换到本输入法」按钮
+                    if (_imeEnabled) ...[
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: () => ImeStatusService.showImePicker(),
+                          icon: const Icon(Icons.swap_horiz, size: 18),
+                          label: Text(l10n.tr('switch_to_ime')),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     // 无障碍状态
                     _buildStatusCard(
@@ -103,11 +126,48 @@ class _KeyboardSetupScreenState extends State<KeyboardSetupScreen> with WidgetsB
                       actionLabel: l10n.tr('open_accessibility_settings'),
                       onAction: () => ImeStatusService.openAccessibilitySettings(),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 16),
+                    // 测试输入框：点击后弹出当前输入法键盘
+                    _buildTestInput(l10n, cs),
+                    const SizedBox(height: 16),
                     // 使用说明
                     _buildInstructions(l10n, cs),
                   ],
                 ),
+    );
+  }
+
+  /// 测试输入框：用于验证输入法是否正常工作
+  Widget _buildTestInput(L10n l10n, ColorScheme cs) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.edit_note, size: 18, color: cs.primary),
+                const SizedBox(width: 8),
+                Text(l10n.tr('test_input_title'),
+                    style: TextStyle(fontWeight: FontWeight.w600, color: cs.primary)),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(l10n.tr('test_input_desc'),
+                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+            const SizedBox(height: 12),
+            TextField(
+              decoration: InputDecoration(
+                hintText: l10n.tr('test_input_hint'),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                suffixIcon: const Icon(Icons.keyboard, size: 20),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

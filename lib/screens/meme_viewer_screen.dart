@@ -900,9 +900,9 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
     final isMobile = _isMobilePlatform();
     final settings = context.watch<SettingsProvider>();
     return DraggableScrollableSheet(
-      initialChildSize: 0.35,
-      minChildSize: 0.15,
-      maxChildSize: 0.85,
+      initialChildSize: 0.45,
+      minChildSize: 0.2,
+      maxChildSize: 0.9,
       builder: (ctx, controller) {
         return Container(
           decoration: BoxDecoration(
@@ -1481,21 +1481,18 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
     }
   }
 
-  /// 编辑文本/小说内容 — 打开全屏编辑器
+  /// 编辑文本/小说内容 — 打开编辑弹窗
   void _editText(Meme m) {
     final prov = context.read<MemeProvider>();
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => TextEditorScreen(
-          type: m.type,
-          initialText: m.textContent,
-          initialTitle: m.name,
-          onSave: (text, title) async {
-            await prov.updateMemeText(m.id, text, name: title);
-          },
-        ),
+    showDialog(
+      context: context,
+      builder: (_) => TextEditorScreen(
+        type: m.type,
+        initialText: m.textContent,
+        initialTitle: m.name,
+        onSave: (text, title) async {
+          await prov.updateMemeText(m.id, text, name: title);
+        },
       ),
     );
   }
