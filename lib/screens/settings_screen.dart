@@ -563,66 +563,102 @@ class _SettingsScreenState extends State<SettingsScreen> {
       Meme.typePortrait, Meme.typeCg, Meme.typeCharacterCard,
       Meme.typeVector, Meme.typePsd, Meme.typePdf, Meme.typeNovel,
     ];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ListTile(
-          leading: const Icon(Icons.category_outlined),
-          title: Text(l10n.tr('category_manage')),
-          subtitle: Text(l10n.tr('category_manage_desc')),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          child: Text(l10n.tr('builtin_categories'),
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.primary)),
-        ),
-        // 内置分类的显示/隐藏开关
-        ...builtinCats.map((type) {
-          final m = Meme(id: '', name: '', createdAt: DateTime.now(), type: type, filePath: '');
-          final label = l10n.tr(m.typeLabelKey);
-          final visible = settings.isCategoryVisible(type);
-          return SwitchListTile(
-            secondary: const Icon(Icons.label_outline, size: 20),
-            title: Text(label),
-            value: visible,
-            onChanged: (v) => settings.toggleCategoryVisibility(type),
-            dense: true,
-          );
-        }),
-        // 自定义分类
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(l10n.tr('custom_categories'),
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.primary)),
+    final visibleCount = builtinCats.where(settings.isCategoryVisible).length;
+    return ListTile(
+      leading: const Icon(Icons.category_outlined),
+      title: Text(l10n.tr('category_manage')),
+      subtitle: Text('$visibleCount / ${builtinCats.length}'),
+      trailing: const Icon(Icons.chevron_right, size: 20),
+      onTap: () => _showCategoryManageSheet(settings, l10n, builtinCats),
+    );
+  }
+
+  /// 分类管理底部弹窗：紧凑列表形式
+  void _showCategoryManageSheet(SettingsProvider settings, L10n l10n, List<String> builtinCats) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) {
+        final s = ctx.watch<SettingsProvider>();
+        return StatefulBuilder(
+          builder: (ctx, setState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).viewInsets.bottom,
               ),
-              IconButton(
-                icon: const Icon(Icons.add, size: 20),
-                onPressed: () => _showAddCustomCategoryDialog(settings, l10n),
-                tooltip: l10n.tr('add_category'),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    child: Row(
+                      children: [
+                        Text(l10n.tr('category_manage'),
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Theme.of(ctx).colorScheme.primary)),
+                        const Spacer(),
+                        TextButton.icon(
+                          icon: const Icon(Icons.add, size: 18),
+                          label: Text(l10n.tr('add_category')),
+                          onPressed: () => _showAddCustomCategoryDialog(settings, l10n),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  // 内置分类列表
+                  ...builtinCats.map((type) {
+                    final m = Meme(id: '', name: '', createdAt: DateTime.now(), type: type, filePath: '');
+                    final label = l10n.tr(m.typeLabelKey);
+                    final visible = s.isCategoryVisible(type);
+                    return CheckboxListTile(
+                      controlAffinity: ListTileControlAffinity.leading,
+                      value: visible,
+                      title: Text(label, style: const TextStyle(fontSize: 14)),
+                      dense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                      onChanged: (v) {
+                        s.toggleCategoryVisibility(type);
+                        setState(() {});
+                      },
+                    );
+                  }),
+                  // 自定义分类标题
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(l10n.tr('custom_categories'),
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Theme.of(ctx).colorScheme.primary)),
+                    ),
+                  ),
+                  if (s.customCategories.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Text(l10n.tr('no_custom_categories'),
+                        style: TextStyle(fontSize: 12, color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
+                    )
+                  else
+                    ...s.customCategories.map((name) => ListTile(
+                      leading: const Icon(Icons.tag, size: 18),
+                      title: Text(name, style: const TextStyle(fontSize: 14)),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline, size: 18),
+                        onPressed: () {
+                          s.removeCustomCategory(name);
+                          setState(() {});
+                        },
+                      ),
+                      dense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                    )),
+                  const SizedBox(height: 12),
+                ],
               ),
-            ],
-          ),
-        ),
-        if (settings.customCategories.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Text(l10n.tr('no_custom_categories'),
-              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-          )
-        else
-          ...settings.customCategories.map((name) => ListTile(
-            leading: const Icon(Icons.tag, size: 20),
-            title: Text(name),
-            trailing: IconButton(
-              icon: const Icon(Icons.delete_outline, size: 20),
-              onPressed: () => settings.removeCustomCategory(name),
-            ),
-            dense: true,
-          )),
-      ],
+            );
+          },
+        );
+      },
     );
   }
 
