@@ -24,6 +24,8 @@ class Meme {
   final String? textContent;
   final String? remotePath;
   final Map<String, dynamic>? characterData;
+  final int width;
+  final int height;
 
   Meme({
     required this.id,
@@ -39,6 +41,8 @@ class Meme {
     this.textContent,
     this.remotePath,
     this.characterData,
+    this.width = 0,
+    this.height = 0,
   });
 
   Map<String, dynamic> toMap() => {
@@ -55,6 +59,8 @@ class Meme {
     'textContent': textContent,
     'remotePath': remotePath,
     'characterData': characterData,
+    'width': width,
+    'height': height,
   };
 
   factory Meme.fromMap(Map<String, dynamic> map) => Meme(
@@ -71,6 +77,8 @@ class Meme {
     textContent: map['textContent'] as String?,
     remotePath: map['remotePath'] as String?,
     characterData: map['characterData'] as Map<String, dynamic>?,
+    width: map['width'] as int? ?? 0,
+    height: map['height'] as int? ?? 0,
   );
 
   Meme copyWith({
@@ -87,6 +95,8 @@ class Meme {
     String? textContent,
     String? remotePath,
     Map<String, dynamic>? characterData,
+    int? width,
+    int? height,
   }) => Meme(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -101,5 +111,7 @@ class Meme {
     textContent: textContent ?? this.textContent,
     remotePath: remotePath ?? this.remotePath,
     characterData: characterData ?? this.characterData,
+    width: width ?? this.width,
+    height: height ?? this.height,
   );
 }

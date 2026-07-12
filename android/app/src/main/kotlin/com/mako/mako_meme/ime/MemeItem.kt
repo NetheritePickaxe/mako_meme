@@ -20,7 +20,9 @@ data class MemeItem(
     val folderId: String?,
     val isFavorite: Boolean,
     val mimeType: String,
-    val textContent: String?
+    val textContent: String?,
+    val width: Int = 0,
+    val height: Int = 0
 ) {
     /** 是否为图片类（有绝对路径可加载）。文字类 absPath 为空。 */
     val isImage: Boolean get() = absPath.isNotEmpty()
@@ -39,6 +41,8 @@ data class MemeItem(
         obj.put("isFavorite", isFavorite)
         obj.put("mimeType", mimeType)
         obj.put("textContent", textContent ?: JSONObject.NULL)
+        obj.put("width", width)
+        obj.put("height", height)
         return obj.toString()
     }
 
@@ -88,7 +92,9 @@ data class MemeItem(
                 folderId = optNullableString(obj, "folderId"),
                 isFavorite = obj.optBoolean("isFavorite", false),
                 mimeType = obj.optString("mimeType", ""),
-                textContent = optNullableString(obj, "textContent")
+                textContent = optNullableString(obj, "textContent"),
+                width = obj.optInt("width", 0),
+                height = obj.optInt("height", 0)
             )
         }
 

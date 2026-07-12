@@ -1,5 +1,5 @@
 {
-  "search_hint": "Search memes (use # for tags)",
+  "search_hint": "Search / #tag @folder *wildcard",
   "menu": "Menu",
   "multi_select": "Multi-select",
   "exit_multi_select": "Exit multi-select",

@@ -1,5 +1,5 @@
 {
-  "search_hint": "搜索表情（用 #前缀 搜索标签）",
+  "search_hint": "搜索 / #标签 @文件夹 *通配符",
   "menu": "打开菜单",
   "multi_select": "多选",
   "exit_multi_select": "退出多选",

@@ -36,6 +36,8 @@ class MemeIndexExporter {
         'isFavorite': m.isFavorite,
         'mimeType': m.mimeType,
         'textContent': m.textContent,
+        'width': m.width,
+        'height': m.height,
       });
     }
 

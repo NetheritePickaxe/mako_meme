@@ -1,10 +1,10 @@
 import 'package:flutter/foundation.dart';
-import 'package:fuzzy/fuzzy.dart';
 import 'package:file_picker/file_picker.dart';
 import '../models/meme.dart';
 import '../models/folder.dart';
 import '../services/storage_service.dart';
 import '../services/meme_index_exporter.dart';
+import '../services/search_query.dart';
 import '../services/webdav_service.dart';
 import 'settings_provider.dart';
 
@@ -364,20 +364,8 @@ class MemeProvider with ChangeNotifier {
       list = list.where((m) => _typeFilter.contains(m.type)).toList();
     }
     if (_query.isNotEmpty) {
-      if (_query.startsWith('#')) {
-        final tq = _query.substring(1).toLowerCase();
-        list = list.where((m) => m.tags.any((tag) => _matchWildcard(tag, tq))).toList();
-      } else if (_query.startsWith('@')) {
-        final fq = _query.substring(1).toLowerCase();
-        final matchedFolderIds = _folders.where((f) => f.name.toLowerCase().contains(fq) || _matchWildcard(f.name, fq)).map((f) => f.id).toSet();
-        list = list.where((m) => m.folderId != null && matchedFolderIds.contains(m.folderId)).toList();
-      } else {
-        final searchList = list.map((m) => '${m.name} ${m.tags.join(" ")}').toList();
-        final fuse = Fuzzy(searchList, options: FuzzyOptions(threshold: 0.3));
-        final results = fuse.search(_query);
-        final matchedItems = results.where((r) => r.score < 0.7).map((r) => r.item).toSet();
-        list = list.where((m) => matchedItems.contains('${m.name} ${m.tags.join(" ")}')).toList();
-      }
+      final matcher = SearchQuery.parse(_query, _folders);
+      list = list.where(matcher).toList();
     }
 
     list.sort((a, b) {
