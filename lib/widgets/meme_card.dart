@@ -261,85 +261,110 @@ class _MemeCardState extends State<MemeCard> {
   }
 
   /// 表情卡片固定 1:1，文字卡片自适应高度，图片卡片按真实宽高比
-  /// 当设置中开启了卡片信息显示时，在图片下方追加信息栏
+  /// 卡片信息（名称/标签/类型/后缀）以透明渐变层叠加在图片底部
   Widget _buildAspectRatioCard(MemeProvider prov, bool isSelected, bool isMulti, ThemeData theme) {
     final ratio = _effectiveAspectRatio;
-    final settings = context.watch<SettingsProvider>();
-    final showInfo = settings.showCardName || settings.showCardTags ||
-        settings.showCardType || settings.showCardExt;
-
     if (ratio.isNaN) {
       // 文字卡片：由内容决定高度，不强制比例
       return _buildCard(context, prov, isSelected, isMulti, theme);
     }
-
-    final card = AspectRatio(
+    return AspectRatio(
       aspectRatio: ratio,
       child: _buildCard(context, prov, isSelected, isMulti, theme),
     );
-
-    if (!showInfo || widget.meme.type == Meme.typeText) return card;
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        card,
-        _buildInfoBar(theme, settings),
-      ],
-    );
   }
 
-  /// 卡片下方信息栏：根据设置显示名称、标签、类型、后缀
-  Widget _buildInfoBar(ThemeData theme, SettingsProvider settings) {
+  /// 卡片底部叠加的信息层：名称第一行（大），标签/类型/后缀第二行（小，可换行）
+  Widget _buildInfoOverlay(ThemeData theme) {
+    final settings = context.watch<SettingsProvider>();
     final l10n = context.read<LocaleProvider>().l10n;
     final m = widget.meme;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
-      ),
-      child: Wrap(
-        spacing: 4,
-        runSpacing: 2,
-        children: [
-          if (settings.showCardName)
-            Text(
-              m.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurface,
-              ),
+    final showName = settings.showCardName;
+    final showTags = settings.showCardTags && m.tags.isNotEmpty;
+    final showType = settings.showCardType;
+    final showExt = settings.showCardExt && m.extension.isNotEmpty;
+    if (!showName && !showTags && !showType && !showExt) {
+      return const SizedBox.shrink();
+    }
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: IgnorePointer(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          decoration: BoxDecoration(
+            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.transparent,
+                Colors.black.withValues(alpha: 0.55),
+              ],
             ),
-          if (settings.showCardTags && m.tags.isNotEmpty)
-            Text(
-              m.tags.map((t) => '#$t').join(' '),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.primary,
-              ),
-            ),
-          if (settings.showCardType)
-            _infoChip(l10n.tr(m.typeLabelKey), theme.colorScheme.secondaryContainer, theme.colorScheme.onSecondaryContainer),
-          if (settings.showCardExt && m.extension.isNotEmpty)
-            _infoChip(m.extension.toUpperCase(), theme.colorScheme.tertiaryContainer, theme.colorScheme.onTertiaryContainer),
-        ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (showName)
+                Text(
+                  m.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                    decoration: TextDecoration.none,
+                  ),
+                ),
+              if (showTags || showType || showExt) ...[
+                const SizedBox(height: 2),
+                Wrap(
+                  spacing: 4,
+                  runSpacing: 2,
+                  children: [
+                    if (showTags)
+                      Text(
+                        m.tags.map((t) => '#$t').join(' '),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: Colors.white70,
+                          decoration: TextDecoration.none,
+                        ),
+                      ),
+                    if (showType)
+                      _overlayChip(l10n.tr(m.typeLabelKey)),
+                    if (showExt)
+                      _overlayChip(m.extension.toUpperCase()),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  Widget _infoChip(String label, Color bg, Color fg) => Container(
+  Widget _overlayChip(String label) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
     decoration: BoxDecoration(
-      color: bg,
+      color: Colors.white.withValues(alpha: 0.25),
       borderRadius: BorderRadius.circular(4),
     ),
     child: Text(
       label,
-      style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: fg),
+      style: const TextStyle(
+        fontSize: 9,
+        fontWeight: FontWeight.bold,
+        color: Colors.white,
+        decoration: TextDecoration.none,
+      ),
     ),
   );
 
@@ -618,7 +643,8 @@ class _MemeCardState extends State<MemeCard> {
                     child: isSelected ? const Icon(Icons.check, size: 14, color: Colors.white) : const SizedBox(width: 14, height: 14),
                   ),
                 ),
-              if (widget.meme.type != Meme.typeImage)
+              if (widget.meme.type != Meme.typeImage &&
+                  !(context.watch<SettingsProvider>().showCardType))
                 Positioned(bottom: 6, left: 6,
                   child: Container(padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                     decoration: BoxDecoration(color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.85), borderRadius: BorderRadius.circular(4)),
@@ -626,6 +652,8 @@ class _MemeCardState extends State<MemeCard> {
                       style: TextStyle(color: Theme.of(context).colorScheme.onSecondary, fontSize: 10, fontWeight: FontWeight.bold)),
                   ),
                 ),
+              // 底部叠加信息层（名称/标签/类型/后缀）
+              _buildInfoOverlay(Theme.of(context)),
             ],
           ),
         ),

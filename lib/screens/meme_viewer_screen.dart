@@ -68,6 +68,10 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
   // 拖动面板时实时更新，图片区域随之收缩，保证图片始终可见
   double _panelExtent = 0.45;
 
+  // 全屏查看模式：隐藏 AppBar 和详情面板，图片占满整屏
+  // 单击图片切换，支持 PhotoView/InteractiveViewer 捏合缩放
+  bool _isFullscreen = false;
+
   // 漫画内部页面滑动
   int _mangaPageIndex = 0;
   final _LruCache<String, Uint8List?> _mangaBytesCache = _LruCache(3);
@@ -93,6 +97,11 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
   }
 
   Meme get _meme => widget.memes[_currentIndex];
+
+  /// 切换全屏查看模式：单击图片进入/退出全屏
+  void _toggleFullscreen() {
+    setState(() => _isFullscreen = !_isFullscreen);
+  }
 
   /// 全屏查看时的 cacheWidth：按屏幕短边 × devicePixelRatio 计算，上限 4096
   /// 这样既保证清晰度，又避免超大图全分辨率解码导致 OOM
@@ -140,89 +149,103 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
     final prov = context.watch<MemeProvider>();
     final l10n = context.watch<LocaleProvider>().l10n;
 
-    return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
-      appBar: AppBar(
+    return PopScope(
+      // 全屏模式下按返回键先退出全屏，而非直接 pop
+      canPop: !_isFullscreen,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _isFullscreen) _toggleFullscreen();
+      },
+      child: Scaffold(
         backgroundColor: theme.colorScheme.surface,
-        foregroundColor: theme.colorScheme.onSurface,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          tooltip: l10n.tr('back'),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              _meme.name,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            Text(
-              _meme.isManga
-                  ? '${_currentIndex + 1} / ${widget.memes.length}  ·  ${l10n.tr('manga_page_label')} ${_mangaPageIndex + 1} / ${_meme.pages.length}'
-                  : '${_currentIndex + 1} / ${widget.memes.length}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+        // 全屏模式隐藏 AppBar，图片占满整屏
+        appBar: _isFullscreen ? null : AppBar(
+          backgroundColor: theme.colorScheme.surface,
+          foregroundColor: theme.colorScheme.onSurface,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            tooltip: l10n.tr('back'),
+            onPressed: () => Navigator.pop(context),
+          ),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _meme.name,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-            ),
+              Text(
+                _meme.isManga
+                    ? '${_currentIndex + 1} / ${widget.memes.length}  ·  ${l10n.tr('manga_page_label')} ${_mangaPageIndex + 1} / ${_meme.pages.length}'
+                    : '${_currentIndex + 1} / ${widget.memes.length}',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            // PSD 图层面板按钮
+            if (_meme.isPsd)
+              IconButton(
+                icon: const Icon(Icons.layers),
+                tooltip: l10n.tr('psd_layers'),
+                onPressed: () => _showPsdLayersPanel(_meme, l10n),
+              ),
+            // 立绘/CG 精灵图层面板按钮
+            if (_meme.isSprite)
+              IconButton(
+                icon: const Icon(Icons.face_retouching_natural),
+                tooltip: l10n.tr('sprite_layers'),
+                onPressed: () => _showSpriteLayersPanel(_meme, l10n),
+              ),
           ],
         ),
-        actions: [
-          // PSD 图层面板按钮
-          if (_meme.isPsd)
-            IconButton(
-              icon: const Icon(Icons.layers),
-              tooltip: l10n.tr('psd_layers'),
-              onPressed: () => _showPsdLayersPanel(_meme, l10n),
-            ),
-          // 立绘/CG 精灵图层面板按钮
-          if (_meme.isSprite)
-            IconButton(
-              icon: const Icon(Icons.face_retouching_natural),
-              tooltip: l10n.tr('sprite_layers'),
-              onPressed: () => _showSpriteLayersPanel(_meme, l10n),
-            ),
-        ],
-      ),
-      body: PageView.builder(
-        physics: const BouncingScrollPhysics(),
-        controller: _controller,
-        itemCount: widget.memes.length,
-        onPageChanged: (i) => setState(() {
-          _currentIndex = i;
-          _mangaPageIndex = 0;
-        }),
-        itemBuilder: (ctx, i) {
-          final m = widget.memes[i];
-          final screenHeight = MediaQuery.sizeOf(context).height;
-          // 图片区域底部留出面板高度的空白，拖动面板时图片随之收缩
-          final panelHeight = _panelExtent * screenHeight;
-          // 使用 Stack 让面板覆盖在图片上方，避免 Column 无界高度导致 DraggableScrollableSheet 失效
-          // Align(bottomCenter) 让面板固定在底部并可正确计算高度
-          return NotificationListener<DraggableScrollableNotification>(
-            onNotification: (notification) {
-              final newExtent = notification.extent;
-              if ((newExtent - _panelExtent).abs() > 0.005) {
-                setState(() => _panelExtent = newExtent);
-              }
-              return false;
-            },
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  bottom: panelHeight,
-                  child: _buildImageArea(m, i),
-                ),
-                Align(
-                  alignment: Alignment.bottomCenter,
-                  child: _buildDraggableDetailPanel(theme, prov, m, l10n),
-                ),
-              ],
-            ),
-          );
-        },
+        body: PageView.builder(
+          physics: const BouncingScrollPhysics(),
+          controller: _controller,
+          itemCount: widget.memes.length,
+          onPageChanged: (i) => setState(() {
+            _currentIndex = i;
+            _mangaPageIndex = 0;
+          }),
+          itemBuilder: (ctx, i) {
+            final m = widget.memes[i];
+            final screenHeight = MediaQuery.sizeOf(context).height;
+            // 全屏模式下面板高度为 0，图片占满；否则留出面板高度
+            final panelHeight = _isFullscreen ? 0.0 : _panelExtent * screenHeight;
+            // 使用 Stack 让面板覆盖在图片上方，避免 Column 无界高度导致 DraggableScrollableSheet 失效
+            // Align(bottomCenter) 让面板固定在底部并可正确计算高度
+            return NotificationListener<DraggableScrollableNotification>(
+              onNotification: (notification) {
+                final newExtent = notification.extent;
+                if ((newExtent - _panelExtent).abs() > 0.005) {
+                  setState(() => _panelExtent = newExtent);
+                }
+                return false;
+              },
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    bottom: panelHeight,
+                    // 单击图片切换全屏（PhotoView 的捏合/拖拽手势不受影响）
+                    child: GestureDetector(
+                      onTap: _toggleFullscreen,
+                      behavior: HitTestBehavior.translucent,
+                      child: _buildImageArea(m, i),
+                    ),
+                  ),
+                  if (!_isFullscreen)
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: _buildDraggableDetailPanel(theme, prov, m, l10n),
+                    ),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -947,29 +970,14 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                     ),
                   ),
                 ),
-                // 名称（点击可编辑）
-                GestureDetector(
-                  onTap: _rename,
-                  behavior: HitTestBehavior.opaque,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          m.name,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      Icon(
-                        Icons.edit,
-                        size: 16,
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                      ),
-                    ],
+                // 名称（纯展示，重命名按钮在底部操作区）
+                Text(
+                  m.name,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 8),
                 // 文件信息
@@ -999,12 +1007,13 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                           color: theme.colorScheme.primary,
                         )),
                       const Spacer(),
-                      InkWell(
-                        onTap: () => _showAddTagDialog(theme, l10n, prov, m),
-                        child: Padding(
-                          padding: const EdgeInsets.all(2),
-                          child: Icon(Icons.add, size: 16, color: theme.colorScheme.primary),
-                        ),
+                      IconButton(
+                        onPressed: () => _showAddTagDialog(theme, l10n, prov, m),
+                        icon: Icon(Icons.add_circle, size: 22, color: theme.colorScheme.primary),
+                        visualDensity: VisualDensity.compact,
+                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        padding: EdgeInsets.zero,
+                        tooltip: l10n.tr('add_tag'),
                       ),
                     ],
                   ),
@@ -1048,6 +1057,7 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                   children: [
                     if (!(isMobile && m.isImageType))
                       _actionButton(theme, l10n.tr('copy'), Icons.copy, _copy),
+                    _actionButton(theme, l10n.tr('rename'), Icons.edit, _rename),
                     _actionButton(theme, l10n.tr('share'), Icons.ios_share, _share),
                     _actionButton(
                       theme,
@@ -1115,12 +1125,13 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                 color: theme.colorScheme.tertiary,
               )),
             const Spacer(),
-            InkWell(
-              onTap: () => _showAddMoodDialog(theme, l10n, prov, m),
-              child: Padding(
-                padding: const EdgeInsets.all(2),
-                child: Icon(Icons.add, size: 16, color: theme.colorScheme.tertiary),
-              ),
+            IconButton(
+              onPressed: () => _showAddMoodDialog(theme, l10n, prov, m),
+              icon: Icon(Icons.add_circle, size: 22, color: theme.colorScheme.tertiary),
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              padding: EdgeInsets.zero,
+              tooltip: l10n.tr('add_mood'),
             ),
           ],
         ),
@@ -1168,12 +1179,13 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                 color: theme.colorScheme.primary,
               )),
             const Spacer(),
-            InkWell(
-              onTap: () => _showAddTagDialog(theme, l10n, prov, m),
-              child: Padding(
-                padding: const EdgeInsets.all(2),
-                child: Icon(Icons.add, size: 16, color: theme.colorScheme.primary),
-              ),
+            IconButton(
+              onPressed: () => _showAddTagDialog(theme, l10n, prov, m),
+              icon: Icon(Icons.add_circle, size: 22, color: theme.colorScheme.primary),
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              padding: EdgeInsets.zero,
+              tooltip: l10n.tr('add_tag'),
             ),
           ],
         ),
