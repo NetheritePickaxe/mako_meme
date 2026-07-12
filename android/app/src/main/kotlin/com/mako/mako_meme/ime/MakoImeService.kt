@@ -100,7 +100,7 @@ class MakoImeService : InputMethodService() {
         root.addView(buildActionBar())
         root.addView(buildCategoryTabs())
         root.addView(buildSearchBar())
-        root.addView(buildGrid(), weight = 1f)
+        root.addView(buildGrid())
 
         // 首次加载 meme 数据
         loadMemes()
@@ -279,7 +279,7 @@ class MakoImeService : InputMethodService() {
 
     /** 按当前分类 + 搜索关键字过滤并刷新网格。 */
     private fun applyFilter() {
-        var filtered = allMemes
+        var filtered: List<MemeItem> = allMemes
         // 按分类过滤
         if (currentType != null) {
             filtered = filtered.filter { it.type == currentType }

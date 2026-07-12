@@ -32,6 +32,46 @@ class MakoAccessibilityService : AccessibilityService() {
     companion object {
         private const val TAG = "MakoA11y"
         private const val TEMP_DIR = "mako_meme_temp"
+
+        /** 按文本查找可点击节点。 */
+        fun findByText(root: AccessibilityNodeInfo, text: String): AccessibilityNodeInfo? {
+            val nodes = root.findAccessibilityNodeInfosByText(text)
+            return nodes.firstOrNull { it.isClickable } ?: nodes.firstOrNull()
+        }
+
+        /** 按 viewId 查找节点（如 com.tencent.mm:id/xxx）。 */
+        fun findById(root: AccessibilityNodeInfo, id: String): AccessibilityNodeInfo? {
+            val nodes = root.findAccessibilityNodeInfosByViewId(id)
+            return nodes.firstOrNull()
+        }
+
+        /** 按类名递归查找节点。 */
+        fun findNodesByClassName(
+            root: AccessibilityNodeInfo,
+            className: String
+        ): List<AccessibilityNodeInfo> {
+            val result = mutableListOf<AccessibilityNodeInfo>()
+            fun walk(node: AccessibilityNodeInfo) {
+                if (node.className?.toString() == className) result.add(node)
+                for (i in 0 until node.childCount) {
+                    node.getChild(i)?.let(::walk)
+                }
+            }
+            walk(root)
+            return result
+        }
+
+        /** 按描述（contentDescription）查找节点。 */
+        fun findByDesc(root: AccessibilityNodeInfo, desc: String): AccessibilityNodeInfo? {
+            fun walk(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+                if (node.contentDescription?.toString()?.contains(desc) == true) return node
+                for (i in 0 until node.childCount) {
+                    node.getChild(i)?.let { walk(it)?.let { return it } }
+                }
+                return null
+            }
+            return walk(root)
+        }
     }
 
     private var sendReceiver: SendReceiver? = null
@@ -147,50 +187,6 @@ class MakoAccessibilityService : AccessibilityService() {
             it.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
             Log.d(TAG, "已提交文本: $text")
         } ?: Log.w(TAG, "未找到可输入的 EditText")
-    }
-
-    // ===== 静态工具：查找节点 =====
-
-    companion object {
-        /** 按文本查找可点击节点。 */
-        fun findByText(root: AccessibilityNodeInfo, text: String): AccessibilityNodeInfo? {
-            val nodes = root.findAccessibilityNodeInfosByText(text)
-            return nodes.firstOrNull { it.isClickable } ?: nodes.firstOrNull()
-        }
-
-        /** 按 viewId 查找节点（如 com.tencent.mm:id/xxx）。 */
-        fun findById(root: AccessibilityNodeInfo, id: String): AccessibilityNodeInfo? {
-            val nodes = root.findAccessibilityNodeInfosByViewId(id)
-            return nodes.firstOrNull()
-        }
-
-        /** 按类名递归查找节点。 */
-        fun findNodesByClassName(
-            root: AccessibilityNodeInfo,
-            className: String
-        ): List<AccessibilityNodeInfo> {
-            val result = mutableListOf<AccessibilityNodeInfo>()
-            fun walk(node: AccessibilityNodeInfo) {
-                if (node.className?.toString() == className) result.add(node)
-                for (i in 0 until node.childCount) {
-                    node.getChild(i)?.let(::walk)
-                }
-            }
-            walk(root)
-            return result
-        }
-
-        /** 按描述（contentDescription）查找节点。 */
-        fun findByDesc(root: AccessibilityNodeInfo, desc: String): AccessibilityNodeInfo? {
-            fun walk(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
-                if (node.contentDescription?.toString()?.contains(desc) == true) return node
-                for (i in 0 until node.childCount) {
-                    node.getChild(i)?.let { walk(it)?.let { return it } }
-                }
-                return null
-            }
-            return walk(root)
-        }
     }
 
     // ===== 广播接收器 =====
