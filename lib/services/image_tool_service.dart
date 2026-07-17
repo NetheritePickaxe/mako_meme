@@ -135,6 +135,82 @@ class ImageToolService {
     );
   }
 
+  /// 幻影坦克图制作
+  /// 前景图在黑底显示，背景图在白底显示，合成一张带透明通道的 PNG。
+  /// [fgPath] 前景图（黑底显示）；[bgPath] 背景图（白底显示）
+  /// [colorMode] true=彩色输出（保留前景色彩），false=黑白输出
+  /// [brightnessRatio] 亮度比例 (0.5~2.0)，整体缩放前后景亮度
+  /// [colorIntensity] 色彩强度 (0.0~1.0)，仅彩色模式有效，控制前景饱和度
+  Future<Meme> makePhantomTank(
+    String fgPath,
+    String bgPath, {
+    bool colorMode = true,
+    double brightnessRatio = 1.0,
+    double colorIntensity = 1.0,
+    String? name,
+    String? folderId,
+  }) async {
+    final fg = await decode(fgPath);
+    final bg = await decode(bgPath);
+    if (fg == null || bg == null) throw StateError('decode failed');
+    // 统一尺寸：以前景为基准，背景缩放对齐
+    final w = fg.width;
+    final h = fg.height;
+    final bgResized = (bg.width == w && bg.height == h)
+        ? bg
+        : img.copyResize(bg, width: w, height: h);
+
+    final out = img.Image(width: w, height: h, numChannels: 4);
+
+    for (var y = 0; y < h; y++) {
+      for (var x = 0; x < w; x++) {
+        final fp = fg.getPixel(x, y);
+        final bp = bgResized.getPixel(x, y);
+        // 亮度（0-255）
+        double ga = 0.299 * fp.r + 0.587 * fp.g + 0.114 * fp.b;
+        double gb = 0.299 * bp.r + 0.587 * bp.g + 0.114 * bp.b;
+        // 亮度比例
+        ga = (ga * brightnessRatio).clamp(0.0, 255.0);
+        gb = (gb * brightnessRatio).clamp(0.0, 255.0);
+        // alpha = 255 - gb + ga（黑底显示前景、白底显示背景）
+        int alpha = (255 - gb + ga).round().clamp(0, 255);
+
+        if (colorMode) {
+          // 彩色：保留前景色彩
+          double ar = fp.r.toDouble();
+          double ag = fp.g.toDouble();
+          double ab = fp.b.toDouble();
+          // 色彩强度：向灰度混合（1.0=全彩，0.0=纯灰）
+          if (colorIntensity < 1.0) {
+            ar = ga + (ar - ga) * colorIntensity;
+            ag = ga + (ag - ga) * colorIntensity;
+            ab = ga + (ab - ga) * colorIntensity;
+          }
+          int r, g, b;
+          if (alpha > 0) {
+            r = (ar * 255 / alpha).round().clamp(0, 255);
+            g = (ag * 255 / alpha).round().clamp(0, 255);
+            b = (ab * 255 / alpha).round().clamp(0, 255);
+          } else {
+            r = g = b = 0;
+          }
+          out.setPixelRgba(x, y, r, g, b, alpha);
+        } else {
+          // 黑白
+          int c = alpha > 0 ? (ga * 255 / alpha).round().clamp(0, 255) : 0;
+          out.setPixelRgba(x, y, c, c, c, alpha);
+        }
+      }
+    }
+
+    final bytes = img.encodePng(out);
+    return _saveAndCreateMeme(bytes, '.png',
+      name: name ?? 'phantom_tank',
+      format: 'png',
+      folderId: folderId,
+    );
+  }
+
   /// 构建动画 Image 并用 [encoder] 编码为字节
   Future<Uint8List> _buildAnimation(
     List<String> srcPaths,

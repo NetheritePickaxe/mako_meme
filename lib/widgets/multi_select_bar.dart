@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/meme.dart';
 import '../providers/meme_provider.dart';
 import '../providers/locale_provider.dart';
 import '../services/image_tool_service.dart';
+import '../services/storage_service.dart';
 import '../l10n/l10n.dart';
 
 class MultiSelectBar extends StatelessWidget {
@@ -118,6 +120,16 @@ class MultiSelectBar extends StatelessWidget {
               onTap: canAnimate ? () {
                 Navigator.pop(bCtx);
                 _showAnimationDialog(ctx, prov, l10n, imageMemes);
+              } : null,
+            ),
+            ListTile(
+              leading: const Icon(Icons.visibility),
+              title: Text(l10n.tr('tool_phantom_tank')),
+              enabled: imageMemes.length == 2,
+              subtitle: imageMemes.length != 2 ? Text(l10n.tr('phantom_need_two')) : null,
+              onTap: imageMemes.length == 2 ? () {
+                Navigator.pop(bCtx);
+                _showPhantomTankDialog(ctx, prov, l10n, imageMemes);
               } : null,
             ),
           ],
@@ -343,6 +355,162 @@ class MultiSelectBar extends StatelessWidget {
       if (ctx.mounted) {
         Navigator.pop(ctx);
         messenger.showSnackBar(SnackBar(content: Text(l10n.tr('convert_success'))));
+      }
+    } catch (e) {
+      if (ctx.mounted) {
+        Navigator.pop(ctx);
+        messenger.showSnackBar(SnackBar(content: Text('${l10n.tr('convert_failed')}: $e')));
+      }
+    }
+  }
+
+  /// 幻影坦克制作对话框
+  void _showPhantomTankDialog(BuildContext ctx, MemeProvider prov, L10n l10n, List<Meme> memes) {
+    bool swapFgBg = false; // false: 第一张为前景
+    bool colorMode = true;
+    double brightnessRatio = 1.0;
+    double colorIntensity = 1.0;
+    showDialog(
+      context: ctx,
+      builder: (dCtx) => StatefulBuilder(
+        builder: (sCtx, setState) => AlertDialog(
+          title: Text(l10n.tr('tool_phantom_tank')),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 前景/背景预览
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        children: [
+                          Text(l10n.tr('phantom_foreground'),
+                            style: TextStyle(fontSize: 11, color: Theme.of(sCtx).colorScheme.primary, fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 4),
+                          _ptThumb(sCtx, memes[swapFgBg ? 1 : 0]),
+                          Text(memes[swapFgBg ? 1 : 0].name,
+                            style: const TextStyle(fontSize: 10), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.swap_horiz),
+                      tooltip: l10n.tr('phantom_swap'),
+                      onPressed: () => setState(() => swapFgBg = !swapFgBg),
+                    ),
+                    Expanded(
+                      child: Column(
+                        children: [
+                          Text(l10n.tr('phantom_background'),
+                            style: TextStyle(fontSize: 11, color: Theme.of(sCtx).colorScheme.outline, fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 4),
+                          _ptThumb(sCtx, memes[swapFgBg ? 0 : 1]),
+                          Text(memes[swapFgBg ? 0 : 1].name,
+                            style: const TextStyle(fontSize: 10), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // 彩色/黑白切换
+                Row(children: [
+                  ChoiceChip(
+                    label: Text(l10n.tr('phantom_color')),
+                    selected: colorMode,
+                    onSelected: (_) => setState(() => colorMode = true),
+                  ),
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    label: Text(l10n.tr('phantom_bw')),
+                    selected: !colorMode,
+                    onSelected: (_) => setState(() => colorMode = false),
+                  ),
+                ]),
+                const SizedBox(height: 12),
+                // 亮度比例
+                Text('${l10n.tr('phantom_brightness')}: ${brightnessRatio.toStringAsFixed(2)}'),
+                Slider(
+                  value: brightnessRatio,
+                  min: 0.5, max: 2.0, divisions: 30,
+                  label: brightnessRatio.toStringAsFixed(2),
+                  onChanged: (v) => setState(() => brightnessRatio = v),
+                ),
+                // 色彩强度（仅彩色模式）
+                if (colorMode) ...[
+                  Text('${l10n.tr('phantom_color_intensity')}: ${colorIntensity.toStringAsFixed(2)}'),
+                  Slider(
+                    value: colorIntensity,
+                    min: 0.0, max: 1.0, divisions: 20,
+                    label: colorIntensity.toStringAsFixed(2),
+                    onChanged: (v) => setState(() => colorIntensity = v),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dCtx), child: Text(l10n.tr('cancel'))),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(dCtx);
+                _makePhantomTank(ctx, prov, l10n, memes, swapFgBg, colorMode, brightnessRatio, colorIntensity);
+              },
+              child: Text(l10n.tr('phantom_generate')),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 幻影坦克缩略图
+  Widget _ptThumb(BuildContext ctx, Meme m) {
+    final storage = ctx.read<StorageService>();
+    return FutureBuilder<Uint8List?>(
+      future: storage.readMemeBytes(m.filePath),
+      builder: (_, snap) {
+        if (snap.data == null) {
+          return Container(width: 64, height: 64, color: Theme.of(ctx).colorScheme.surfaceContainerHigh);
+        }
+        return Image.memory(snap.data!, width: 64, height: 64, fit: BoxFit.cover);
+      },
+    );
+  }
+
+  Future<void> _makePhantomTank(
+    BuildContext ctx, MemeProvider prov, L10n l10n, List<Meme> memes,
+    bool swapFgBg, bool colorMode, double brightnessRatio, double colorIntensity,
+  ) async {
+    final tool = ctx.read<ImageToolService>();
+    final messenger = ScaffoldMessenger.of(ctx);
+    showDialog(
+      context: ctx,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        content: Row(children: [
+          const CircularProgressIndicator(strokeWidth: 2),
+          const SizedBox(width: 16),
+          Expanded(child: Text('${l10n.tr('phantom_generating')}…')),
+        ]),
+      ),
+    );
+    try {
+      final fg = memes[swapFgBg ? 1 : 0];
+      final bg = memes[swapFgBg ? 0 : 1];
+      await tool.makePhantomTank(
+        fg.filePath, bg.filePath,
+        colorMode: colorMode,
+        brightnessRatio: brightnessRatio,
+        colorIntensity: colorIntensity,
+        name: '${fg.name}_phantom',
+      );
+      await prov.loadAll();
+      if (ctx.mounted) {
+        Navigator.pop(ctx);
+        messenger.showSnackBar(SnackBar(content: Text(l10n.tr('phantom_success'))));
       }
     } catch (e) {
       if (ctx.mounted) {
