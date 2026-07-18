@@ -147,10 +147,10 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
         final b = await storage.readMemeBytes(path);
         if (mounted) setState(() => _bytesCache.put(index, b));
       } else {
-        // 原生端：直接拿 File，不读字节，避免大文件 OOM
+        // 原生端：同步设置 File，靠 PhotoView/Image 的 errorBuilder 兜底
+        // 这样首次 build 就能命中 Flutter ImageCache，避免加载等待
         final f = storage.getMemeFile(path);
-        final exists = f != null && await f.exists();
-        if (mounted) setState(() => _fileCache.put(index, exists ? f : null));
+        _fileCache.put(index, f);
       }
     } catch (_) {}
   }
@@ -1000,6 +1000,8 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                   children: [
                     _infoChip(theme, _typeLabel(m.type, l10n), icon: _typeIcon(m.type), accent: theme.colorScheme.secondary),
                     _infoChip(theme, _formatFileSize(m.fileSize), icon: Icons.data_usage),
+                    if (m.width > 0 && m.height > 0)
+                      _infoChip(theme, '${m.width}×${m.height}', icon: Icons.aspect_ratio),
                     _infoChip(theme, _formatDate(m.createdAt), icon: Icons.access_time),
                   ],
                 ),

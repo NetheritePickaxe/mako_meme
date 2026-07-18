@@ -74,6 +74,10 @@ class _MemeCardState extends State<MemeCard> {
     }
     final storage = context.read<StorageService>();
     if (m.isImageType && _displayPath.isNotEmpty) {
+      // 优先用导入时记录的宽高，避免每次都解析文件头
+      if (m.width > 0 && m.height > 0) {
+        _aspectRatio = m.width / m.height;
+      }
       if (kIsWeb) {
         // Web：读 bytes
         storage.readMemeBytes(_displayPath).then((b) {
@@ -82,29 +86,24 @@ class _MemeCardState extends State<MemeCard> {
               _bytes = b;
               _loading = false;
             });
-            if (b != null) _loadAspectRatioFromBytes(b);
+            // 仅当 meme 未记录宽高时才从头解析
+            if (b != null && (m.width == 0 || m.height == 0)) {
+              _loadAspectRatioFromBytes(b);
+            }
           }
         }, onError: (_) {
           if (mounted) setState(() { _loading = false; });
         });
       } else {
-        // 原生：用 File 直接显示，避免一次性载入大文件字节
+        // 原生：同步设置 _file，靠 Image.file 的 errorBuilder 处理文件不存在的情况
+        // 这样首次 build 就能命中 Flutter ImageCache，避免灰色闪烁
         final f = storage.getMemeFile(_displayPath);
-        if (f == null) {
-          if (mounted) setState(() { _loading = false; });
-          return;
+        _file = f;
+        _loading = false;
+        // 仅当 meme 未记录宽高时才异步解析文件头
+        if (f != null && (m.width == 0 || m.height == 0)) {
+          _loadAspectRatioFromFile();
         }
-        f.exists().then((exists) {
-          if (mounted) {
-            setState(() {
-              _file = exists ? f : null;
-              _loading = false;
-            });
-            if (exists) _loadAspectRatioFromFile();
-          }
-        }, onError: (_) {
-          if (mounted) setState(() { _loading = false; });
-        });
       }
     } else {
       _loading = false;

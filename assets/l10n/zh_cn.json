@@ -53,6 +53,7 @@
   "import_as_manga": "合并为漫画",
   "import_as_sprite": "合并为立绘",
   "import_as_novel": "作为小说导入",
+  "import_as_text": "作为文字导入",
   "search_help_title": "搜索帮助",
   "close": "关闭",
   "command_mode_hint": "命令模式：按回车执行",

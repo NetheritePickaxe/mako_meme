@@ -937,8 +937,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     _showMangaImportMenu(ctx, prov);
                   } else if (v == 'sprite') {
                     _showSpriteImportMenu(ctx, prov);
-                  } else if (v == 'novel') {
-                    _importNovel(ctx, prov);
                   } else {
                     _importFiles(ctx, prov);
                   }
@@ -965,6 +963,34 @@ class _HomeScreenState extends State<HomeScreen> {
                     dense: true,
                     contentPadding: EdgeInsets.zero,
                   )),
+                ],
+              ),
+              onTap: () { Navigator.pop(bCtx); _importFiles(ctx, prov); },
+            ),
+            ListTile(
+              leading: const Icon(Icons.text_fields),
+              title: Text(l10n.tr('import_text')),
+              subtitle: Text(l10n.tr('plain_text_or_emoji')),
+              trailing: PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert),
+                tooltip: l10n.tr('more_options'),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                onSelected: (v) {
+                  Navigator.pop(bCtx);
+                  if (v == 'novel') {
+                    _importNovel(ctx, prov);
+                  } else {
+                    _importText(ctx, prov);
+                  }
+                },
+                itemBuilder: (_) => [
+                  PopupMenuItem(value: 'text', child: ListTile(
+                    leading: const Icon(Icons.text_fields, size: 20),
+                    title: Text(l10n.tr('import_as_text'),
+                      style: const TextStyle(fontSize: 14)),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                  )),
                   PopupMenuItem(value: 'novel', child: ListTile(
                     leading: const Icon(Icons.menu_book, size: 20),
                     title: Text(l10n.tr('import_as_novel'),
@@ -974,12 +1000,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   )),
                 ],
               ),
-              onTap: () { Navigator.pop(bCtx); _importFiles(ctx, prov); },
-            ),
-            ListTile(
-              leading: const Icon(Icons.text_fields),
-              title: Text(l10n.tr('import_text')),
-              subtitle: Text(l10n.tr('plain_text_or_emoji')),
               onTap: () { Navigator.pop(bCtx); _importText(ctx, prov); },
             ),
             const Divider(),

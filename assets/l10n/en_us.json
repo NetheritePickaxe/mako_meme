@@ -49,6 +49,7 @@
   "import_as_manga": "Merge as manga",
   "import_as_sprite": "Merge as sprite",
   "import_as_novel": "Import as novel",
+  "import_as_text": "Import as text",
   "search_help_title": "Search Help",
   "close": "Close",
   "command_mode_hint": "Command mode: press Enter to execute",
