@@ -306,8 +306,8 @@ class _MakoSearchBarState extends State<MakoSearchBar> {
               ],
             ),
           ),
-        // 补全建议列表（有错误时不显示）
-        if (!hasError && _suggestions.isNotEmpty)
+        // 补全建议列表（即使有错误也显示，帮助用户完成输入）
+        if (_suggestions.isNotEmpty)
           Container(
             constraints: const BoxConstraints(maxHeight: 200),
             margin: const EdgeInsets.symmetric(horizontal: 12),

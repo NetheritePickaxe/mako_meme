@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/meme.dart';
 import '../providers/meme_provider.dart';
 import '../providers/locale_provider.dart';
+import '../screens/phantom_tank_batch_screen.dart';
 import '../services/image_tool_service.dart';
 import '../services/storage_service.dart';
 import '../l10n/l10n.dart';
@@ -129,11 +130,19 @@ class MultiSelectBar extends StatelessWidget {
             ListTile(
               leading: const Icon(Icons.visibility),
               title: Text(l10n.tr('tool_phantom_tank')),
-              enabled: imageMemes.length == 2,
-              subtitle: imageMemes.length != 2 ? Text(l10n.tr('phantom_need_two')) : null,
-              onTap: imageMemes.length == 2 ? () {
+              // 2 张：单张幻影坦克对话框；3+ 张：批量生成独立界面
+              enabled: imageMemes.length >= 2,
+              subtitle: imageMemes.length < 2 ? Text(l10n.tr('phantom_need_two')) : null,
+              onTap: imageMemes.length >= 2 ? () {
                 Navigator.pop(bCtx);
-                _showPhantomTankDialog(ctx, prov, l10n, imageMemes);
+                if (imageMemes.length == 2) {
+                  _showPhantomTankDialog(ctx, prov, l10n, imageMemes);
+                } else {
+                  // 3+ 张进入批量生成独立界面
+                  Navigator.push(ctx, MaterialPageRoute(
+                    builder: (_) => PhantomTankBatchScreen(memes: imageMemes),
+                  ));
+                }
               } : null,
             ),
           ],

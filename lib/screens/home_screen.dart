@@ -200,15 +200,23 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: () => Scaffold.of(ctx).openDrawer(),
           ),
         ),
-      // 多选模式且选中 1+ 时显示工具按钮
-      if (prov.isMulti && prov.selected.isNotEmpty)
-        Builder(
-          builder: (ctx) => IconButton(
-            icon: const Icon(Icons.build_outlined),
-            tooltip: l10n.tr('tools'),
-            onPressed: () => MultiSelectBar.showToolsMenu(ctx, prov, l10n),
-          ),
+      // 工具按钮直接放在主界面右上角，多选模式下需选中 1+ 才可点击
+      // 不进入多选模式也能看到入口，点击时若未选中提示先选中图片
+      Builder(
+        builder: (ctx) => IconButton(
+          icon: const Icon(Icons.build_outlined),
+          tooltip: l10n.tr('tools'),
+          onPressed: () {
+            if (prov.selected.isEmpty) {
+              ScaffoldMessenger.of(ctx).showSnackBar(
+                SnackBar(content: Text(l10n.tr('tools_need_select'))),
+              );
+              return;
+            }
+            MultiSelectBar.showToolsMenu(ctx, prov, l10n);
+          },
         ),
+      ),
       IconButton(
         icon: Icon(prov.isMulti ? Icons.close : Icons.checklist),
         tooltip: prov.isMulti ? l10n.tr('exit_multi_select') : l10n.tr('multi_select'),
