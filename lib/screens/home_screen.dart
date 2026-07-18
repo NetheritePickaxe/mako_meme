@@ -200,23 +200,23 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: () => Scaffold.of(ctx).openDrawer(),
           ),
         ),
-      // 工具按钮直接放在主界面右上角，多选模式下需选中 1+ 才可点击
-      // 不进入多选模式也能看到入口，点击时若未选中提示先选中图片
-      Builder(
-        builder: (ctx) => IconButton(
-          icon: const Icon(Icons.build_outlined),
-          tooltip: l10n.tr('tools'),
-          onPressed: () {
-            if (prov.selected.isEmpty) {
-              ScaffoldMessenger.of(ctx).showSnackBar(
-                SnackBar(content: Text(l10n.tr('tools_need_select'))),
-              );
-              return;
-            }
-            MultiSelectBar.showToolsMenu(ctx, prov, l10n);
-          },
+      // 工具按钮仅在多选模式下显示，需选中 1+ 才可点击
+      if (prov.isMulti)
+        Builder(
+          builder: (ctx) => IconButton(
+            icon: const Icon(Icons.build_outlined),
+            tooltip: l10n.tr('tools'),
+            onPressed: () {
+              if (prov.selected.isEmpty) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  SnackBar(content: Text(l10n.tr('tools_need_select'))),
+                );
+                return;
+              }
+              MultiSelectBar.showToolsMenu(ctx, prov, l10n);
+            },
+          ),
         ),
-      ),
       IconButton(
         icon: Icon(prov.isMulti ? Icons.close : Icons.checklist),
         tooltip: prov.isMulti ? l10n.tr('exit_multi_select') : l10n.tr('multi_select'),
@@ -466,11 +466,19 @@ class _HomeScreenState extends State<HomeScreen> {
           final storage = context.read<StorageService>();
           final settingsProvider = context.read<SettingsProvider>();
           for (final f in files) {
+            // Web 端无文件路径，必须预读 bytes；原生端用 path 流式拷贝
+            Uint8List? webBytes;
+            if (kIsWeb) {
+              try {
+                webBytes = await f.readAsBytes();
+              } catch (_) {}
+            }
             await storage.importFile(
               PlatformFile(
                 name: f.name,
                 size: await f.length(),
                 path: f.path,
+                bytes: webBytes,
               ),
               autoClassify: settingsProvider.autoClassify,
               classifyRatio: settingsProvider.classifyRatio,
@@ -1049,9 +1057,9 @@ class _HomeScreenState extends State<HomeScreen> {
       allowMultiple: true,
       type: FileType.custom,
       allowedExtensions: Meme.supportedExtensions,
-      // 关键：禁止 file_picker 预读 bytes，否则 2GB 大图会 OOM
-      // 仅获取 path，导入流程通过 path 流式拷贝
-      withData: false,
+      // 原生端：禁止预读 bytes，避免 2GB 大图 OOM，用 path 流式拷贝
+      // Web 端：必须预读 bytes（无文件路径），否则图片字节无法存储
+      withData: kIsWeb,
     );
     if (result != null && result.files.isNotEmpty) {
       final settings = context.read<SettingsProvider>();
