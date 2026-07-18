@@ -200,6 +200,15 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: () => Scaffold.of(ctx).openDrawer(),
           ),
         ),
+      // 多选模式且选中 1+ 时显示工具按钮
+      if (prov.isMulti && prov.selected.isNotEmpty)
+        Builder(
+          builder: (ctx) => IconButton(
+            icon: const Icon(Icons.build_outlined),
+            tooltip: l10n.tr('tools'),
+            onPressed: () => MultiSelectBar.showToolsMenu(ctx, prov, l10n),
+          ),
+        ),
       IconButton(
         icon: Icon(prov.isMulti ? Icons.close : Icons.checklist),
         tooltip: prov.isMulti ? l10n.tr('exit_multi_select') : l10n.tr('multi_select'),
@@ -927,7 +936,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ListTile(
               leading: const Icon(Icons.image),
               title: Text(l10n.tr('import_images')),
-              subtitle: Text(l10n.tr('import_images_desc')),
+              subtitle: Text(l10n.tr('import_from_gallery')),
               trailing: PopupMenuButton<String>(
                 icon: const Icon(Icons.more_vert),
                 tooltip: l10n.tr('more_options'),
@@ -938,20 +947,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     _showMangaImportMenu(ctx, prov);
                   } else if (v == 'sprite') {
                     _showSpriteImportMenu(ctx, prov);
-                  } else if (v == 'gallery') {
-                    _importFromGallery(ctx, prov);
                   } else {
                     _importFiles(ctx, prov);
                   }
                 },
                 itemBuilder: (_) => [
-                  PopupMenuItem(value: 'gallery', child: ListTile(
-                    leading: const Icon(Icons.photo_camera, size: 20),
-                    title: Text(l10n.tr('import_from_gallery'),
-                      style: const TextStyle(fontSize: 14)),
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                  )),
                   PopupMenuItem(value: 'normal', child: ListTile(
                     leading: const Icon(Icons.folder_open, size: 20),
                     title: Text(l10n.tr('import_from_files'),
@@ -975,7 +975,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   )),
                 ],
               ),
-              onTap: () { Navigator.pop(bCtx); _importFiles(ctx, prov); },
+              onTap: () { Navigator.pop(bCtx); _importFromGallery(ctx, prov); },
             ),
             ListTile(
               leading: const Icon(Icons.text_fields),

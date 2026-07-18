@@ -36,23 +36,17 @@ class MultiSelectBar extends StatelessWidget {
             label: Text(l10n.tr('cancel')),
             onPressed: () => prov.deselectAll(),
           ),
-          // 右侧操作按钮：窄屏可横向滚动，避免删除按钮被挤出
+          // 右侧操作按钮：窄屏可横向滚动，删除固定在最后
           Expanded(
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              reverse: true,
               child: Row(
                 children: [
                   if (prov.selected.isNotEmpty) ...[
                     IconButton(
-                      icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
-                      tooltip: l10n.tr('delete_selected'),
-                      onPressed: () => _confirmDelete(context, prov, l10n),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.ios_share, size: 20),
-                      tooltip: l10n.tr('export_selected'),
-                      onPressed: () => _exportSelected(context, prov, l10n),
+                      icon: const Icon(Icons.folder_open, size: 20),
+                      tooltip: l10n.tr('move_to_folder'),
+                      onPressed: () => _showMoveDialog(context, prov, l10n),
                     ),
                     IconButton(
                       icon: const Icon(Icons.label_outline, size: 20),
@@ -60,14 +54,14 @@ class MultiSelectBar extends StatelessWidget {
                       onPressed: () => _showTypeDialog(context, prov, l10n),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.folder_open, size: 20),
-                      tooltip: l10n.tr('move_to_folder'),
-                      onPressed: () => _showMoveDialog(context, prov, l10n),
+                      icon: const Icon(Icons.ios_share, size: 20),
+                      tooltip: l10n.tr('export_selected'),
+                      onPressed: () => _exportSelected(context, prov, l10n),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.build_outlined, size: 20),
-                      tooltip: l10n.tr('tools'),
-                      onPressed: () => _showToolsMenu(context, prov, l10n),
+                      icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                      tooltip: l10n.tr('delete_selected'),
+                      onPressed: () => _confirmDelete(context, prov, l10n),
                     ),
                   ],
                 ],
@@ -79,8 +73,8 @@ class MultiSelectBar extends StatelessWidget {
     );
   }
 
-  /// 图片工具底部菜单：格式转换 / 尺寸修改 / 转GIF-APNG
-  void _showToolsMenu(BuildContext ctx, MemeProvider prov, L10n l10n) {
+  /// 图片工具底部菜单：格式转换 / 尺寸修改 / 转GIF-APNG / 幻影坦克
+  static void showToolsMenu(BuildContext ctx, MemeProvider prov, L10n l10n) {
     final selected = prov.selectedMemes;
     final canAnimate = selected.length >= 2;
     // 仅对可处理的图片类型生效
@@ -149,7 +143,7 @@ class MultiSelectBar extends StatelessWidget {
   }
 
   /// 批量格式转换
-  void _showConvertDialog(BuildContext ctx, MemeProvider prov, L10n l10n, List<Meme> memes) {
+  static void _showConvertDialog(BuildContext ctx, MemeProvider prov, L10n l10n, List<Meme> memes) {
     String format = 'png';
     int quality = 90;
     showDialog(
@@ -201,7 +195,7 @@ class MultiSelectBar extends StatelessWidget {
     );
   }
 
-  Future<void> _batchConvert(BuildContext ctx, MemeProvider prov, L10n l10n, List<Meme> memes, String format, int quality) async {
+  static Future<void> _batchConvert(BuildContext ctx, MemeProvider prov, L10n l10n, List<Meme> memes, String format, int quality) async {
     final tool = ctx.read<ImageToolService>();
     final messenger = ScaffoldMessenger.of(ctx);
     showDialog(
@@ -230,7 +224,7 @@ class MultiSelectBar extends StatelessWidget {
   }
 
   /// 批量尺寸修改
-  void _showResizeDialog(BuildContext ctx, MemeProvider prov, L10n l10n, List<Meme> memes) {
+  static void _showResizeDialog(BuildContext ctx, MemeProvider prov, L10n l10n, List<Meme> memes) {
     int percent = 50;
     showDialog(
       context: ctx,
@@ -267,7 +261,7 @@ class MultiSelectBar extends StatelessWidget {
     );
   }
 
-  Future<void> _batchResize(BuildContext ctx, MemeProvider prov, L10n l10n, List<Meme> memes, double ratio) async {
+  static Future<void> _batchResize(BuildContext ctx, MemeProvider prov, L10n l10n, List<Meme> memes, double ratio) async {
     final tool = ctx.read<ImageToolService>();
     final messenger = ScaffoldMessenger.of(ctx);
     showDialog(
@@ -296,7 +290,7 @@ class MultiSelectBar extends StatelessWidget {
   }
 
   /// 多图转 GIF/APNG
-  void _showAnimationDialog(BuildContext ctx, MemeProvider prov, L10n l10n, List<Meme> memes) {
+  static void _showAnimationDialog(BuildContext ctx, MemeProvider prov, L10n l10n, List<Meme> memes) {
     int frameDuration = 200;
     String format = 'gif';
     showDialog(
@@ -340,7 +334,7 @@ class MultiSelectBar extends StatelessWidget {
     );
   }
 
-  Future<void> _makeAnimation(BuildContext ctx, MemeProvider prov, L10n l10n, List<Meme> memes, int frameDuration, String format) async {
+  static Future<void> _makeAnimation(BuildContext ctx, MemeProvider prov, L10n l10n, List<Meme> memes, int frameDuration, String format) async {
     final tool = ctx.read<ImageToolService>();
     final messenger = ScaffoldMessenger.of(ctx);
     showDialog(
@@ -375,7 +369,7 @@ class MultiSelectBar extends StatelessWidget {
   }
 
   /// 幻影坦克制作对话框
-  void _showPhantomTankDialog(BuildContext ctx, MemeProvider prov, L10n l10n, List<Meme> memes) {
+  static void _showPhantomTankDialog(BuildContext ctx, MemeProvider prov, L10n l10n, List<Meme> memes) {
     bool swapFgBg = false; // false: 第一张为前景
     bool colorMode = true;
     double brightnessRatio = 1.0;
@@ -477,7 +471,7 @@ class MultiSelectBar extends StatelessWidget {
   }
 
   /// 幻影坦克缩略图
-  Widget _ptThumb(BuildContext ctx, Meme m) {
+  static Widget _ptThumb(BuildContext ctx, Meme m) {
     final storage = ctx.read<StorageService>();
     return FutureBuilder<Uint8List?>(
       future: storage.readMemeBytes(m.filePath),
@@ -490,7 +484,7 @@ class MultiSelectBar extends StatelessWidget {
     );
   }
 
-  Future<void> _makePhantomTank(
+  static Future<void> _makePhantomTank(
     BuildContext ctx, MemeProvider prov, L10n l10n, List<Meme> memes,
     bool swapFgBg, bool colorMode, double brightnessRatio, double colorIntensity,
   ) async {
