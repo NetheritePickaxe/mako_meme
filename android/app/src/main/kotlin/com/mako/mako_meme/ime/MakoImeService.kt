@@ -250,7 +250,9 @@ class MakoImeService : InputMethodService() {
         }
     }
 
-    /** 第三行：搜索框。 */
+    /** 第三行：搜索框。
+     *  在 IME 中 EditText 不会自动弹出系统键盘（因为 IME 本身就是键盘），
+     *  所以点击搜索框时自动切换到内置 QWERTY 键盘模式供用户输入。 */
     private fun buildSearchBar(): View {
         searchInput = EditText(this).apply {
             hint = "搜索表情包名称 / 标签..."
@@ -264,6 +266,14 @@ class MakoImeService : InputMethodService() {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 dp(34)
             )
+            // 点击搜索框自动切换到 QWERTY 键盘模式
+            setOnClickListener {
+                if (!qwertyMode) toggleQwerty()
+            }
+            // 获得焦点也切换（覆盖某些场景）
+            setOnFocusChangeListener { _, hasFocus ->
+                if (hasFocus && !qwertyMode) toggleQwerty()
+            }
             addTextChangedListener(object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
                 override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
@@ -369,6 +379,20 @@ class MakoImeService : InputMethodService() {
             }
         }
         lastRow.addView(space)
+        val done = Button(this).apply {
+            text = "完成"
+            textSize = 13f
+            setTextColor(theme.onAccent)
+            setBackgroundColor(theme.accent)
+            val lp = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1.5f)
+            lp.setMargins(dp(2), dp(2), dp(2), dp(2))
+            layoutParams = lp
+            setOnClickListener {
+                // 切回表情网格查看搜索结果
+                if (qwertyMode) toggleQwerty()
+            }
+        }
+        lastRow.addView(done)
         root.addView(lastRow)
         return root
     }

@@ -143,25 +143,32 @@ class MemeIndexPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         }
     }
 
-    /** 检查本应用 IME 是否已在系统输入法列表中启用。 */
+    /** 检查本应用 IME 是否已在系统输入法列表中启用。
+     *  使用 InputMethodManager.getEnabledInputMethodList() 比 Settings 字符串更可靠，
+     *  因为后者存储的组件名可能是相对路径（如 com.pkg/.ime.XxxService），
+     *  字符串匹配容易遗漏。 */
     private fun isImeEnabled(ctx: Context?): Boolean {
         if (ctx == null) return false
-        val imeIds = Settings.Secure.getString(
-            ctx.contentResolver,
-            Settings.Secure.ENABLED_INPUT_METHODS
-        ) ?: return false
-        // 精确匹配，或匹配同包名前缀（兼容子类型后缀等情况）
-        return imeIds.split(";").any { it == IME_FLATTENED || it.startsWith("com.mako.mako_meme/") }
+        val imm = ctx.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+            ?: return false
+        val pkg = ctx.packageName
+        return imm.enabledInputMethodList.any { it.packageName == pkg }
     }
 
-    /** 检查本应用 IME 是否为当前默认输入法。 */
+    /** 检查本应用 IME 是否为当前默认输入法。
+     *  Settings.Secure.DEFAULT_INPUT_METHOD 存储格式为 "com.pkg/.ime.XxxService"，
+     *  检查包名前缀即可，避免相对类名与完整类名不一致导致匹配失败。 */
     private fun isImeDefault(ctx: Context?): Boolean {
         if (ctx == null) return false
         val defaultId = Settings.Secure.getString(
             ctx.contentResolver,
             Settings.Secure.DEFAULT_INPUT_METHOD
         ) ?: return false
-        return defaultId == IME_FLATTENED
+        val pkg = ctx.packageName
+        // defaultId 形如 "com.mako.mako_meme/.ime.MakoImeService"
+        return defaultId.startsWith("$pkg/") ||
+            defaultId == IME_FLATTENED ||
+            defaultId.contains("MakoImeService")
     }
 
     /** 检查本应用无障碍服务是否已启用。 */
