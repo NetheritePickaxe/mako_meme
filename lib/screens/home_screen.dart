@@ -167,8 +167,22 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// leading 是否被返回按钮占用（文件夹内 / 情绪筛选内）
+  bool _leadingIsBack(MemeProvider prov) =>
+      (_currentTab == 0 && prov.folderId != null) ||
+      (_currentTab == 3 && prov.moodFilter != null);
+
   List<Widget> _buildActions(MemeProvider prov, L10n l10n) {
     return [
+      // 进入文件夹/情绪筛选后 leading 变成返回按钮，这里补一个菜单入口
+      if (_leadingIsBack(prov))
+        Builder(
+          builder: (ctx) => IconButton(
+            icon: const Icon(Icons.menu),
+            tooltip: l10n.tr('menu'),
+            onPressed: () => Scaffold.of(ctx).openDrawer(),
+          ),
+        ),
       IconButton(
         icon: Icon(prov.isMulti ? Icons.close : Icons.checklist),
         tooltip: prov.isMulti ? l10n.tr('exit_multi_select') : l10n.tr('multi_select'),
