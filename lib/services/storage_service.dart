@@ -297,6 +297,11 @@ class StorageService {
     final fileName = '$id$ext';
     final now = DateTime.now();
 
+    // 大文件阈值：超过 200MB 视为超大图，跳过 hash/character card/dimensions 等可选解析
+    // 这些解析虽是流式但耗时极长，且大图不可能是角色卡，跳过可显著提升导入成功率
+    final fileSize = file.size;
+    final isHugeFile = fileSize > 200 * 1024 * 1024;
+
     Uint8List? bytes;
     String filePath;
     String? fileHash;
@@ -305,7 +310,7 @@ class StorageService {
       bytes = file.bytes;
       filePath = 'memes/$fileName';
       if (bytes != null) {
-        fileHash = _computeHash(bytes);
+        fileHash = isHugeFile ? null : _computeHash(bytes);
         await webStorageSetBinary(filePath, bytes);
       }
     } else {
@@ -313,12 +318,14 @@ class StorageService {
       final dest = File(p.join(_basePath!, filePath));
       await dest.create(recursive: true);
       if (file.path != null) {
+        // 流式拷贝：File.copy 内部使用 chunked IO，不会一次性载入内存
         await File(file.path!).copy(dest.path);
-        fileHash = await _computeFileHash(dest.path);
+        // 超大文件跳过 hash 计算：MD5 流式扫描 2GB 文件耗时数秒且可能触发 ANR
+        fileHash = isHugeFile ? null : await _computeFileHash(dest.path);
       } else if (file.bytes != null) {
         final b = file.bytes!;
         bytes = b;
-        fileHash = _computeHash(b);
+        fileHash = isHugeFile ? null : _computeHash(b);
         await dest.writeAsBytes(b);
       }
     }
@@ -339,7 +346,8 @@ class StorageService {
     String memeType = type ?? _guessType(ext);
     Map<String, dynamic>? characterData;
 
-    if (ext == '.png') {
+    // 超大 PNG 不可能是角色卡（角色卡通常 <2MB），跳过 character card 解析
+    if (ext == '.png' && !isHugeFile) {
       if (bytes != null) {
         characterData = await CharacterCardService.parseFromBytes(bytes);
       } else if (file.path != null) {
@@ -387,61 +395,65 @@ class StorageService {
     await _saveMeme(meme, fileHash);
 
     // 自动按画幅归类：正方形→表情，长方形→图片
+    // 超大文件跳过尺寸解析（getImageDimensions 已是流式但仍有 IO 开销）
     int imgWidth = 0;
     int imgHeight = 0;
-    if (autoClassify && type == null && memeType != Meme.typeCharacterCard && ext != '.gif') {
-      double? ratio;
-      if (!kIsWeb) {
-        final dims = await getImageDimensions(filePath);
-        if (dims != null) {
-          imgWidth = dims.width;
-          imgHeight = dims.height;
-          ratio = dims.ratio;
+    if (!isHugeFile) {
+      if (autoClassify && type == null && memeType != Meme.typeCharacterCard && ext != '.gif') {
+        double? ratio;
+        if (!kIsWeb) {
+          final dims = await getImageDimensions(filePath);
+          if (dims != null) {
+            imgWidth = dims.width;
+            imgHeight = dims.height;
+            ratio = dims.ratio;
+          }
+        } else if (bytes != null) {
+          final dims = _parseImageDimensionsFromHeader(bytes);
+          if (dims != null) {
+            imgWidth = dims.width;
+            imgHeight = dims.height;
+            ratio = dims.ratio;
+          }
         }
-      } else if (bytes != null) {
-        final dims = _parseImageDimensionsFromHeader(bytes);
-        if (dims != null) {
-          imgWidth = dims.width;
-          imgHeight = dims.height;
-          ratio = dims.ratio;
+        if (ratio != null && ratio > 0) {
+          // 宽高比 <= 阈值 → 正方形 → 表情；否则 → 图片
+          final autoType = (ratio <= classifyRatio) ? Meme.typeEmoji : Meme.typeImage;
+          if (autoType != memeType) {
+            await setMemeType(id, autoType);
+            meme = meme.copyWith(type: autoType);
+          }
+        }
+      } else if (meme.isImageType && meme.filePath.isNotEmpty) {
+        // 非自动归类场景也解析宽高并存储
+        if (!kIsWeb) {
+          final dims = await getImageDimensions(filePath);
+          if (dims != null) {
+            imgWidth = dims.width;
+            imgHeight = dims.height;
+          }
+        } else if (bytes != null) {
+          final dims = _parseImageDimensionsFromHeader(bytes);
+          if (dims != null) {
+            imgWidth = dims.width;
+            imgHeight = dims.height;
+          }
         }
       }
-      if (ratio != null && ratio > 0) {
-        // 宽高比 <= 阈值 → 正方形 → 表情；否则 → 图片
-        final autoType = (ratio <= classifyRatio) ? Meme.typeEmoji : Meme.typeImage;
-        if (autoType != memeType) {
-          await setMemeType(id, autoType);
-          meme = meme.copyWith(type: autoType);
-        }
+      if (imgWidth > 0 && imgHeight > 0) {
+        meme = meme.copyWith(width: imgWidth, height: imgHeight);
+        await _saveMeme(meme, fileHash);
       }
-    } else if (meme.isImageType && meme.filePath.isNotEmpty) {
-      // 非自动归类场景也解析宽高并存储
-      if (!kIsWeb) {
-        final dims = await getImageDimensions(filePath);
-        if (dims != null) {
-          imgWidth = dims.width;
-          imgHeight = dims.height;
-        }
-      } else if (bytes != null) {
-        final dims = _parseImageDimensionsFromHeader(bytes);
-        if (dims != null) {
-          imgWidth = dims.width;
-          imgHeight = dims.height;
-        }
-      }
-    }
-    if (imgWidth > 0 && imgHeight > 0) {
-      meme = meme.copyWith(width: imgWidth, height: imgHeight);
-      await _saveMeme(meme, fileHash);
     }
 
-    // PSD 解析：提取合成预览 + 图层信息
-    if (memeType == Meme.typePsd) {
+    // PSD 解析：提取合成预览 + 图层信息（超大 PSD 跳过，避免 OOM）
+    if (memeType == Meme.typePsd && !isHugeFile) {
       meme = await _processPsdImport(meme, file, bytes, fileHash);
     }
 
     // ICO/TIF 转 PNG：Flutter 原生不支持这两种格式，导入时转换为 PNG 缩略图
-    if (const ['.ico', '.tif', '.tiff'].contains(ext)) {
+    // 超大 ICO/TIF 跳过转换（image 包 decodeImage 会一次性载入内存）
+    if (const ['.ico', '.tif', '.tiff'].contains(ext) && !isHugeFile) {
       meme = await _processRasterConversion(meme, file, bytes, fileHash);
     }
 
@@ -814,6 +826,167 @@ class StorageService {
     );
     await _saveMeme(meme, null);
     return meme;
+  }
+
+  /// 从文本文件导入为小说/文字
+  /// 支持 .txt / .md / .doc / .docx 等常见格式
+  /// - .txt / .md：直接读取 UTF-8 文本
+  /// - .doc：旧版 Word 二进制格式，提取文本可能不完整（仅尽力而为）
+  /// - .docx：Office Open XML，解压后读取 word/document.xml 提取纯文本
+  /// 返回导入的 Meme，失败时抛出异常
+  Future<Meme> importTextFile(PlatformFile file, {String? folderId, String? type}) async {
+    final ext = _guessExt(file.name).toLowerCase();
+    final baseName = p.basenameWithoutExtension(file.name);
+    final isNovel = type == Meme.typeNovel ||
+        ['doc', 'docx'].contains(ext.substring(1)) ||
+        (ext == '.md') ||
+        (ext == '.txt' && await _isLikelyLongText(file));
+    final memeType = isNovel ? Meme.typeNovel : Meme.typeText;
+
+    String? text;
+    if (kIsWeb) {
+      if (file.bytes != null) {
+        text = await _extractTextFromBytes(file.bytes!, ext);
+      }
+    } else {
+      final path = file.path;
+      if (path != null) {
+        text = await _extractTextFromFile(path, ext);
+      } else if (file.bytes != null) {
+        text = await _extractTextFromBytes(file.bytes!, ext);
+      }
+    }
+    if (text == null || text.trim().isEmpty) {
+      throw StateError('cannot extract text from file');
+    }
+
+    return importText(text, name: baseName, folderId: folderId, type: memeType);
+  }
+
+  /// 粗略判断 txt 文件是否为长文本（>10KB 视为小说）
+  Future<bool> _isLikelyLongText(PlatformFile file) async {
+    int size = file.size;
+    if (size == 0 && !kIsWeb && file.path != null) {
+      try {
+        size = await File(file.path!).length();
+      } catch (_) {}
+    }
+    return size > 10 * 1024;
+  }
+
+  /// 从字节流提取文本（按扩展名分发）
+  Future<String?> _extractTextFromBytes(Uint8List bytes, String ext) async {
+    try {
+      switch (ext) {
+        case '.txt':
+          return utf8.decode(bytes, allowMalformed: true);
+        case '.md':
+          return utf8.decode(bytes, allowMalformed: true);
+        case '.docx':
+          return _extractTextFromDocxBytes(bytes);
+        case '.doc':
+          // .doc 是二进制格式，无法在纯 Dart 中可靠解析，尽力提取可打印文本
+          return _extractTextFromLegacyDocBytes(bytes);
+        default:
+          return utf8.decode(bytes, allowMalformed: true);
+      }
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 从文件路径提取文本（按扩展名分发）
+  Future<String?> _extractTextFromFile(String path, String ext) async {
+    try {
+      final file = File(path);
+      if (!await file.exists()) return null;
+      switch (ext) {
+        case '.txt':
+        case '.md':
+          return await file.readAsString();
+        case '.docx':
+          // docx 是 zip 压缩包，用流式读取避免一次性载入内存
+          final bytes = await file.readAsBytes();
+          return _extractTextFromDocxBytes(bytes);
+        case '.doc':
+          final bytes = await file.readAsBytes();
+          return _extractTextFromLegacyDocBytes(bytes);
+        default:
+          return await file.readAsString();
+      }
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 从 docx 字节流提取纯文本
+  /// docx 是 zip 包，word/document.xml 包含正文，提取 <w:t> 标签内容
+  String? _extractTextFromDocxBytes(Uint8List bytes) {
+    try {
+      final archive = ZipDecoder().decodeBytes(bytes);
+      final docXml = archive.files
+          .firstWhere((f) => f.name == 'word/document.xml', orElse: () => archive.files.first);
+      if (!docXml.isFile) return null;
+      final raw = docXml.content as List<int>;
+      final xml = utf8.decode(raw, allowMalformed: true);
+      // 提取所有 <w:t> 标签内的文本，按段落换行
+      final paragraphs = <String>[];
+      final paraRegex = RegExp(r'<w:p[\s>][\s\S]*?</w:p>');
+      final textRegex = RegExp(r'<w:t[^>]*>([\s\S]*?)</w:t>');
+      for (final paraMatch in paraRegex.allMatches(xml)) {
+        final paraXml = paraMatch.group(0)!;
+        final buf = StringBuffer();
+        for (final m in textRegex.allMatches(paraXml)) {
+          buf.write(m.group(1));
+        }
+        if (buf.isNotEmpty) {
+          paragraphs.add(_decodeXmlEntities(buf.toString()));
+        } else {
+          paragraphs.add('');
+        }
+      }
+      return paragraphs.join('\n');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 旧版 .doc 二进制格式：尽力提取可打印文本
+  /// 不做完整解析，仅扫描连续的可打印 ASCII/UTF-8 字符段
+  String? _extractTextFromLegacyDocBytes(Uint8List bytes) {
+    try {
+      final buf = StringBuffer();
+      var i = 0;
+      while (i < bytes.length) {
+        final b = bytes[i];
+        // 可打印 ASCII 或常见 UTF-8 多字节首字节
+        if ((b >= 0x20 && b < 0x7F) || b == 0x09 || b == 0x0A || b == 0x0D || b >= 0x80) {
+          buf.writeCharCode(b);
+        } else if (buf.length > 80) {
+          // 连续段足够长才保留，避免二进制噪声
+          buf.write('\n');
+        } else {
+          buf.clear();
+        }
+        i++;
+      }
+      final text = buf.toString();
+      // 解码为 UTF-8（容错），去除连续空行
+      final decoded = utf8.decode(text.codeUnits, allowMalformed: true);
+      final lines = decoded.split(RegExp(r'\n{2,}')).where((s) => s.trim().isNotEmpty).toList();
+      return lines.isEmpty ? null : lines.join('\n');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _decodeXmlEntities(String s) {
+    return s
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&apos;', "'");
   }
 
   /// 自然排序比较器：page_1.jpg < page_2.jpg < page_10.jpg

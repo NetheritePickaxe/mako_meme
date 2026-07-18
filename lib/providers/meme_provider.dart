@@ -506,6 +506,14 @@ class MemeProvider with ChangeNotifier {
     return meme;
   }
 
+  /// 从文本文件导入（支持 txt / md / doc / docx 等格式）
+  /// 自动判断类型：大文件/doc/docx/md 视为小说，小 txt 视为文字
+  Future<Meme> importTextFile(PlatformFile file, {String? type}) async {
+    final meme = await _storage.importTextFile(file, folderId: _folderId, type: type);
+    await loadAll();
+    return meme;
+  }
+
   /// 导入漫画（手动多图合并）
   Future<Meme> importMangaFromFiles(List<PlatformFile> files, {String? name}) async {
     final meme = await _storage.importMangaFromFiles(files, name: name, folderId: _folderId);

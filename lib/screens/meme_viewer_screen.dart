@@ -91,12 +91,6 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
     _controller = PageController(initialPage: _currentIndex);
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
   /// 当前 meme：优先从 provider 读取最新数据（标签/名称等变更后立即刷新）
   /// 若列表已变化导致索引越界，则回退到 widget 传入的快照
   Meme get _meme {
@@ -111,8 +105,26 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
   }
 
   /// 切换全屏查看模式：单击图片进入/退出全屏
+  /// 进入全屏时隐藏系统状态栏，退出时恢复
   void _toggleFullscreen() {
     setState(() => _isFullscreen = !_isFullscreen);
+    if (_isFullscreen) {
+      // 进入沉浸式全屏：隐藏状态栏和导航栏，图片真正占满整屏
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    } else {
+      // 退出全屏：恢复边到边模式（状态栏可见）
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
+  }
+
+  @override
+  void dispose() {
+    // 退出页面时若仍处于全屏，恢复系统 UI 模式
+    if (_isFullscreen) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
+    _controller.dispose();
+    super.dispose();
   }
 
   /// 全屏查看时的 cacheWidth：按屏幕短边 × devicePixelRatio 计算，上限 4096
@@ -165,7 +177,12 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
       // 全屏模式下按返回键先退出全屏，而非直接 pop
       canPop: !_isFullscreen,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && _isFullscreen) _toggleFullscreen();
+        if (!didPop && _isFullscreen) {
+          _toggleFullscreen();
+        } else if (didPop) {
+          // 真正退出页面时恢复系统 UI 模式
+          SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+        }
       },
       child: Scaffold(
         backgroundColor: theme.colorScheme.surface,
@@ -215,7 +232,11 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
           ],
         ),
         body: PageView.builder(
-          physics: const BouncingScrollPhysics(),
+          // 全屏模式下禁用左右滑动，避免与 PhotoView 捏合缩放冲突
+          // 非全屏保持 BouncingScrollPhysics，允许左右切换上一张/下一张
+          physics: _isFullscreen
+              ? const NeverScrollableScrollPhysics()
+              : const BouncingScrollPhysics(),
           controller: _controller,
           // 使用 provider 的实时列表，标签/名称变更后立即刷新
           itemCount: prov.memes.length,
@@ -240,13 +261,16 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
               },
               child: Stack(
                 children: [
+                  // ClipRect 强制裁剪，防止超大画幅图片在 PhotoView 缩放时
+                  // 溢出到 PageView 相邻页面（左右两侧看到本页内容）
                   Positioned.fill(
                     bottom: panelHeight,
-                    // 单击图片切换全屏（PhotoView 的捏合/拖拽手势不受影响）
-                    child: GestureDetector(
-                      onTap: _toggleFullscreen,
-                      behavior: HitTestBehavior.translucent,
-                      child: _buildImageArea(m, i),
+                    child: ClipRect(
+                      child: GestureDetector(
+                        onTap: _toggleFullscreen,
+                        behavior: HitTestBehavior.translucent,
+                        child: _buildImageArea(m, i),
+                      ),
                     ),
                   ),
                   if (!_isFullscreen)

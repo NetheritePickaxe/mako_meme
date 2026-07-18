@@ -989,6 +989,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   Navigator.pop(bCtx);
                   if (v == 'novel') {
                     _importNovel(ctx, prov);
+                  } else if (v == 'text_file') {
+                    _importTextFile(ctx, prov);
                   } else {
                     _importText(ctx, prov);
                   }
@@ -1005,6 +1007,15 @@ class _HomeScreenState extends State<HomeScreen> {
                     leading: const Icon(Icons.menu_book, size: 20),
                     title: Text(l10n.tr('import_as_novel'),
                       style: const TextStyle(fontSize: 14)),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                  )),
+                  PopupMenuItem(value: 'text_file', child: ListTile(
+                    leading: const Icon(Icons.description_outlined, size: 20),
+                    title: Text(l10n.tr('import_text_file'),
+                      style: const TextStyle(fontSize: 14)),
+                    subtitle: Text(l10n.tr('import_text_file_desc'),
+                      style: const TextStyle(fontSize: 11)),
                     dense: true,
                     contentPadding: EdgeInsets.zero,
                   )),
@@ -1030,6 +1041,9 @@ class _HomeScreenState extends State<HomeScreen> {
       allowMultiple: true,
       type: FileType.custom,
       allowedExtensions: Meme.supportedExtensions,
+      // 关键：禁止 file_picker 预读 bytes，否则 2GB 大图会 OOM
+      // 仅获取 path，导入流程通过 path 流式拷贝
+      withData: false,
     );
     if (result != null && result.files.isNotEmpty) {
       final settings = context.read<SettingsProvider>();
@@ -1075,6 +1089,39 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _importNovel(BuildContext ctx, MemeProvider prov) {
     _showTextEditor(ctx, prov, type: Meme.typeNovel);
+  }
+
+  /// 从文本文件导入（txt / md / doc / docx）
+  /// 自动判断类型：大文件/doc/docx/md 视为小说，小 txt 视为文字
+  Future<void> _importTextFile(BuildContext ctx, MemeProvider prov) async {
+    final l10n = context.read<LocaleProvider>().l10n;
+    final result = await FilePicker.platform.pickFiles(
+      allowMultiple: true,
+      type: FileType.custom,
+      allowedExtensions: ['txt', 'md', 'markdown', 'doc', 'docx'],
+    );
+    if (result == null || result.files.isEmpty) return;
+    if (!ctx.mounted) return;
+    int okCount = 0;
+    int failCount = 0;
+    for (final file in result.files) {
+      try {
+        await prov.importTextFile(file);
+        okCount++;
+      } catch (_) {
+        failCount++;
+      }
+    }
+    if (!ctx.mounted) return;
+    String msg;
+    if (failCount == 0) {
+      msg = l10n.tr('imported_count', args: {'count': okCount.toString()});
+    } else if (okCount == 0) {
+      msg = l10n.tr('import_text_file_failed');
+    } else {
+      msg = '${l10n.tr('imported_count', args: {'count': okCount.toString()})} · $failCount ${l10n.tr('import_text_file_failed')}';
+    }
+    ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   /// 漫画导入子菜单：手动多图 / CBZ、ZIP 压缩包
