@@ -54,6 +54,8 @@
   "import_as_sprite": "合并为立绘",
   "import_as_novel": "作为小说导入",
   "import_as_text": "作为文字导入",
+  "import_from_gallery": "从相册导入",
+  "import_from_files": "从文件管理导入",
   "search_help_title": "搜索帮助",
   "close": "关闭",
   "command_mode_hint": "命令模式：按回车执行",

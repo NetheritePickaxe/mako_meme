@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'services/storage_service.dart';
+import 'services/share_receiver_service.dart';
 import 'providers/meme_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/locale_provider.dart';
@@ -18,12 +19,33 @@ Future<void> main() async {
   await storage.init();
   final localeProvider = LocaleProvider();
   await localeProvider.init();
+
+  // 接收外部分享（仅 Android/iOS 生效）
+  final shareReceiver = ShareReceiverService();
+
+  // 单例 SettingsProvider：MemeProvider 内部依赖与 UI 共用同一份
+  final settings = SettingsProvider(storage);
+
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: localeProvider),
-        ChangeNotifierProvider(create: (_) => MemeProvider(storage, SettingsProvider(storage))..init()),
-        ChangeNotifierProvider(create: (_) => SettingsProvider(storage)),
+        ChangeNotifierProvider.value(value: settings),
+        ChangeNotifierProvider(create: (_) {
+          final prov = MemeProvider(storage, settings);
+          // 分享回调：直接走导入流程
+          shareReceiver.onShared = (files) {
+            prov.importFiles(
+              files,
+              autoClassify: settings.autoClassify,
+              classifyRatio: settings.classifyRatio,
+            );
+          };
+          prov.init();
+          // 监听初始/运行时分享 intent
+          shareReceiver.init();
+          return prov;
+        }),
         Provider.value(value: storage),
         Provider.value(value: AdminService()),
         Provider.value(value: ImageToolService(storage)),

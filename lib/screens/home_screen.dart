@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'dart:ui' as ui;
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import '../providers/meme_provider.dart';
@@ -937,14 +938,23 @@ class _HomeScreenState extends State<HomeScreen> {
                     _showMangaImportMenu(ctx, prov);
                   } else if (v == 'sprite') {
                     _showSpriteImportMenu(ctx, prov);
+                  } else if (v == 'gallery') {
+                    _importFromGallery(ctx, prov);
                   } else {
                     _importFiles(ctx, prov);
                   }
                 },
                 itemBuilder: (_) => [
+                  PopupMenuItem(value: 'gallery', child: ListTile(
+                    leading: const Icon(Icons.photo_camera, size: 20),
+                    title: Text(l10n.tr('import_from_gallery'),
+                      style: const TextStyle(fontSize: 14)),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                  )),
                   PopupMenuItem(value: 'normal', child: ListTile(
-                    leading: const Icon(Icons.photo, size: 20),
-                    title: Text(l10n.tr('import_as_images'),
+                    leading: const Icon(Icons.folder_open, size: 20),
+                    title: Text(l10n.tr('import_from_files'),
                       style: const TextStyle(fontSize: 14)),
                     dense: true,
                     contentPadding: EdgeInsets.zero,
@@ -1029,6 +1039,34 @@ class _HomeScreenState extends State<HomeScreen> {
         classifyRatio: settings.classifyRatio,
       );
     }
+  }
+
+  /// 从系统相册导入图片（仅 Android/iOS）
+  Future<void> _importFromGallery(BuildContext ctx, MemeProvider prov) async {
+    final picker = ImagePicker();
+    final List<XFile> images = await picker.pickMultiImage(
+      limit: 20,
+    );
+    if (images.isEmpty) return;
+    // XFile → PlatformFile
+    final files = <PlatformFile>[];
+    for (final x in images) {
+      final size = await x.length();
+      files.add(PlatformFile(
+        name: x.name,
+        path: x.path,
+        size: size,
+        bytes: null,
+      ));
+    }
+    if (files.isEmpty) return;
+    if (!ctx.mounted) return;
+    final settings = context.read<SettingsProvider>();
+    await prov.importFiles(
+      files,
+      autoClassify: settings.autoClassify,
+      classifyRatio: settings.classifyRatio,
+    );
   }
 
   void _importText(BuildContext ctx, MemeProvider prov) {

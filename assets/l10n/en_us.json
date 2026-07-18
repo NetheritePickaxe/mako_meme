@@ -50,6 +50,8 @@
   "import_as_sprite": "Merge as sprite",
   "import_as_novel": "Import as novel",
   "import_as_text": "Import as text",
+  "import_from_gallery": "Import from gallery",
+  "import_from_files": "Import from files",
   "search_help_title": "Search Help",
   "close": "Close",
   "command_mode_hint": "Command mode: press Enter to execute",
