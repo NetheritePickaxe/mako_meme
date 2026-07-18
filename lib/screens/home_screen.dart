@@ -37,6 +37,21 @@ class _HomeScreenState extends State<HomeScreen> {
   String _folderQuery = '';
   String _moodQuery = '';
 
+  // 底部导航位置 ↔ 内部 tab 语义转换（收藏与文件夹位置已交换）
+  // nav: 0=表情 1=收藏 2=文件夹 3=情绪
+  // logic: 0=表情 1=文件夹 2=收藏 3=情绪
+  int _navToLogic(int nav) {
+    if (nav == 1) return 2;
+    if (nav == 2) return 1;
+    return nav;
+  }
+
+  int _logicToNav(int logic) {
+    if (logic == 1) return 2;
+    if (logic == 2) return 1;
+    return logic;
+  }
+
   void _onTabChanged(int i) {
     final prov = context.read<MemeProvider>();
     prov.clearPreviewMeme();
@@ -92,8 +107,9 @@ class _HomeScreenState extends State<HomeScreen> {
         if (mounted) _onTabChanged(0);
       });
     }
-    // 实际 selectedIndex 需要跳过被隐藏的情绪标签
-    final navIndex = _currentTab == 3 ? 3 : _currentTab.clamp(0, showMoodTab ? 3 : 2);
+    // 实际 selectedIndex 需要跳过被隐藏的情绪标签，并按交换后的导航位置转换
+    final rawNav = _currentTab == 3 ? 3 : _currentTab.clamp(0, showMoodTab ? 3 : 2);
+    final navIndex = _logicToNav(rawNav);
 
     return Scaffold(
       backgroundColor: hasBg ? Colors.transparent : theme.colorScheme.surface,
@@ -111,7 +127,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: _buildBackgroundedBody(prov, l10n),
       bottomNavigationBar: NavigationBar(
         selectedIndex: navIndex,
-        onDestinationSelected: _onTabChanged,
+        onDestinationSelected: (i) => _onTabChanged(_navToLogic(i)),
         destinations: [
           NavigationDestination(
             icon: const Icon(Icons.photo_library_outlined),
@@ -119,14 +135,14 @@ class _HomeScreenState extends State<HomeScreen> {
             label: l10n.tr('nav_memes'),
           ),
           NavigationDestination(
-            icon: const Icon(Icons.folder_outlined),
-            selectedIcon: Icon(Icons.folder, color: theme.colorScheme.onSurface),
-            label: l10n.tr('nav_folders'),
-          ),
-          NavigationDestination(
             icon: const Icon(Icons.favorite_border),
             selectedIcon: Icon(Icons.favorite, color: theme.colorScheme.onSurface),
             label: l10n.tr('favorites'),
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.folder_outlined),
+            selectedIcon: Icon(Icons.folder, color: theme.colorScheme.onSurface),
+            label: l10n.tr('nav_folders'),
           ),
           if (showMoodTab)
             NavigationDestination(
