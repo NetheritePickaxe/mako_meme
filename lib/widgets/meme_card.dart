@@ -158,6 +158,11 @@ class _MemeCardState extends State<MemeCard> {
     final theme = Theme.of(context);
     final canReorder = widget.onReorder != null;
 
+    // 占位卡片（导入中）：显示骨架 + "导入中"
+    if (widget.meme.id.startsWith('importing_')) {
+      return _buildImportingCard(theme);
+    }
+
     // 桌面端：长按拖拽（用于排序或拖入文件夹），左键复制，右键菜单
     if (_isDesktop) {
       return LongPressDraggable<Meme>(
@@ -367,6 +372,68 @@ class _MemeCardState extends State<MemeCard> {
       ),
     ),
   );
+
+  /// 导入中占位卡片：骨架 + "导入中"标识
+  Widget _buildImportingCard(ThemeData theme) {
+    final l10n = context.read<LocaleProvider>().l10n;
+    final cs = theme.colorScheme;
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // 骨架背景
+          Container(
+            color: cs.surfaceContainerHighest,
+            child: Center(
+              child: SizedBox(
+                width: 24, height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: cs.primary,
+                ),
+              ),
+            ),
+          ),
+          // 底部渐变 + 名称 + "导入中"
+          Positioned(
+            left: 0, right: 0, bottom: 0,
+            child: IgnorePointer(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                decoration: BoxDecoration(
+                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.transparent, Colors.black.withValues(alpha: 0.55)],
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.meme.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white),
+                    ),
+                    Text(
+                      l10n.tr('importing'),
+                      style: TextStyle(fontSize: 11, color: cs.primary.withValues(alpha: 0.9)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildFeedback() {
     // 文字卡片：反馈显示文字

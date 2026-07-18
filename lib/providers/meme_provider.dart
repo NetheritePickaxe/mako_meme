@@ -33,6 +33,11 @@ class MemeProvider with ChangeNotifier {
   final Set<String> _typeFilter = {};
   // 情绪筛选：null=全部，否则只显示该 mood 的 memes
   String? _moodFilter;
+  // 正在导入的占位卡片（导入完成后会移除）
+  List<Meme> _importing = [];
+  // 导入进度（已完成数 / 总数）
+  int _importDone = 0;
+  int _importTotal = 0;
 
   Set<String> get folderFilter => _folderFilter;
   Set<String> get typeFilter => _typeFilter;
@@ -43,7 +48,13 @@ class MemeProvider with ChangeNotifier {
 
   MemeProvider(this._storage, this._settings);
 
-  List<Meme> get memes => _filtered;
+  List<Meme> get memes => [..._importing, ..._filtered];
+  /// 是否正在导入
+  bool get isImporting => _importing.isNotEmpty;
+  /// 导入进度（已完成数）
+  int get importDone => _importDone;
+  /// 导入总数
+  int get importTotal => _importTotal;
   int get allMemesCount => _all.length;
   List<MemeFolder> get folders => _folders;
   String? get folderId => _folderId;
@@ -445,9 +456,48 @@ class MemeProvider with ChangeNotifier {
   }
 
   Future<List<Meme>> importFiles(List<PlatformFile> files, {String? folderId, bool autoClassify = false, double classifyRatio = 1.1}) async {
-    final memes = await _storage.importFiles(files, folderId: folderId ?? _folderId, autoClassify: autoClassify, classifyRatio: classifyRatio);
-    await loadAll();
-    return memes;
+    if (files.isEmpty) return [];
+    final targetFolderId = folderId ?? _folderId;
+    // 1. 创建占位卡片并立即刷新 UI，让用户看到"导入中"
+    final placeholders = <Meme>[];
+    for (var i = 0; i < files.length; i++) {
+      final f = files[i];
+      placeholders.add(Meme(
+        id: 'importing_${DateTime.now().microsecondsSinceEpoch}_$i',
+        name: f.name,
+        filePath: '', // 空路径标识占位
+        folderId: targetFolderId,
+        createdAt: DateTime.now(),
+        type: Meme.typeImage,
+      ));
+    }
+    _importing = List.unmodifiable(placeholders);
+    _importTotal = files.length;
+    _importDone = 0;
+    notifyListeners();
+
+    // 2. 逐张导入，每完成一张刷新 UI
+    final results = <Meme>[];
+    for (var i = 0; i < files.length; i++) {
+      try {
+        final m = await _storage.importFile(
+          files[i],
+          folderId: targetFolderId,
+          autoClassify: autoClassify,
+          classifyRatio: classifyRatio,
+        );
+        results.add(m);
+      } catch (_) {}
+      // 移除该占位，刷新真实数据
+      _importDone = i + 1;
+      _importing = _importing.where((p) => p.id != placeholders[i].id).toList();
+      await loadAll(); // loadAll 内部会 notifyListeners
+    }
+    _importing = [];
+    _importTotal = 0;
+    _importDone = 0;
+    notifyListeners();
+    return results;
   }
 
   Future<Meme> importText(String text, {String? name, List<String> tags = const [], String type = Meme.typeText}) async {

@@ -52,6 +52,8 @@
   "import_as_text": "Import as text",
   "import_from_gallery": "Import from gallery",
   "import_from_files": "Import from files",
+  "importing": "Importing",
+  "importing_progress": "Importing {done}/{total}",
   "search_help_title": "Search Help",
   "close": "Close",
   "command_mode_hint": "Command mode: press Enter to execute",
