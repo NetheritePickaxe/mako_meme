@@ -46,38 +46,16 @@ class CharacterCardService {
         final type = String.fromCharCodes(bytes.sublist(offset, offset + 4));
         offset += 4;
 
-        if (type == 'iTXt') {
-          final chunkData = bytes.sublist(offset, offset + length);
-          final keywordEnd = chunkData.indexOf(0);
-          if (keywordEnd == -1) {
-            offset += length + 4;
-            continue;
+        if (type == 'iTXt' || type == 'tEXt') {
+          if (length > 0 && offset + length <= bytes.length) {
+            final chunkData = bytes.sublist(offset, offset + length);
+            final result = _parseTextChunk(type, chunkData);
+            if (result != null) return result;
           }
-
-          final keyword = String.fromCharCodes(chunkData.sublist(0, keywordEnd));
-          if (keyword.toLowerCase() == 'chara') {
-            var dataOffset = keywordEnd + 1 + 1 + 1 + 1;
-            if (dataOffset < chunkData.length) {
-              final textData = chunkData.sublist(dataOffset);
-              return utf8.decode(textData);
-            }
-          }
-        } else if (type == 'tEXt') {
-          final chunkData = bytes.sublist(offset, offset + length);
-          final keywordEnd = chunkData.indexOf(0);
-          if (keywordEnd == -1) {
-            offset += length + 4;
-            continue;
-          }
-
-          final keyword = String.fromCharCodes(chunkData.sublist(0, keywordEnd));
-          if (keyword.toLowerCase() == 'chara') {
-            final textData = chunkData.sublist(keywordEnd + 1);
-            return utf8.decode(textData);
-          }
+          offset += length + 4;
+        } else {
+          offset += length + 4;
         }
-
-        offset += length + 4;
       }
     } catch (_) {}
     return null;

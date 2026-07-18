@@ -906,7 +906,8 @@ class _MemeCardState extends State<MemeCard> {
 
   void _showTypeDialog() {
     final l10n = context.read<LocaleProvider>().l10n;
-    final types = [
+    final settings = context.read<SettingsProvider>();
+    final allTypes = [
       {'type': Meme.typeEmoji, 'label': l10n.tr('type_emoji'), 'icon': Icons.face},
       {'type': Meme.typeGif, 'label': l10n.tr('type_gif'), 'icon': Icons.gif},
       {'type': Meme.typeImage, 'label': l10n.tr('type_image'), 'icon': Icons.image},
@@ -920,6 +921,11 @@ class _MemeCardState extends State<MemeCard> {
       {'type': Meme.typePsd, 'label': l10n.tr('type_psd'), 'icon': Icons.layers},
       {'type': Meme.typePdf, 'label': l10n.tr('type_pdf'), 'icon': Icons.picture_as_pdf},
     ];
+    // 仅显示已启用的分类 + 当前 meme 所属分类（即便被隐藏也可保持）
+    final types = allTypes.where((t) {
+      final type = t['type'] as String;
+      return settings.isCategoryVisible(type) || widget.meme.type == type;
+    }).toList();
 
     showDialog(
       context: context,

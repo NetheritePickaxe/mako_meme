@@ -1121,6 +1121,8 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                 ),
                 if (m.type == Meme.typeCharacterCard) ...[
                   const SizedBox(height: 8),
+                  ..._buildCharacterCardPreview(theme, l10n, m),
+                  const SizedBox(height: 8),
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.tonalIcon(
@@ -1625,6 +1627,83 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
         builder: (ctx) => CharacterCardEditorScreen(meme: _meme),
       ),
     );
+  }
+
+  /// 角色卡数据预览（只读展示已有数据，未读取到时提示）
+  List<Widget> _buildCharacterCardPreview(ThemeData theme, L10n l10n, Meme m) {
+    final data = m.characterData;
+    if (data == null || data.isEmpty) {
+      return [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            l10n.tr('no_text_content'),
+            style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.5), fontSize: 12),
+          ),
+        ),
+      ];
+    }
+
+    String field(String key) {
+      final v = data[key];
+      if (v == null) return '';
+      if (v is String) return v;
+      return v.toString();
+    }
+
+    final name = field('name');
+    final description = field('description');
+    final personality = field('personality');
+    final scenario = field('scenario');
+    final firstMes = field('first_mes');
+
+    Widget row(String label, String value, {int maxLines = 4}) {
+      if (value.isEmpty) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.primary,
+              fontWeight: FontWeight.w600,
+            )),
+            const SizedBox(height: 2),
+            Text(value, style: theme.textTheme.bodySmall, maxLines: maxLines, overflow: TextOverflow.ellipsis),
+          ],
+        ),
+      );
+    }
+
+    return [
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (name.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(name, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+              ),
+            row(l10n.tr('char_description'), description),
+            row(l10n.tr('char_personality'), personality),
+            row(l10n.tr('char_scenario'), scenario),
+            row(l10n.tr('char_first_mes'), firstMes),
+          ],
+        ),
+      ),
+    ];
   }
 
   void _showTypeDialog() {

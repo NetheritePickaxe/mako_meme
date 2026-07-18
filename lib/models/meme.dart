@@ -172,7 +172,9 @@ class Meme {
     type: map['type'] as String? ?? 'image',
     textContent: map['textContent'] as String?,
     remotePath: map['remotePath'] as String?,
-    characterData: map['characterData'] as Map<String, dynamic>?,
+    characterData: map['characterData'] is Map
+        ? Map<String, dynamic>.from(map['characterData'] as Map)
+        : null,
     width: map['width'] as int? ?? 0,
     height: map['height'] as int? ?? 0,
     thumbPath: map['thumbPath'] as String?,

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/meme.dart';
 import '../providers/meme_provider.dart';
 import '../providers/locale_provider.dart';
+import '../providers/settings_provider.dart';
 import '../screens/phantom_tank_batch_screen.dart';
 import '../services/image_tool_service.dart';
 import '../services/storage_service.dart';
@@ -553,7 +554,8 @@ class MultiSelectBar extends StatelessWidget {
   }
 
   void _showTypeDialog(BuildContext ctx, MemeProvider prov, L10n l10n) {
-    final types = [
+    final settings = ctx.read<SettingsProvider>();
+    final allTypes = [
       {'type': Meme.typeEmoji, 'label': l10n.tr('type_emoji'), 'icon': Icons.face},
       {'type': Meme.typeGif, 'label': l10n.tr('type_gif'), 'icon': Icons.gif},
       {'type': Meme.typeImage, 'label': l10n.tr('type_image'), 'icon': Icons.image},
@@ -562,6 +564,7 @@ class MultiSelectBar extends StatelessWidget {
       {'type': Meme.typeCg, 'label': l10n.tr('type_cg'), 'icon': Icons.photo_library},
       {'type': Meme.typeCharacterCard, 'label': l10n.tr('type_character_card'), 'icon': Icons.person_outline},
     ];
+    final types = allTypes.where((t) => settings.isCategoryVisible(t['type'] as String)).toList();
 
     showDialog(
       context: ctx,
