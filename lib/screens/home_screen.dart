@@ -1512,8 +1512,8 @@ class _EmojiRainOverlayState extends State<_EmojiRainOverlay>
 
   void _spawnParticles() {
     final rng = Random();
-    // 下雨：从顶部下落，粒子数量加大
-    for (int i = 0; i < 80; i++) {
+    // 下雨：从顶部下落
+    for (int i = 0; i < 36; i++) {
       _particles.add(_EmojiParticle(
         emoji: _emojis[rng.nextInt(_emojis.length)],
         x: rng.nextDouble(),
