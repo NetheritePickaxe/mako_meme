@@ -23,7 +23,7 @@ class MultiSelectBar extends StatelessWidget {
           bottom: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.4), width: 0.5),
         ),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Row(
         children: [
           TextButton.icon(
@@ -36,34 +36,44 @@ class MultiSelectBar extends StatelessWidget {
             label: Text(l10n.tr('cancel')),
             onPressed: () => prov.deselectAll(),
           ),
-          const Spacer(),
-          if (prov.selected.isNotEmpty) ...[
-            IconButton(
-              icon: const Icon(Icons.build_outlined, size: 20),
-              tooltip: l10n.tr('tools'),
-              onPressed: () => _showToolsMenu(context, prov, l10n),
+          // 右侧操作按钮：窄屏可横向滚动，避免删除按钮被挤出
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              reverse: true,
+              child: Row(
+                children: [
+                  if (prov.selected.isNotEmpty) ...[
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                      tooltip: l10n.tr('delete_selected'),
+                      onPressed: () => _confirmDelete(context, prov, l10n),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.ios_share, size: 20),
+                      tooltip: l10n.tr('export_selected'),
+                      onPressed: () => _exportSelected(context, prov, l10n),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.label_outline, size: 20),
+                      tooltip: l10n.tr('change_category'),
+                      onPressed: () => _showTypeDialog(context, prov, l10n),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.folder_open, size: 20),
+                      tooltip: l10n.tr('move_to_folder'),
+                      onPressed: () => _showMoveDialog(context, prov, l10n),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.build_outlined, size: 20),
+                      tooltip: l10n.tr('tools'),
+                      onPressed: () => _showToolsMenu(context, prov, l10n),
+                    ),
+                  ],
+                ],
+              ),
             ),
-            IconButton(
-              icon: const Icon(Icons.folder_open, size: 20),
-              tooltip: l10n.tr('move_to_folder'),
-              onPressed: () => _showMoveDialog(context, prov, l10n),
-            ),
-            IconButton(
-              icon: const Icon(Icons.label_outline, size: 20),
-              tooltip: l10n.tr('change_category'),
-              onPressed: () => _showTypeDialog(context, prov, l10n),
-            ),
-            IconButton(
-              icon: const Icon(Icons.ios_share, size: 20),
-              tooltip: l10n.tr('export_selected'),
-              onPressed: () => _exportSelected(context, prov, l10n),
-            ),
-            IconButton(
-              icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
-              tooltip: l10n.tr('delete_selected'),
-              onPressed: () => _confirmDelete(context, prov, l10n),
-            ),
-          ],
+          ),
         ],
       ),
     );

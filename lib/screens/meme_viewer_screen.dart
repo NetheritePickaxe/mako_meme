@@ -330,13 +330,17 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
       }
 
       // PSD / 普通位图：用 PhotoView 手势缩放
-      // 注意：PhotoView 不直接支持 cacheWidth，但 FileImage/MemoryImage 内部会解码
-      // 对于超大图，这里依赖 cacheWidth 的方式有限，但 PhotoView 的 maxScale 限制
-      // 已能避免过度放大导致 OOM
+      // 用 ResizeImage 包装，解码时缩放到目标宽度，避免超大图（如 2GB）全分辨率解码导致 OOM
+      // 目标宽度 = 屏幕长边 × dpr × 2（留出 2x 放大余量），上限 4096
+      final viewSize = MediaQuery.of(context).size;
+      final dpr = MediaQuery.of(context).devicePixelRatio;
+      final targetWidth = (viewSize.longestSide * dpr * 2).round().clamp(1024, 4096);
+      final ImageProvider baseProvider = file != null
+          ? FileImage(file)
+          : MemoryImage(bytes!);
+      final resizedProvider = ResizeImage(baseProvider, width: targetWidth);
       return PhotoView(
-        imageProvider: file != null
-            ? FileImage(file)
-            : MemoryImage(bytes!),
+        imageProvider: resizedProvider,
         minScale: PhotoViewComputedScale.contained,
         maxScale: PhotoViewComputedScale.covered * 2,
         heroAttributes: PhotoViewHeroAttributes(tag: m.id),
@@ -399,7 +403,11 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
         return Stack(
           children: [
             PhotoView(
-              imageProvider: file != null ? FileImage(file) : MemoryImage(bytes!),
+              // 用 ResizeImage 限制解码尺寸，避免超大图 OOM
+              imageProvider: ResizeImage(
+                file != null ? FileImage(file) : MemoryImage(bytes!),
+                width: _viewerCacheWidth,
+              ),
               minScale: PhotoViewComputedScale.contained,
               maxScale: PhotoViewComputedScale.covered * 2,
               backgroundDecoration: BoxDecoration(color: theme.colorScheme.surface),
