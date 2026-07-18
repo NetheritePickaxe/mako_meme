@@ -151,16 +151,29 @@ class SettingsProvider extends ChangeNotifier {
       seedColor: seedColor,
       brightness: isDark ? Brightness.dark : Brightness.light,
     );
+    // 语义化色板：bg/surface/cardBg/keyBg/keyFuncBg 等按键专用色，
+    // 让 IME 端按键 / 网格 / Tab 各部位有独立语义色，参考 Gboard 配色规范。
+    final bg = isDark ? 0xFF161616 : 0xFFF0F0F3;
+    final surface = isDark ? 0xFF1F1F1F : 0xFFE6E6EA;
+    final cardBg = isDark ? 0xFF242424 : 0xFFFFFFFF;
+    final keyBg = isDark ? scheme.surfaceContainerHighest : scheme.surface;
+    final keyFuncBg = isDark ? scheme.surfaceContainer : scheme.surfaceContainerHighest;
+    final divider = isDark ? 0xFF2E2E2E : 0xFFDADADA;
     final json = '{'
         '"dark":$isDark,'
-        '"bg":${isDark ? 0xFF1A1A1A : 0xFFF5F5F5},'
-        '"surface":${(isDark ? scheme.surfaceContainer : scheme.surface).toARGB32()},'
+        '"bg":$bg,'
+        '"surface":$surface,'
+        '"cardBg":$cardBg,'
+        '"keyBg":${keyBg.toARGB32()},'
+        '"keyActiveBg":${scheme.primary.toARGB32()},'
+        '"keyFuncBg":${keyFuncBg.toARGB32()},'
         '"accent":${scheme.primary.toARGB32()},'
         '"onAccent":${scheme.onPrimary.toARGB32()},'
         '"text":${(isDark ? 0xFFEEEEEE : 0xFF222222)},'
-        '"subText":${(isDark ? 0xFFAAAAAA : 0xFF666666)},'
+        '"subText":${(isDark ? 0xFF9A9A9A : 0xFF666666)},'
         '"tabBg":${scheme.primary.toARGB32()},'
-        '"tabText":${scheme.onPrimary.toARGB32()}'
+        '"tabText":${scheme.onPrimary.toARGB32()},'
+        '"divider":$divider'
         '}';
     ImeStatusService.updateImeTheme(json);
   }
