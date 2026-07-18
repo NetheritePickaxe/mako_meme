@@ -118,7 +118,7 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: hasBg ? Colors.transparent : theme.colorScheme.surface,
         leading: _buildLeading(prov, l10n),
         title: Text(_getTitle(prov, l10n)),
-        actions: _buildActions(prov, l10n),
+        actions: _buildActions(prov, l10n, settings),
         bottom: prov.isMulti ? const PreferredSize(
           preferredSize: Size.fromHeight(48),
           child: MultiSelectBar(),
@@ -189,7 +189,7 @@ class _HomeScreenState extends State<HomeScreen> {
       (_currentTab == 0 && prov.folderId != null) ||
       (_currentTab == 3 && prov.moodFilter != null);
 
-  List<Widget> _buildActions(MemeProvider prov, L10n l10n) {
+  List<Widget> _buildActions(MemeProvider prov, L10n l10n, SettingsProvider settings) {
     return [
       // 进入文件夹/情绪筛选后 leading 变成返回按钮，这里补一个菜单入口
       if (_leadingIsBack(prov))
@@ -232,6 +232,9 @@ class _HomeScreenState extends State<HomeScreen> {
             case 'name': prov.setSort(SortBy.name); break;
             case 'size': prov.setSort(SortBy.size); break;
             case 'order': prov.toggleOrder(); break;
+            case 'excludeFoldered':
+              context.read<SettingsProvider>().setExcludeFoldered(!settings.excludeFoldered);
+              break;
           }
         },
         itemBuilder: (_) => [
@@ -240,6 +243,12 @@ class _HomeScreenState extends State<HomeScreen> {
           CheckedPopupMenuItem(value: 'size', checked: prov.sortBy == SortBy.size, child: Text(l10n.tr('sort_by_size'))),
           const PopupMenuDivider(),
           PopupMenuItem(value: 'order', child: Text(prov.order == SortOrder.asc ? '↑ ${l10n.tr('asc')}' : '↓ ${l10n.tr('desc')}')),
+          const PopupMenuDivider(),
+          CheckedPopupMenuItem(
+            value: 'excludeFoldered',
+            checked: settings.excludeFoldered,
+            child: Text(l10n.tr('exclude_foldered')),
+          ),
         ],
       ),
     ];

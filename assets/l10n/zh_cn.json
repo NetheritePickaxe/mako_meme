@@ -125,6 +125,7 @@
   "favorites": "收藏",
   "delete_folder": "删除文件夹",
   "cat_all": "全部",
+  "exclude_foldered": "全部视图中排除已归入文件夹的图片",
   "cat_emoji": "表情",
   "cat_gif": "GIF",
   "cat_image": "图片",

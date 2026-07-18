@@ -156,8 +156,8 @@ class _MemePreviewPanelState extends State<MemePreviewPanel> {
   }
 
   Widget _buildPreviewArea(ThemeData theme, Meme m) {
-    // 非图片类：显示占位
-    if (!m.isImageType) {
+    // 非图片类或无图片路径（文本 emoji）：显示文字/占位
+    if (!m.isImageType || m.displayPath.isEmpty) {
       if (m.isTextLike) {
         final content = m.textContent ?? '';
         return SingleChildScrollView(

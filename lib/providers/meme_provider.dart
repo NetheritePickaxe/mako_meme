@@ -46,7 +46,21 @@ class MemeProvider with ChangeNotifier {
   bool get showFavorites => _showFavorites;
   Meme? get previewMeme => _previewMeme;
 
-  MemeProvider(this._storage, this._settings);
+  MemeProvider(this._storage, this._settings) {
+    // 监听设置变化（如 excludeFoldered 切换）后重新筛选
+    _settings.addListener(_onSettingsChanged);
+  }
+
+  void _onSettingsChanged() {
+    _apply();
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _settings.removeListener(_onSettingsChanged);
+    super.dispose();
+  }
 
   List<Meme> get memes => [..._importing, ..._filtered];
   /// 是否正在导入
@@ -119,7 +133,12 @@ class MemeProvider with ChangeNotifier {
   Future<void> loadAll() async {
     _all = _storage.getAllMemes();
     _folders = _storage.getAllFolders();
+    debugPrint('[Mako] loadAll: _all.length=${_all.length}, _folders.length=${_folders.length}'
+        ', folderId=$_folderId, showFavorites=$_showFavorites, showFoldersView=$_showFoldersView'
+        ', typeFilter=$_typeFilter, tagFilter=$_tagFilter, folderFilter=$_folderFilter'
+        ', moodFilter=$_moodFilter, query="$_query"');
     _apply();
+    debugPrint('[Mako] loadAll done: _filtered.length=${_filtered.length}');
     notifyListeners();
     // 同步 meme 索引到原生 ContentProvider（供 IME 进程读取）
     _exporter.exportAll(_all);
@@ -271,7 +290,7 @@ class MemeProvider with ChangeNotifier {
   void setShowFoldersView(bool v) {
     _showFoldersView = v;
     if (v) {
-      _folderId = null;
+      // 进入文件夹视图时不清除 _folderId，以便切回表情包 tab 时保持原文件夹
       _typeFilter.clear();
       _tagFilter.clear();
       _folderFilter.clear();
@@ -283,7 +302,7 @@ class MemeProvider with ChangeNotifier {
   void setShowFavorites(bool v) {
     _showFavorites = v;
     if (v) {
-      _folderId = null;
+      // 进入收藏视图时不清除 _folderId，以便切回表情包 tab 时保持原文件夹
       _showFoldersView = false;
     }
     _apply();
@@ -441,6 +460,8 @@ class MemeProvider with ChangeNotifier {
   Future<List<Meme>> importFiles(List<PlatformFile> files, {String? folderId, bool autoClassify = false, double classifyRatio = 1.1}) async {
     if (files.isEmpty) return [];
     final targetFolderId = folderId ?? _folderId;
+    debugPrint('[Mako] importFiles START: ${files.length} files, targetFolderId=$targetFolderId, '
+        'current folderId=$_folderId, typeFilter=$_typeFilter, _all.length=${_all.length}');
     // 1. 创建占位卡片并立即刷新 UI，让用户看到"导入中"
     final placeholders = <Meme>[];
     for (var i = 0; i < files.length; i++) {
@@ -470,16 +491,27 @@ class MemeProvider with ChangeNotifier {
           classifyRatio: classifyRatio,
         );
         results.add(m);
-      } catch (_) {}
+        debugPrint('[Mako] importFiles[$i] ok: id=${m.id}, name="${m.name}", '
+            'type=${m.type}, filePath="${m.filePath}", folderId=${m.folderId}');
+      } catch (e, st) {
+        debugPrint('[Mako] importFiles[$i] ERROR: $e, st=$st');
+      }
       // 移除该占位，刷新真实数据
       _importDone = i + 1;
       _importing = _importing.where((p) => p.id != placeholders[i].id).toList();
       await loadAll(); // loadAll 内部会 notifyListeners
+      debugPrint('[Mako] importFiles[$i] after loadAll: '
+          '_all.length=${_all.length}, _filtered.length=${_filtered.length}, '
+          '_importing.length=${_importing.length}');
     }
     _importing = [];
     _importTotal = 0;
     _importDone = 0;
-    notifyListeners();
+    // 兜底：循环内每张已 loadAll，但若最后一行 _apply 后 SettingsProvider 等又变化，
+    // 这里再统一刷新一次确保 UI 与存储一致，避免出现"全部图片消失需切 tab 才恢复"
+    await loadAll();
+    debugPrint('[Mako] importFiles DONE: results=${results.length}, '
+        '_all.length=${_all.length}, _filtered.length=${_filtered.length}');
     return results;
   }
 
@@ -588,7 +620,9 @@ class MemeProvider with ChangeNotifier {
 
   void _apply() {
     var list = List<Meme>.from(_all);
-    if (_folderId != null) {
+    // 文件夹筛选仅在表情包 tab（非收藏视图）生效；
+    // 切到收藏/文件夹 tab 时保留 _folderId 但不应用，以便切回时恢复
+    if (_folderId != null && !_showFavorites && !_showFoldersView) {
       list = list.where((m) => m.folderId == _folderId).toList();
     }
     if (_showFavorites) {
@@ -605,6 +639,14 @@ class MemeProvider with ChangeNotifier {
     }
     if (_moodFilter != null) {
       list = list.where((m) => m.moods.any((mo) => mo['name'] == _moodFilter)).toList();
+    }
+    // 主界面（全部 / 表情包 tab，未进入文件夹、未在收藏/文件夹视图）排除已归入文件夹的图片
+    if (_settings.excludeFoldered &&
+        _folderId == null &&
+        !_showFavorites &&
+        !_showFoldersView &&
+        _moodFilter == null) {
+      list = list.where((m) => m.folderId == null).toList();
     }
     if (_query.isNotEmpty) {
       final result = SearchQuery.parse(_query, _folders);
@@ -625,5 +667,14 @@ class MemeProvider with ChangeNotifier {
       return _order == SortOrder.asc ? cmp : -cmp;
     });
     _filtered = list;
+    // 诊断日志：当筛选结果为空但全量数据非空时，记录筛选状态以便定位问题
+    if (_filtered.isEmpty && _all.isNotEmpty) {
+      debugPrint('[Mako] _apply EMPTY: _all.length=${_all.length}, '
+          'folderId=$_folderId, showFavorites=$_showFavorites, '
+          'showFoldersView=$_showFoldersView, typeFilter=$_typeFilter, '
+          'tagFilter=$_tagFilter, folderFilter=$_folderFilter, '
+          'moodFilter=$_moodFilter, excludeFoldered=${_settings.excludeFoldered}, '
+          'query="$_query"');
+    }
   }
 }

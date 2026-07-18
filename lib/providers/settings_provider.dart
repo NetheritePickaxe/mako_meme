@@ -34,6 +34,9 @@ class SettingsProvider extends ChangeNotifier {
   // tag 细分：开启后大图详情面板显示双列 tag（情绪+普通）
   bool _tagSubdivision = false;
 
+  // 主界面（全部 / 表情包 tab）排除已归入文件夹的图片
+  bool _excludeFoldered = false;
+
   // 分类可见性 — 默认仅显示 emoji/gif/image/text 四类
   // 其他（manga/vector/psd/pdf/portrait/cg/character_card/novel）默认隐藏，可在设置中开启
   // 存储为逗号分隔的隐藏类型字符串
@@ -113,6 +116,9 @@ class SettingsProvider extends ChangeNotifier {
 
     // 加载 tag 细分设置
     _tagSubdivision = _storage.getSetting('tagSubdivision') == 'true';
+
+    // 加载主界面排除文件夹内图片设置
+    _excludeFoldered = _storage.getSetting('excludeFoldered') == 'true';
 
     // 加载分类可见性（未设置时默认仅显示 emoji/gif/image/text）
     final savedHidden = _storage.getSetting('hiddenCategories');
@@ -208,6 +214,7 @@ class SettingsProvider extends ChangeNotifier {
   bool get mobileLongPressIsMenu => _mobileLongPress == 'menu';
 
   bool get tagSubdivision => _tagSubdivision;
+  bool get excludeFoldered => _excludeFoldered;
 
   Set<String> get hiddenCategories => Set.unmodifiable(_hiddenCategories);
   List<String> get customCategories => List.unmodifiable(_customCategories);
@@ -341,6 +348,12 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setTagSubdivision(bool v) async {
     _tagSubdivision = v;
     await _storage.setSetting('tagSubdivision', v ? 'true' : 'false');
+    notifyListeners();
+  }
+
+  Future<void> setExcludeFoldered(bool v) async {
+    _excludeFoldered = v;
+    await _storage.setSetting('excludeFoldered', v ? 'true' : 'false');
     notifyListeners();
   }
 

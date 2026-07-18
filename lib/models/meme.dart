@@ -24,9 +24,9 @@ class Meme {
   ];
 
   bool get isImageType => type == typeImage || type == typeGif ||
-      type == typePortrait || type == typeCg || type == typeCharacterCard ||
-      type == typeVector || type == typePsd || type == typePdf || type == typeNovel ||
-      type == typeManga;
+      type == typeEmoji || type == typePortrait || type == typeCg ||
+      type == typeCharacterCard || type == typeVector || type == typePsd ||
+      type == typePdf || type == typeNovel || type == typeManga;
 
   /// 是否为动画类型（GIF / APNG）
   bool get isAnimated => type == typeGif || mimeType == 'image/apng';

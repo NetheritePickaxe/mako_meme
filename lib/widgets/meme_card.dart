@@ -80,18 +80,22 @@ class _MemeCardState extends State<MemeCard> {
       }
       if (kIsWeb) {
         // Web：读 bytes
+        debugPrint('[MakoCard] _loadBytes WEB: id=${m.id}, displayPath="$_displayPath", type=${m.type}');
         storage.readMemeBytes(_displayPath).then((b) {
           if (mounted) {
             setState(() {
               _bytes = b;
               _loading = false;
             });
+            debugPrint('[MakoCard] _loadBytes WEB done: id=${m.id}, '
+                'bytes=${b == null ? "null" : b.length.toString()}');
             // 仅当 meme 未记录宽高时才从头解析
             if (b != null && (m.width == 0 || m.height == 0)) {
               _loadAspectRatioFromBytes(b);
             }
           }
-        }, onError: (_) {
+        }, onError: (e) {
+          debugPrint('[MakoCard] _loadBytes WEB ERROR: id=${m.id}, error=$e');
           if (mounted) setState(() { _loading = false; });
         });
       } else {
@@ -106,6 +110,8 @@ class _MemeCardState extends State<MemeCard> {
         }
       }
     } else {
+      debugPrint('[MakoCard] _loadBytes SKIP: id=${m.id}, '
+          'isImageType=${m.isImageType}, displayPath="$_displayPath", type=${m.type}');
       _loading = false;
     }
   }
@@ -651,7 +657,7 @@ class _MemeCardState extends State<MemeCard> {
                 const Center(child: CircularProgressIndicator(strokeWidth: 2))
               else if (widget.meme.isImageType && (_file != null || _bytes != null))
                 _buildThumbnail(fit: BoxFit.cover)
-              else if (widget.meme.isImageType)
+              else if (widget.meme.isImageType && widget.meme.displayPath.isNotEmpty)
                 Container(
                   color: Colors.grey.shade200,
                   child: Center(
@@ -730,7 +736,7 @@ class _MemeCardState extends State<MemeCard> {
   void _copyToClipboard() {
     final l10n = context.read<LocaleProvider>().l10n;
     final hasData = _bytes != null || _file != null;
-    if (widget.meme.isImageType && !hasData) {
+    if (widget.meme.isImageType && widget.meme.displayPath.isNotEmpty && !hasData) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.tr('lost')), duration: const Duration(seconds: 1)),
       );

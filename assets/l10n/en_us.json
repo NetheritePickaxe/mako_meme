@@ -125,6 +125,7 @@
   "favorites": "Favorites",
   "delete_folder": "Delete Folder",
   "cat_all": "All",
+  "exclude_foldered": "Exclude foldered memes in All view",
   "cat_emoji": "Emoji",
   "cat_gif": "GIF",
   "cat_image": "Image",

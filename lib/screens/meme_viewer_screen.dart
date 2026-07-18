@@ -316,7 +316,7 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
       return _buildSpriteView(theme, m);
     }
 
-    if (m.isImageType) {
+    if (m.isImageType && m.displayPath.isNotEmpty) {
       if (!hasData) {
         return Center(
           child: CircularProgressIndicator(
