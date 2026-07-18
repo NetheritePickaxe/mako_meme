@@ -27,11 +27,11 @@ class _MakoSearchBarState extends State<MakoSearchBar> {
   void _onChanged(String v) {
     setState(() {
       _updateError(v);
+      // 始终更新补全建议：即使有错误，也展示可用的补全项帮助用户完成输入
+      // 这样用户输入 /tag 时即使格式不完整也能看到 add/remove 等补全
+      _updateSuggestions(v);
       if (_error == null) {
-        _updateSuggestions(v);
         _maybeShowHelp(v);
-      } else {
-        _suggestions = [];
       }
     });
     // 有错误时不触发搜索（保持上次结果）

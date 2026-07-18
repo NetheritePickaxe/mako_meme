@@ -828,6 +828,11 @@ class _MemeCardState extends State<MemeCard> {
         ),
         const PopupMenuDivider(),
         PopupMenuItem<String>(
+          value: 'multi_select',
+          child: ListTile(leading: const Icon(Icons.checklist), title: Text(l10n.tr('multi_select')), dense: true),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem<String>(
           value: 'delete',
           child: ListTile(leading: const Icon(Icons.delete, color: Colors.red), title: Text(l10n.tr('delete'), style: const TextStyle(color: Colors.red)), dense: true),
         ),
@@ -844,6 +849,14 @@ class _MemeCardState extends State<MemeCard> {
         case 'set_bg': _setAsBackground(); break;
         case 'favorite':
           if (mounted) context.read<MemeProvider>().toggleFavorite(widget.meme.id);
+          break;
+        case 'multi_select':
+          // 进入多选模式并选中当前卡片
+          if (mounted) {
+            final prov = context.read<MemeProvider>();
+            if (!prov.isMulti) prov.toggleMulti();
+            prov.toggleSelect(widget.meme.id);
+          }
           break;
         case 'delete': _confirmDelete(); break;
       }
