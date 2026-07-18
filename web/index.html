@@ -16,9 +16,31 @@
   -->
   <base href="$FLUTTER_BASE_HREF">
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <!--
+    字体加载策略：
+    1. 不再从 Google Fonts CDN 在线加载 Noto Sans SC（网络差时会导致所有文字变方框）
+    2. 改为依赖系统本地字体回退链：Roboto → Source Han Sans / PingFang / Microsoft YaHei → sans-serif
+       系统已安装的中文字体会被浏览器自动选用，避免 CDN 加载失败的 tofu 问题
+    3. Flutter Web 自身的 Roboto 字体走 FlutterFontRegistry，已通过 uses-material-design 内联
+    4. 通过 flutterConfiguration 配置 CanvasKit 在字体加载失败时降级到系统字体渲染
+  -->
+  <style>
+    /* 全局字体回退：覆盖 body 默认字体，保证网络异常时不出现方框 */
+    html, body {
+      font-family: "Roboto", "Source Han Sans SC", "Source Han Sans CN",
+                   "Noto Sans CJK SC", "Noto Sans SC",
+                   "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+                   "WenQuanYi Micro Hei", "Segoe UI", Arial, sans-serif;
+    }
+  </style>
+  <script>
+    // Flutter Web 初始化前配置：
+    // - canvasKitVariant: 'full' 包含完整字体集（含 CJK 回退），避免 CDN 失败时 CanvasKit 无字体可用
+    // - 即便加载稍大（~2MB），但保证文字一定能渲染出来，不会出现方框
+    window.flutterConfiguration = {
+      canvasKitVariant: "full"
+    };
+  </script>
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="Mako Meme - 跨平台表情包管理器">

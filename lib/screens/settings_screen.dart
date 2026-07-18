@@ -172,12 +172,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
             trailing: const Icon(Icons.history, size: 20),
             onTap: () => _showChangelog(context, l10n),
           ),
-          ListTile(
-            leading: Icon(_checking ? Icons.hourglass_top : Icons.system_update_outlined),
-            title: Text(l10n.tr('check_update')),
-            subtitle: Text(l10n.tr('check_update_desc')),
-            onTap: _checking ? null : () => _checkUpdate(context, l10n),
-          ),
+          // Web 端不提供检查更新功能（Web 端通过重新部署即可更新，无需检查）
+          if (!kIsWeb)
+            ListTile(
+              leading: Icon(_checking
+                  ? Icons.hourglass_top
+                  : Icons.system_security_update),
+              title: Text(l10n.tr('check_update')),
+              subtitle: Text(l10n.tr('check_update_desc')),
+              onTap: _checking ? null : () => _checkUpdate(context, l10n),
+            ),
           ListTile(
             leading: const Icon(Icons.open_in_new),
             title: const Text('GitHub'),
