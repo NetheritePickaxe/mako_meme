@@ -86,22 +86,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
           const SizedBox(height: 16),
 
-          _sectionHeader(l10n.tr('background'), cs),
-          _backgroundTile(settings, l10n),
-          if (settings.hasCustomBg) ...[
-            const Divider(indent: 16, endIndent: 16),
-            _bgBlurTile(settings, l10n),
-            const Divider(indent: 16, endIndent: 16),
-            _bgOpacityTile(settings, l10n),
-            const Divider(indent: 16, endIndent: 16),
-            ListTile(
-              leading: const Icon(Icons.delete_outline, color: Colors.red),
-              title: Text(l10n.tr('clear_background'), style: const TextStyle(color: Colors.red)),
-              onTap: () => settings.setBgImagePath(null),
-            ),
-          ],
-          const SizedBox(height: 16),
-
           _sectionHeader(l10n.tr('data'), cs),
           if (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.windows) ...[
             _storageLocationTile(settings, l10n),
@@ -489,99 +473,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       subtitle: Text(l10n.tr('tag_subdivision_desc')),
       value: settings.tagSubdivision,
       onChanged: (v) => settings.setTagSubdivision(v),
-    );
-  }
-
-  Widget _backgroundTile(SettingsProvider settings, L10n l10n) {
-    final hasBg = settings.hasCustomBg;
-    return ListTile(
-      leading: const Icon(Icons.wallpaper_outlined),
-      title: Text(l10n.tr('custom_background')),
-      subtitle: Text(hasBg ? l10n.tr('background_set_desc') : l10n.tr('background_empty_desc')),
-      trailing: hasBg
-          ? const Icon(Icons.check_circle, color: Colors.green, size: 20)
-          : null,
-      onTap: () => _pickBackgroundImage(settings, l10n),
-    );
-  }
-
-  /// 从文件选择器导入背景图，存到 storage 的 backgrounds/ 路径
-  Future<void> _pickBackgroundImage(SettingsProvider settings, L10n l10n) async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.image,
-      withData: kIsWeb,
-    );
-    if (result == null || result.files.isEmpty) return;
-
-    final file = result.files.first;
-    final storage = context.read<StorageService>();
-    final uuid = DateTime.now().microsecondsSinceEpoch.toString();
-    final ext = p.extension(file.name).toLowerCase();
-    final relPath = 'backgrounds/$uuid$ext';
-
-    try {
-      if (kIsWeb) {
-        final bytes = file.bytes;
-        if (bytes == null) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(l10n.tr('operation_failed', args: {'error': 'no bytes'}))),
-            );
-          }
-          return;
-        }
-        await storage.writeBytesToPath(relPath, bytes);
-      } else {
-        final srcPath = file.path;
-        if (srcPath == null) return;
-        await storage.writeBytesToPath(relPath, await File(srcPath).readAsBytes());
-      }
-      await settings.setBgImagePath(relPath);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.tr('background_set'))),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.tr('operation_failed', args: {'error': e.toString()}))),
-        );
-      }
-    }
-  }
-
-  Widget _bgBlurTile(SettingsProvider settings, L10n l10n) {
-    return ListTile(
-      leading: const Icon(Icons.blur_on),
-      title: Text(l10n.tr('background_blur')),
-      subtitle: Slider(
-        value: settings.bgBlur,
-        min: 0,
-        max: 30,
-        divisions: 30,
-        label: settings.bgBlur.toStringAsFixed(0),
-        onChanged: (v) => settings.setBgBlur(v),
-      ),
-      trailing: Text(settings.bgBlur.toStringAsFixed(0)),
-    );
-  }
-
-  Widget _bgOpacityTile(SettingsProvider settings, L10n l10n) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    return ListTile(
-      leading: Icon(isDark ? Icons.dark_mode : Icons.light_mode),
-      title: Text(l10n.tr('background_dimming')),
-      subtitle: Slider(
-        value: settings.bgOpacity,
-        min: 0,
-        max: 0.9,
-        divisions: 18,
-        label: '${(settings.bgOpacity * 100).round()}%',
-        onChanged: (v) => settings.setBgOpacity(v),
-      ),
-      trailing: Text('${(settings.bgOpacity * 100).round()}%'),
     );
   }
 

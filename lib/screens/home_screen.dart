@@ -1,9 +1,7 @@
-import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
-import 'dart:ui' as ui;
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
@@ -99,7 +97,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final l10n = context.watch<LocaleProvider>().l10n;
     final theme = Theme.of(context);
     final settings = context.watch<SettingsProvider>();
-    final hasBg = settings.hasCustomBg;
     // 情绪页仅在 tag 细分开启时显示
     final showMoodTab = settings.tagSubdivision;
     // 若 tag 细分被关闭但当前在情绪页，回退到表情包页
@@ -113,11 +110,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final navIndex = _logicToNav(rawNav);
 
     return Scaffold(
-      backgroundColor: hasBg ? Colors.transparent : theme.colorScheme.surface,
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: hasBg ? Colors.transparent : theme.colorScheme.surface,
+        backgroundColor: theme.colorScheme.surface,
         leading: _buildLeading(prov, l10n),
-        title: Text(_getTitle(prov, l10n)),
+        title: _buildTitle(prov, l10n),
         actions: _buildActions(prov, l10n, settings),
         bottom: prov.isMulti ? const PreferredSize(
           preferredSize: Size.fromHeight(48),
@@ -125,7 +122,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ) : null,
       ),
       drawer: _buildDrawer(context, prov),
-      body: _buildBackgroundedBody(prov, l10n),
+      body: _buildBody(prov, l10n),
       bottomNavigationBar: NavigationBar(
         selectedIndex: navIndex,
         onDestinationSelected: (i) => _onTabChanged(_navToLogic(i)),
@@ -189,17 +186,37 @@ class _HomeScreenState extends State<HomeScreen> {
       (_currentTab == 0 && prov.folderId != null) ||
       (_currentTab == 3 && prov.moodFilter != null);
 
-  List<Widget> _buildActions(MemeProvider prov, L10n l10n, SettingsProvider settings) {
-    return [
-      // 进入文件夹/情绪筛选后 leading 变成返回按钮，这里补一个菜单入口
-      if (_leadingIsBack(prov))
-        Builder(
-          builder: (ctx) => IconButton(
-            icon: const Icon(Icons.menu),
-            tooltip: l10n.tr('menu'),
-            onPressed: () => Scaffold.of(ctx).openDrawer(),
+  /// AppBar 标题：在文件夹/情绪筛选内时点击可打开侧边栏
+  Widget _buildTitle(MemeProvider prov, L10n l10n) {
+    final title = _getTitle(prov, l10n);
+    if (!_leadingIsBack(prov)) {
+      return Text(title);
+    }
+    return Builder(
+      builder: (ctx) => InkWell(
+        onTap: () => Scaffold.of(ctx).openDrawer(),
+        borderRadius: BorderRadius.circular(6),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  title,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const Icon(Icons.arrow_drop_down, size: 20),
+            ],
           ),
         ),
+      ),
+    );
+  }
+
+  List<Widget> _buildActions(MemeProvider prov, L10n l10n, SettingsProvider settings) {
+    return [
       // 工具按钮仅在多选模式下显示，需选中 1+ 才可点击
       if (prov.isMulti)
         Builder(
@@ -419,42 +436,6 @@ class _HomeScreenState extends State<HomeScreen> {
       default:
         return _buildMemesListView(prov, l10n);
     }
-  }
-
-  /// 带自定义背景的 body：背景图 + 模糊 + 暗色遮罩 + 原内容
-  Widget _buildBackgroundedBody(MemeProvider prov, L10n l10n) {
-    final settings = context.watch<SettingsProvider>();
-    final body = _buildBody(prov, l10n);
-
-    if (!settings.hasCustomBg) return body;
-
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    // 遮罩颜色：深色模式用黑色，浅色模式用白色（保证内容可读）
-    final overlayColor = isDark ? Colors.black : Colors.white;
-
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        // 背景图
-        Positioned.fill(
-          child: _CustomBackgroundImage(
-            path: settings.bgImagePath!,
-            blur: settings.bgBlur,
-          ),
-        ),
-        // 暗色/亮色遮罩（保证内容可读）
-        Positioned.fill(
-          child: IgnorePointer(
-            child: ColoredBox(
-              color: overlayColor.withValues(alpha: settings.bgOpacity),
-            ),
-          ),
-        ),
-        // 主内容
-        Positioned.fill(child: body),
-      ],
-    );
   }
 
   /// 表情包/收藏的通用列表视图：搜索栏 + 分类筛选 + 网格
@@ -1569,75 +1550,6 @@ class _HomeScreenState extends State<HomeScreen> {
           }, child: Text(l10n.tr('save'))),
         ],
       ),
-    );
-  }
-}
-
-/// 自定义背景图：加载图片并应用高斯模糊
-class _CustomBackgroundImage extends StatefulWidget {
-  final String path;
-  final double blur;
-
-  const _CustomBackgroundImage({required this.path, required this.blur});
-
-  @override
-  State<_CustomBackgroundImage> createState() => _CustomBackgroundImageState();
-}
-
-class _CustomBackgroundImageState extends State<_CustomBackgroundImage> {
-  Uint8List? _bytes;
-  File? _file;
-  bool _loaded = false;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _load();
-  }
-
-  void _load() {
-    if (_loaded) return;
-    _loaded = true;
-    final storage = context.read<StorageService>();
-    if (kIsWeb) {
-      storage.readMemeBytes(widget.path).then((b) {
-        if (mounted) setState(() => _bytes = b);
-      });
-    } else {
-      final f = storage.getMemeFile(widget.path);
-      if (f != null && f.existsSync()) {
-        _file = f;
-      }
-      if (mounted) setState(() {});
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final hasData = _bytes != null || _file != null;
-    if (!hasData) {
-      return const ColoredBox(color: Colors.transparent);
-    }
-
-    Widget image = _file != null
-        ? Image.file(_file!, fit: BoxFit.cover)
-        : Image.memory(_bytes!, fit: BoxFit.cover);
-
-    // 应用高斯模糊
-    if (widget.blur > 0) {
-      image = ImageFiltered(
-        imageFilter: ui.ImageFilter.blur(
-          sigmaX: widget.blur,
-          sigmaY: widget.blur,
-        ),
-        child: image,
-      );
-    }
-
-    // 略微放大避免模糊后边缘出现透明边
-    return Transform.scale(
-      scale: 1.1,
-      child: image,
     );
   }
 }

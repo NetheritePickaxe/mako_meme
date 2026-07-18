@@ -782,9 +782,6 @@ class _MemeCardState extends State<MemeCard> {
 
   void _showContextMenu(Offset tapPosition) {
     final l10n = context.read<LocaleProvider>().l10n;
-    final m = widget.meme;
-    // 图片类型才可设为背景
-    final canSetBg = m.isImageType && !m.isPdf && m.displayPath.isNotEmpty;
     showMenu(
       context: context,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -819,11 +816,6 @@ class _MemeCardState extends State<MemeCard> {
           value: 'share',
           child: ListTile(leading: const Icon(Icons.share), title: Text(l10n.tr('share')), dense: true),
         ),
-        if (canSetBg)
-          PopupMenuItem<String>(
-            value: 'set_bg',
-            child: ListTile(leading: const Icon(Icons.wallpaper), title: Text(l10n.tr('set_as_background')), dense: true),
-          ),
         PopupMenuItem<String>(
           value: 'favorite',
           child: ListTile(
@@ -852,7 +844,6 @@ class _MemeCardState extends State<MemeCard> {
         case 'type': _showTypeDialog(); break;
         case 'copy': _copyToClipboard(); break;
         case 'share': _shareMeme(); break;
-        case 'set_bg': _setAsBackground(); break;
         case 'favorite':
           if (mounted) context.read<MemeProvider>().toggleFavorite(widget.meme.id);
           break;
@@ -867,18 +858,6 @@ class _MemeCardState extends State<MemeCard> {
         case 'delete': _confirmDelete(); break;
       }
     });
-  }
-
-  /// 设为主界面背景
-  void _setAsBackground() {
-    final settings = context.read<SettingsProvider>();
-    settings.setBgImagePath(widget.meme.displayPath);
-    final l10n = context.read<LocaleProvider>().l10n;
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.tr('background_set')), duration: const Duration(seconds: 2)),
-      );
-    }
   }
 
   void _showRenameDialog() async {

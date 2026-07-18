@@ -23,11 +23,6 @@ class SettingsProvider extends ChangeNotifier {
   bool _showCardType = false;
   bool _showCardExt = false;
 
-  // 自定义主界面背景
-  String? _bgImagePath; // meme 的相对存储路径
-  double _bgBlur = 0.0; // 高斯模糊半径
-  double _bgOpacity = 0.0; // 暗色遮罩透明度（0~1，保证内容可读）
-
   // 手机端长按行为：'share' 或 'menu'
   String _mobileLongPress = 'share';
 
@@ -99,14 +94,6 @@ class SettingsProvider extends ChangeNotifier {
     _showCardTags = _storage.getSetting('showCardTags') == 'true';
     _showCardType = _storage.getSetting('showCardType') == 'true';
     _showCardExt = _storage.getSetting('showCardExt') == 'true';
-
-    // 加载自定义背景
-    _bgImagePath = _storage.getSetting('bgImagePath');
-    if (_bgImagePath == '') _bgImagePath = null;
-    final savedBlur = double.tryParse(_storage.getSetting('bgBlur') ?? '');
-    if (savedBlur != null && savedBlur >= 0 && savedBlur <= 50) _bgBlur = savedBlur;
-    final savedOpacity = double.tryParse(_storage.getSetting('bgOpacity') ?? '');
-    if (savedOpacity != null && savedOpacity >= 0 && savedOpacity <= 1) _bgOpacity = savedOpacity;
 
     // 加载手机端长按行为
     final savedLongPress = _storage.getSetting('mobileLongPress');
@@ -207,10 +194,6 @@ class SettingsProvider extends ChangeNotifier {
   bool get showCardType => _showCardType;
   bool get showCardExt => _showCardExt;
 
-  String? get bgImagePath => _bgImagePath;
-  double get bgBlur => _bgBlur;
-  double get bgOpacity => _bgOpacity;
-  bool get hasCustomBg => _bgImagePath != null && _bgImagePath!.isNotEmpty;
   String get mobileLongPress => _mobileLongPress;
   bool get mobileLongPressIsMenu => _mobileLongPress == 'menu';
 
@@ -316,26 +299,6 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setShowCardExt(bool v) async {
     _showCardExt = v;
     await _storage.setSetting('showCardExt', v.toString());
-    notifyListeners();
-  }
-
-  Future<void> setBgImagePath(String? path) async {
-    _bgImagePath = path;
-    await _storage.setSetting('bgImagePath', path ?? '');
-    notifyListeners();
-  }
-
-  Future<void> setBgBlur(double v) async {
-    if (v < 0 || v > 50) return;
-    _bgBlur = v;
-    await _storage.setSetting('bgBlur', v.toString());
-    notifyListeners();
-  }
-
-  Future<void> setBgOpacity(double v) async {
-    if (v < 0 || v > 1) return;
-    _bgOpacity = v;
-    await _storage.setSetting('bgOpacity', v.toString());
     notifyListeners();
   }
 
