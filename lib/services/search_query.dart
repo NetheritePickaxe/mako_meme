@@ -231,12 +231,6 @@ class SearchQuery {
     return PlainSearch(q);
   }
 
-  /// 便捷方法：返回匹配函数（用于纯搜索场景）
-  static bool Function(Meme) matchQuery(String query, List<MemeFolder> folders) {
-    final result = parse(query, folders);
-    return result.asMatcher(folders);
-  }
-
   // ===== 帮助检测 =====
 
   static bool isHelpRequest(String query) {

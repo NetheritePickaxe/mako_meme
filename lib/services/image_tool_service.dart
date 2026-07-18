@@ -21,7 +21,7 @@ class ImageToolService {
 
   /// 读取图片为 [img.Image]（解码）
   /// 优先用 bytes（web），其次用 File（原生）
-  Future<img.Image?> decode(String filePath) async {
+  Future<img.Image?> _decode(String filePath) async {
     final bytes = await _storage.readMemeBytes(filePath);
     if (bytes == null) {
       final f = _storage.getMemeFile(filePath);
@@ -34,7 +34,7 @@ class ImageToolService {
   }
 
   /// 编码为指定格式
-  Uint8List encode(img.Image image, String format, {int quality = 90}) {
+  Uint8List _encode(img.Image image, String format, {int quality = 90}) {
     switch (format.toLowerCase()) {
       case 'jpg':
       case 'jpeg':
@@ -53,9 +53,9 @@ class ImageToolService {
   /// [srcPath] 源文件相对路径；[format] 目标格式（如 'png'）
   /// 返回新生成的 Meme
   Future<Meme> convertFormat(String srcPath, String format, {int quality = 90, String? name, String? folderId}) async {
-    final image = await decode(srcPath);
+    final image = await _decode(srcPath);
     if (image == null) throw StateError('decode failed: $srcPath');
-    final bytes = encode(image, format, quality: quality);
+    final bytes = _encode(image, format, quality: quality);
     final newExt = '.${format.toLowerCase()}';
     return _saveAndCreateMeme(bytes, newExt,
       name: name ?? p.basenameWithoutExtension(srcPath),
@@ -75,7 +75,7 @@ class ImageToolService {
     String? name,
     String? folderId,
   }) async {
-    final image = await decode(srcPath);
+    final image = await _decode(srcPath);
     if (image == null) throw StateError('decode failed: $srcPath');
     final srcW = image.width;
     final srcH = image.height;
@@ -103,7 +103,7 @@ class ImageToolService {
     final resized = img.copyResize(image, width: targetW, height: targetH);
     final ext = p.extension(srcPath).toLowerCase();
     final formatStr = ext.isEmpty ? 'png' : ext.substring(1);
-    final bytes = encode(resized, formatStr);
+    final bytes = _encode(resized, formatStr);
     return _saveAndCreateMeme(bytes, ext.isEmpty ? '.png' : ext,
       name: name ?? p.basenameWithoutExtension(srcPath),
       format: formatStr,
@@ -150,8 +150,8 @@ class ImageToolService {
     String? name,
     String? folderId,
   }) async {
-    final fg = await decode(fgPath);
-    final bg = await decode(bgPath);
+    final fg = await _decode(fgPath);
+    final bg = await _decode(bgPath);
     if (fg == null || bg == null) throw StateError('decode failed');
     // 统一尺寸：以前景为基准，背景缩放对齐
     final w = fg.width;
@@ -220,7 +220,7 @@ class ImageToolService {
     if (srcPaths.isEmpty) throw ArgumentError('no source images');
     final images = <img.Image>[];
     for (final path in srcPaths) {
-      final im = await decode(path);
+      final im = await _decode(path);
       if (im != null) images.add(im);
     }
     if (images.isEmpty) throw StateError('all decode failed');

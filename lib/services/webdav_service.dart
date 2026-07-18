@@ -53,37 +53,6 @@ class WebDavService {
     }
   }
 
-  /// 列出远程目录
-  Future<List<String>> listDirectory(String path) async {
-    try {
-      final uri = Uri.parse('$baseUrl/$path');
-      final request = http.Request('PROPFIND', uri);
-      request.headers['Authorization'] = _getAuthHeader();
-      request.headers['Depth'] = '1';
-      final response = await request.send();
-      
-      if (response.statusCode == 207) {
-        final body = await response.stream.bytesToString();
-        return _parsePropfindResponse(body);
-      }
-      return [];
-    } catch (e) {
-      return [];
-    }
-  }
-
-  /// 删除文件
-  Future<bool> deleteFile(String remotePath) async {
-    try {
-      final uri = Uri.parse('$baseUrl/$remotePath');
-      final request = http.delete(uri, headers: _getAuthHeaders());
-      final response = await request;
-      return response.statusCode == 204 || response.statusCode == 200;
-    } catch (e) {
-      return false;
-    }
-  }
-
   /// 获取认证头
   String _getAuthHeader() {
     final credentials = '$username:$password';
@@ -96,26 +65,6 @@ class WebDavService {
     return {
       'Authorization': _getAuthHeader(),
     };
-  }
-
-  /// 解析 PROPFIND 响应
-  List<String> _parsePropfindResponse(String body) {
-    final List<String> results = [];
-    // 简单解析 DAV 响应
-    final hrefRegex = RegExp(r'<href[^>]*>([^<]+)</href>');
-    final matches = hrefRegex.allMatches(body);
-    
-    for (final match in matches) {
-      String href = match.group(1) ?? '';
-      if (href.startsWith(baseUrl)) {
-        href = href.substring(baseUrl.length);
-      }
-      if (href.isNotEmpty && !href.endsWith('/')) {
-        results.add(href);
-      }
-    }
-    
-    return results;
   }
 
   /// 生成远程路径

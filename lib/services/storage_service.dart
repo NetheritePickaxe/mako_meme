@@ -256,13 +256,6 @@ class StorageService {
     return folders;
   }
 
-  String getFullMemePath(String relPath) {
-    if (kIsWeb) return relPath;
-    final base = _basePath;
-    if (base == null) return relPath;
-    return p.join(base, relPath);
-  }
-
   // ======================== 导入 / 去重 ========================
 
   String _computeHash(Uint8List bytes) {

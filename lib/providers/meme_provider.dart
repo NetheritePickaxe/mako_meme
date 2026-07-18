@@ -189,12 +189,6 @@ class MemeProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void clearTagFilter() {
-    _tagFilter.clear();
-    _apply();
-    notifyListeners();
-  }
-
   /// 设置情绪筛选（null=清除筛选）
   void setMoodFilter(String? mood) {
     _moodFilter = mood;
@@ -228,12 +222,6 @@ class MemeProvider with ChangeNotifier {
 
   void toggleFolderFilter(String folderId) {
     _folderFilter.contains(folderId) ? _folderFilter.remove(folderId) : _folderFilter.add(folderId);
-    _apply();
-    notifyListeners();
-  }
-
-  void clearFolderFilter() {
-    _folderFilter.clear();
     _apply();
     notifyListeners();
   }
@@ -322,11 +310,6 @@ class MemeProvider with ChangeNotifier {
 
   void toggleFolderSelect(String id) {
     _selectedFolders.contains(id) ? _selectedFolders.remove(id) : _selectedFolders.add(id);
-    notifyListeners();
-  }
-
-  void clearFolderSelection() {
-    _selectedFolders.clear();
     notifyListeners();
   }
 
@@ -583,8 +566,6 @@ class MemeProvider with ChangeNotifier {
       }
     }
   }
-
-  String getFullMemePath(String rel) => _storage.getFullMemePath(rel);
 
   int countInFolder(String folderId) =>
       _all.where((m) => m.folderId == folderId).length;

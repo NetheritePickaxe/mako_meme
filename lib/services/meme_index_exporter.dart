@@ -48,12 +48,4 @@ class MemeIndexExporter {
       // 原生插件未注册（非 Android）— 忽略
     }
   }
-
-  /// 清空索引（如用户登出）
-  Future<void> clear() async {
-    if (kIsWeb || !Platform.isAndroid) return;
-    try {
-      await _channel.invokeMethod<bool>('clearMemeIndex');
-    } on PlatformException catch (_) {}
-  }
 }
