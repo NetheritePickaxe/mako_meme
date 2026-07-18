@@ -121,8 +121,9 @@ class SettingsProvider extends ChangeNotifier {
     _excludeFoldered = _storage.getSetting('excludeFoldered') == 'true';
 
     // 加载分类可见性（未设置时默认仅显示 emoji/gif/image/text）
+    // 注意：savedHidden 为空字符串表示用户主动开启了所有分类，应视为空 set（全部可见）
     final savedHidden = _storage.getSetting('hiddenCategories');
-    if (savedHidden != null && savedHidden.isNotEmpty) {
+    if (savedHidden != null) {
       _hiddenCategories = savedHidden.split(',').where((s) => s.isNotEmpty).toSet();
     }
     // 加载自定义分类

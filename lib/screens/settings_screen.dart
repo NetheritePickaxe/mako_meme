@@ -177,7 +177,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ListTile(
               leading: Icon(_checking
                   ? Icons.hourglass_top
-                  : Icons.system_security_update),
+                  : Icons.download_for_offline),
               title: Text(l10n.tr('check_update')),
               subtitle: Text(l10n.tr('check_update_desc')),
               onTap: _checking ? null : () => _checkUpdate(context, l10n),
@@ -501,7 +501,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
       trailing: hasBg
           ? const Icon(Icons.check_circle, color: Colors.green, size: 20)
           : null,
+      onTap: () => _pickBackgroundImage(settings, l10n),
     );
+  }
+
+  /// 从文件选择器导入背景图，存到 storage 的 backgrounds/ 路径
+  Future<void> _pickBackgroundImage(SettingsProvider settings, L10n l10n) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      withData: kIsWeb,
+    );
+    if (result == null || result.files.isEmpty) return;
+
+    final file = result.files.first;
+    final storage = context.read<StorageService>();
+    final uuid = DateTime.now().microsecondsSinceEpoch.toString();
+    final ext = p.extension(file.name).toLowerCase();
+    final relPath = 'backgrounds/$uuid$ext';
+
+    try {
+      if (kIsWeb) {
+        final bytes = file.bytes;
+        if (bytes == null) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(l10n.tr('operation_failed', args: {'error': 'no bytes'}))),
+            );
+          }
+          return;
+        }
+        await storage.writeBytesToPath(relPath, bytes);
+      } else {
+        final srcPath = file.path;
+        if (srcPath == null) return;
+        await storage.writeBytesToPath(relPath, await File(srcPath).readAsBytes());
+      }
+      await settings.setBgImagePath(relPath);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.tr('background_set'))),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.tr('operation_failed', args: {'error': e.toString()}))),
+        );
+      }
+    }
   }
 
   Widget _bgBlurTile(SettingsProvider settings, L10n l10n) {
@@ -840,8 +887,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _presetCard(ColorSchemePreset preset, bool selected, ColorScheme cs, VoidCallback onTap) {
-    // 派生 M3 色板，预览 primary / primaryContainer / secondary / tertiary 四色块
-    final previewScheme = ColorScheme.fromSeed(seedColor: preset.seed, brightness: cs.brightness);
+    // 单种子色方案：只展示一个种子色块（M3 会从种子色派生完整色板）
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -857,19 +903,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         child: Row(
           children: [
-            // 色卡：四个圆角方形色块横向排列，直观展示配色方案
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _swatch(previewScheme.primary),
-                const SizedBox(width: 4),
-                _swatch(previewScheme.primaryContainer),
-                const SizedBox(width: 4),
-                _swatch(previewScheme.secondary),
-                const SizedBox(width: 4),
-                _swatch(previewScheme.tertiary),
-              ],
-            ),
+            _swatch(preset.seed),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -897,7 +931,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _customPresetCard(SettingsProvider settings, ColorScheme cs, L10n l10n) {
     final selected = settings.presetIndex >= AppTheme.presets.length;
-    final previewScheme = ColorScheme.fromSeed(seedColor: settings.customSeed, brightness: cs.brightness);
     return InkWell(
       onTap: () => _showCustomColorPicker(context, settings, cs, l10n),
       borderRadius: BorderRadius.circular(12),
@@ -913,18 +946,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         child: Row(
           children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _swatch(previewScheme.primary),
-                const SizedBox(width: 4),
-                _swatch(previewScheme.primaryContainer),
-                const SizedBox(width: 4),
-                _swatch(previewScheme.secondary),
-                const SizedBox(width: 4),
-                _swatch(previewScheme.tertiary),
-              ],
-            ),
+            _swatch(settings.customSeed),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
