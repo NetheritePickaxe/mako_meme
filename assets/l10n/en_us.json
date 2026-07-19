@@ -359,5 +359,14 @@
   "test_input_title": "Test Input",
   "test_input_desc": "Tap the input box to bring up the current IME keyboard",
   "test_input_hint": "Type here to test...",
-  "help": "Help"
+  "help": "Help",
+  "import_edit_on_import": "Edit on import",
+  "import_edit_on_import_desc": "Pop up an editor after importing images to rename, tag, sort into folders, etc.",
+  "import_edit_title": "Edit {index}/{total}",
+  "meme_name": "Name",
+  "no_folder": "Unsorted",
+  "finish": "Finish",
+  "previous": "Previous",
+  "next": "Next",
+  "deleted_hint": "Deleted"
 }

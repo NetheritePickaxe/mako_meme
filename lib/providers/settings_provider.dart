@@ -32,6 +32,9 @@ class SettingsProvider extends ChangeNotifier {
   // 主界面（全部 / 表情包 tab）排除已归入文件夹的图片
   bool _excludeFoldered = false;
 
+  // 导入时编辑：开启后导入图片完成时弹出编辑界面，可重命名/打标签/选文件夹/收藏/删除
+  bool _importEditOnImport = false;
+
   // 分类可见性 — 默认仅显示 emoji/gif/image/text 四类
   // 其他（manga/vector/psd/pdf/portrait/cg/character_card/novel）默认隐藏，可在设置中开启
   // 存储为逗号分隔的隐藏类型字符串
@@ -106,6 +109,9 @@ class SettingsProvider extends ChangeNotifier {
 
     // 加载主界面排除文件夹内图片设置
     _excludeFoldered = _storage.getSetting('excludeFoldered') == 'true';
+
+    // 加载导入时编辑设置
+    _importEditOnImport = _storage.getSetting('importEditOnImport') == 'true';
 
     // 加载分类可见性（未设置时默认仅显示 emoji/gif/image/text）
     // 注意：savedHidden 为空字符串表示用户主动开启了所有分类，应视为空 set（全部可见）
@@ -199,6 +205,7 @@ class SettingsProvider extends ChangeNotifier {
 
   bool get tagSubdivision => _tagSubdivision;
   bool get excludeFoldered => _excludeFoldered;
+  bool get importEditOnImport => _importEditOnImport;
 
   Set<String> get hiddenCategories => Set.unmodifiable(_hiddenCategories);
   List<String> get customCategories => List.unmodifiable(_customCategories);
@@ -318,6 +325,12 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setExcludeFoldered(bool v) async {
     _excludeFoldered = v;
     await _storage.setSetting('excludeFoldered', v ? 'true' : 'false');
+    notifyListeners();
+  }
+
+  Future<void> setImportEditOnImport(bool v) async {
+    _importEditOnImport = v;
+    await _storage.setSetting('importEditOnImport', v ? 'true' : 'false');
     notifyListeners();
   }
 

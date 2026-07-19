@@ -21,6 +21,7 @@ import '../widgets/meme_preview_panel.dart';
 import '../services/storage_service.dart';
 import '../screens/settings_screen.dart';
 import '../screens/text_editor_screen.dart';
+import '../widgets/import_edit_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -1118,11 +1119,14 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     if (result != null && result.files.isNotEmpty) {
       final settings = context.read<SettingsProvider>();
-      await prov.importFiles(
+      final imported = await prov.importFiles(
         result.files,
         autoClassify: settings.autoClassify,
         classifyRatio: settings.classifyRatio,
       );
+      if (settings.importEditOnImport && imported.isNotEmpty && ctx.mounted) {
+        await ImportEditDialog.show(ctx, imported);
+      }
     }
   }
 
@@ -1147,11 +1151,14 @@ class _HomeScreenState extends State<HomeScreen> {
     if (files.isEmpty) return;
     if (!ctx.mounted) return;
     final settings = context.read<SettingsProvider>();
-    await prov.importFiles(
+    final imported = await prov.importFiles(
       files,
       autoClassify: settings.autoClassify,
       classifyRatio: settings.classifyRatio,
     );
+    if (settings.importEditOnImport && imported.isNotEmpty && ctx.mounted) {
+      await ImportEditDialog.show(ctx, imported);
+    }
   }
 
   void _importText(BuildContext ctx, MemeProvider prov) {

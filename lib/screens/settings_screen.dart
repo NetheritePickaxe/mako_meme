@@ -93,6 +93,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
           _autoClassifyTile(settings, l10n),
           const Divider(indent: 16, endIndent: 16),
+          _importEditOnImportTile(settings, l10n),
+          const Divider(indent: 16, endIndent: 16),
           _cardDisplayTile(settings, l10n),
           const Divider(indent: 16, endIndent: 16),
           _categoryManageTile(settings, l10n),
@@ -473,6 +475,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
       subtitle: Text(l10n.tr('tag_subdivision_desc')),
       value: settings.tagSubdivision,
       onChanged: (v) => settings.setTagSubdivision(v),
+    );
+  }
+
+  Widget _importEditOnImportTile(SettingsProvider settings, L10n l10n) {
+    return SwitchListTile(
+      secondary: const Icon(Icons.edit_note_outlined),
+      title: Text(l10n.tr('import_edit_on_import')),
+      subtitle: Text(l10n.tr('import_edit_on_import_desc')),
+      value: settings.importEditOnImport,
+      onChanged: (v) => settings.setImportEditOnImport(v),
     );
   }
 

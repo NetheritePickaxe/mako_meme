@@ -359,5 +359,14 @@
   "test_input_title": "测试输入",
   "test_input_desc": "点击输入框可唤起当前输入法键盘",
   "test_input_hint": "在此输入测试...",
-  "help": "帮助"
+  "help": "帮助",
+  "import_edit_on_import": "导入时编辑",
+  "import_edit_on_import_desc": "导入图片后弹出编辑界面，可重命名、打标签、归类文件夹等",
+  "import_edit_title": "编辑 {index}/{total}",
+  "meme_name": "名称",
+  "no_folder": "未分类",
+  "finish": "完成",
+  "previous": "上一张",
+  "next": "下一张",
+  "deleted_hint": "已删除"
 }
