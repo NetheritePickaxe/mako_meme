@@ -1649,23 +1649,34 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
       ];
     }
 
-    String field(String key) {
+    String fieldStr(String key) {
       final v = data[key];
       if (v == null) return '';
       if (v is String) return v;
       return v.toString();
     }
 
-    final name = field('name');
-    final description = field('description');
-    final personality = field('personality');
-    final scenario = field('scenario');
-    final firstMes = field('first_mes');
+    final name = fieldStr('name');
+    final description = fieldStr('description');
+    final personality = fieldStr('personality');
+    final scenario = fieldStr('scenario');
+    final firstMes = fieldStr('first_mes');
+    final mesExample = fieldStr('mes_example');
+    final systemPrompt = fieldStr('system_prompt');
+    final postHistory = fieldStr('post_history_instructions');
+    final notes = fieldStr('notes');
+    final creator = fieldStr('creator');
+    final characterVersion = fieldStr('character_version');
+    final version = fieldStr('version');
+    final spec = fieldStr('spec');
+    final specVersion = fieldStr('spec_version');
+    final altGreetings = data['alternate_greetings'];
+    final tags = data['tags'];
 
-    Widget row(String label, String value, {int maxLines = 4}) {
+    Widget row(String label, String value) {
       if (value.isEmpty) return const SizedBox.shrink();
       return Padding(
-        padding: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.only(bottom: 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1673,11 +1684,137 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
               color: theme.colorScheme.primary,
               fontWeight: FontWeight.w600,
             )),
-            const SizedBox(height: 2),
-            Text(value, style: theme.textTheme.bodySmall, maxLines: maxLines, overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 4),
+            SelectableText(value, style: theme.textTheme.bodySmall),
           ],
         ),
       );
+    }
+
+    final children = <Widget>[];
+    if (name.isNotEmpty) {
+      children.add(Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Text(name, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+      ));
+    }
+    // 元信息行：作者 / 角色卡版本 / 规范
+    final metaParts = <String>[
+      if (creator.isNotEmpty) '${l10n.tr('char_creator')}: $creator',
+      if (characterVersion.isNotEmpty) '${l10n.tr('char_character_version')}: $characterVersion',
+      if (version.isNotEmpty) '${l10n.tr('char_version')}: $version',
+      if (spec.isNotEmpty) '${l10n.tr('char_spec')}: $spec',
+      if (specVersion.isNotEmpty) '${l10n.tr('char_spec_version')}: $specVersion',
+    ];
+    if (metaParts.isNotEmpty) {
+      children.add(Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Wrap(
+          spacing: 6,
+          runSpacing: 4,
+          children: metaParts.map((s) => Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(s, style: theme.textTheme.labelSmall),
+          )).toList(),
+        ),
+      ));
+    }
+    // 标签
+    if (tags is List && tags.isNotEmpty) {
+      children.add(Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Wrap(
+          spacing: 4,
+          runSpacing: 4,
+          children: tags.map((t) => Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.secondaryContainer,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text('#$t', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSecondaryContainer)),
+          )).toList(),
+        ),
+      ));
+    }
+    children.addAll([
+      row(l10n.tr('char_description'), description),
+      row(l10n.tr('char_personality'), personality),
+      row(l10n.tr('char_scenario'), scenario),
+      row(l10n.tr('char_first_mes'), firstMes),
+      row(l10n.tr('char_mes_example'), mesExample),
+      row(l10n.tr('char_system_prompt'), systemPrompt),
+      row(l10n.tr('char_post_history_instructions'), postHistory),
+      row(l10n.tr('char_notes'), notes),
+    ]);
+    // 备选开场白
+    if (altGreetings is List && altGreetings.isNotEmpty) {
+      children.add(Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(l10n.tr('char_alt_greetings'), style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.primary, fontWeight: FontWeight.w600,
+            )),
+            const SizedBox(height: 4),
+            ...altGreetings.asMap().entries.map((e) {
+              final v = e.value;
+              final s = v is String ? v : v.toString();
+              if (s.isEmpty) return const SizedBox.shrink();
+              return Container(
+                margin: const EdgeInsets.only(top: 4),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.2)),
+                ),
+                child: SelectableText('[${e.key + 1}] $s', style: theme.textTheme.bodySmall),
+              );
+            }),
+          ],
+        ),
+      ));
+    }
+    // 角色书（仅展示是否存在 + 条目数）
+    final book = data['character_book'];
+    if (book is Map) {
+      final entries = book['entries'];
+      final count = entries is List ? entries.length : 0;
+      children.add(row(l10n.tr('char_character_book'), '${l10n.tr('char_extensions')}: $count'));
+    }
+    // 扩展字段（仅展示 key 列表）
+    final ext = data['extensions'];
+    if (ext is Map && ext.isNotEmpty) {
+      children.add(Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(l10n.tr('char_extensions'), style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.primary, fontWeight: FontWeight.w600,
+            )),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: ext.keys.map((k) => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(k.toString(), style: theme.textTheme.labelSmall),
+              )).toList(),
+            ),
+          ],
+        ),
+      ));
     }
 
     return [
@@ -1690,17 +1827,7 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (name.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(name, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-              ),
-            row(l10n.tr('char_description'), description),
-            row(l10n.tr('char_personality'), personality),
-            row(l10n.tr('char_scenario'), scenario),
-            row(l10n.tr('char_first_mes'), firstMes),
-          ],
+          children: children,
         ),
       ),
     ];

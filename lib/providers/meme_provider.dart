@@ -33,11 +33,6 @@ class MemeProvider with ChangeNotifier {
   final Set<String> _typeFilter = {};
   // 情绪筛选：null=全部，否则只显示该 mood 的 memes
   String? _moodFilter;
-  // 正在导入的占位卡片（导入完成后会移除）
-  List<Meme> _importing = [];
-  // 导入进度（已完成数 / 总数）
-  int _importDone = 0;
-  int _importTotal = 0;
 
   Set<String> get folderFilter => _folderFilter;
   Set<String> get typeFilter => _typeFilter;
@@ -62,13 +57,7 @@ class MemeProvider with ChangeNotifier {
     super.dispose();
   }
 
-  List<Meme> get memes => [..._importing, ..._filtered];
-  /// 是否正在导入
-  bool get isImporting => _importing.isNotEmpty;
-  /// 导入进度（已完成数）
-  int get importDone => _importDone;
-  /// 导入总数
-  int get importTotal => _importTotal;
+  List<Meme> get memes => _filtered;
   int get allMemesCount => _all.length;
   List<MemeFolder> get folders => _folders;
   String? get folderId => _folderId;
@@ -462,25 +451,8 @@ class MemeProvider with ChangeNotifier {
     final targetFolderId = folderId ?? _folderId;
     debugPrint('[Mako] importFiles START: ${files.length} files, targetFolderId=$targetFolderId, '
         'current folderId=$_folderId, typeFilter=$_typeFilter, _all.length=${_all.length}');
-    // 1. 创建占位卡片并立即刷新 UI，让用户看到"导入中"
-    final placeholders = <Meme>[];
-    for (var i = 0; i < files.length; i++) {
-      final f = files[i];
-      placeholders.add(Meme(
-        id: 'importing_${DateTime.now().microsecondsSinceEpoch}_$i',
-        name: f.name,
-        filePath: '', // 空路径标识占位
-        folderId: targetFolderId,
-        createdAt: DateTime.now(),
-        type: Meme.typeImage,
-      ));
-    }
-    _importing = List.unmodifiable(placeholders);
-    _importTotal = files.length;
-    _importDone = 0;
-    notifyListeners();
 
-    // 2. 逐张导入，每完成一张刷新 UI
+    // 逐张写入存储（不在循环中刷新 UI，避免占位卡片与真实数据交叉导致主界面闪烁/消失）
     final results = <Meme>[];
     for (var i = 0; i < files.length; i++) {
       try {
@@ -496,19 +468,8 @@ class MemeProvider with ChangeNotifier {
       } catch (e, st) {
         debugPrint('[Mako] importFiles[$i] ERROR: $e, st=$st');
       }
-      // 移除该占位，刷新真实数据
-      _importDone = i + 1;
-      _importing = _importing.where((p) => p.id != placeholders[i].id).toList();
-      await loadAll(); // loadAll 内部会 notifyListeners
-      debugPrint('[Mako] importFiles[$i] after loadAll: '
-          '_all.length=${_all.length}, _filtered.length=${_filtered.length}, '
-          '_importing.length=${_importing.length}');
     }
-    _importing = [];
-    _importTotal = 0;
-    _importDone = 0;
-    // 兜底：循环内每张已 loadAll，但若最后一行 _apply 后 SettingsProvider 等又变化，
-    // 这里再统一刷新一次确保 UI 与存储一致，避免出现"全部图片消失需切 tab 才恢复"
+    // 全部导入完成后统一刷新一次，确保 _all/_filtered 与存储一致
     await loadAll();
     debugPrint('[Mako] importFiles DONE: results=${results.length}, '
         '_all.length=${_all.length}, _filtered.length=${_filtered.length}');

@@ -36,20 +36,9 @@ class _HomeScreenState extends State<HomeScreen> {
   String _folderQuery = '';
   String _moodQuery = '';
 
-  // 底部导航位置 ↔ 内部 tab 语义转换（收藏与文件夹位置已交换）
-  // nav: 0=表情 1=收藏 2=文件夹 3=情绪
-  // logic: 0=表情 1=文件夹 2=收藏 3=情绪
-  int _navToLogic(int nav) {
-    if (nav == 1) return 2;
-    if (nav == 2) return 1;
-    return nav;
-  }
-
-  int _logicToNav(int logic) {
-    if (logic == 1) return 2;
-    if (logic == 2) return 1;
-    return logic;
-  }
+  // 底部导航顺序与内部 tab 语义一致：0=表情 1=文件夹 2=收藏 3=情绪
+  int _navToLogic(int nav) => nav;
+  int _logicToNav(int logic) => logic;
 
   void _onTabChanged(int i) {
     final prov = context.read<MemeProvider>();
@@ -109,7 +98,27 @@ class _HomeScreenState extends State<HomeScreen> {
     final rawNav = _currentTab == 3 ? 3 : _currentTab.clamp(0, showMoodTab ? 3 : 2);
     final navIndex = _logicToNav(rawNav);
 
-    return Scaffold(
+    // 系统返回键优先级：多选模式 → 退出多选
+    //                文件夹内 → 退出文件夹
+    //                情绪筛选 → 清除情绪筛选
+    //                其他 → 正常返回（退出 app）
+    final canPop = !prov.isMulti &&
+        prov.folderId == null &&
+        prov.moodFilter == null;
+
+    return PopScope(
+      canPop: canPop,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (prov.isMulti) {
+          prov.toggleMulti();
+        } else if (prov.folderId != null) {
+          prov.selectFolder(null);
+        } else if (prov.moodFilter != null) {
+          prov.setMoodFilter(null);
+        }
+      },
+      child: Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         backgroundColor: theme.colorScheme.surface,
@@ -133,14 +142,14 @@ class _HomeScreenState extends State<HomeScreen> {
             label: l10n.tr('nav_memes'),
           ),
           NavigationDestination(
-            icon: const Icon(Icons.favorite_border),
-            selectedIcon: Icon(Icons.favorite, color: theme.colorScheme.onSurface),
-            label: l10n.tr('favorites'),
-          ),
-          NavigationDestination(
             icon: const Icon(Icons.folder_outlined),
             selectedIcon: Icon(Icons.folder, color: theme.colorScheme.onSurface),
             label: l10n.tr('nav_folders'),
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.favorite_border),
+            selectedIcon: Icon(Icons.favorite, color: theme.colorScheme.onSurface),
+            label: l10n.tr('favorites'),
           ),
           if (showMoodTab)
             NavigationDestination(
@@ -151,6 +160,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       floatingActionButton: _buildFab(prov),
+      ),
     );
   }
 
@@ -680,7 +690,23 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      Text('Mako Meme', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                      // 点击标题：回主界面（清文件夹/收藏/情绪筛选，切到表情包 tab）
+                      InkWell(
+                        onTap: () {
+                          prov.selectFolder(null);
+                          prov.setShowFavorites(false);
+                          prov.setShowFoldersView(false);
+                          prov.setMoodFilter(null);
+                          prov.clearTypeFilter();
+                          setState(() => _currentTab = 0);
+                          Navigator.pop(context);
+                        },
+                        borderRadius: BorderRadius.circular(6),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          child: Text('Mako Meme', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -688,9 +714,41 @@ class _HomeScreenState extends State<HomeScreen> {
                     spacing: 8,
                     runSpacing: 6,
                     children: [
-                      _drawerStatChip(theme, Icons.photo_library, prov.allMemesCount.toString()),
-                      _drawerStatChip(theme, Icons.folder_outlined, prov.folders.length.toString()),
-                      _drawerStatChip(theme, Icons.favorite, prov.favorites.length.toString()),
+                      // 点击图片数：转到主界面（表情包 tab）
+                      _drawerStatChip(
+                        theme, Icons.photo_library, prov.allMemesCount.toString(),
+                        onTap: () {
+                          prov.selectFolder(null);
+                          prov.setShowFavorites(false);
+                          prov.setShowFoldersView(false);
+                          prov.setMoodFilter(null);
+                          prov.clearTypeFilter();
+                          setState(() => _currentTab = 0);
+                          Navigator.pop(context);
+                        },
+                      ),
+                      // 点击文件夹数：转到文件夹 tab
+                      _drawerStatChip(
+                        theme, Icons.folder_outlined, prov.folders.length.toString(),
+                        onTap: () {
+                          setState(() => _currentTab = 1);
+                          prov.setShowFoldersView(true);
+                          prov.setShowFavorites(false);
+                          prov.setMoodFilter(null);
+                          Navigator.pop(context);
+                        },
+                      ),
+                      // 点击收藏数：转到收藏 tab
+                      _drawerStatChip(
+                        theme, Icons.favorite, prov.favorites.length.toString(),
+                        onTap: () {
+                          setState(() => _currentTab = 2);
+                          prov.setShowFoldersView(false);
+                          prov.setShowFavorites(true);
+                          prov.setMoodFilter(null);
+                          Navigator.pop(context);
+                        },
+                      ),
                     ],
                   ),
                 ],
@@ -759,21 +817,28 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _drawerStatChip(ThemeData theme, IconData icon, String value) {
-    return Container(
+  Widget _drawerStatChip(ThemeData theme, IconData icon, String value, {VoidCallback? onTap}) {
+    final core = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+        const SizedBox(width: 4),
+        Text(value, style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
+      ],
+    );
+    final content = Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
-          const SizedBox(width: 4),
-          Text(value, style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
-        ],
-      ),
+      child: core,
+    );
+    if (onTap == null) return content;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: content,
     );
   }
 

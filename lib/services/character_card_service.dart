@@ -232,9 +232,16 @@ class CharacterCardService {
       'mes_example': data['mes_example'] as String? ?? '',
       'tags': (data['tags'] as List?)?.cast<String>() ?? [],
       'version': data['version'] as String? ?? '2',
-      'system_prompt': data['system_prompt'] as String?,
-      'character_book': data['character_book'] as Map<String, dynamic>?,
-      'alternate_greetings': data['alternate_greetings'] as List?,
+      'system_prompt': data['system_prompt'] as String? ?? '',
+      'character_book': data['character_book'],
+      'alternate_greetings': data['alternate_greetings'] as List? ?? [],
+      'creator': data['creator'] as String? ?? '',
+      'character_version': data['character_version'] as String? ?? '',
+      'notes': data['notes'] as String? ?? '',
+      'post_history_instructions': data['post_history_instructions'] as String? ?? '',
+      'extensions': data['extensions'],
+      'spec': data['spec'],
+      'spec_version': data['spec_version'],
     };
   }
 }
