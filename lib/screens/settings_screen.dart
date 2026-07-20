@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
@@ -165,7 +166,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ListTile(
               leading: Icon(_checking
                   ? Icons.hourglass_top
-                  : Icons.download_for_offline),
+                  : Icons.system_update_alt_outlined),
               title: Text(l10n.tr('check_update')),
               subtitle: Text(l10n.tr('check_update_desc')),
               onTap: _checking ? null : () => _checkUpdate(context, l10n),
@@ -1172,6 +1173,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     int done = 0;
     int failed = 0;
+    // 收集成功导出的 meme，完成后打上「系统图集」标记 tag
+    final exportedMemeIds = <String>{};
     for (final meme in memes) {
       try {
         final abs = storage.getMemeAbsolutePath(meme.filePath);
@@ -1190,11 +1193,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
           counter++;
         }
         await srcFile.copy(finalPath);
+        exportedMemeIds.add(meme.id);
         done++;
       } catch (_) {
         failed++;
       }
       progressNotifier.value = done + failed;
+    }
+
+    // 给成功导出的 meme 加上「系统图集」标记 tag，便于「系统图集」分类筛选
+    if (exportedMemeIds.isNotEmpty) {
+      try {
+        for (final id in exportedMemeIds) {
+          await storage.addTagToMeme(id, Meme.tagSystemGallery);
+        }
+        if (context.mounted) {
+          await context.read<MemeProvider>().loadAll();
+        }
+      } catch (_) {}
     }
 
     progressNotifier.dispose();
@@ -1211,39 +1227,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _exportData(BuildContext context, L10n l10n) async {
     final storage = context.read<StorageService>();
-
-    // Web 端：用内存字节生成 zip 并触发下载
-    if (kIsWeb) {
-      final bytes = await storage.exportDataBytes();
-      if (bytes == null) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.tr('export_failed_msg'))),
-          );
-        }
-        return;
-      }
-      // Web 端 saveFile 接收 bytes 直接下载
-      final saved = await FilePicker.platform.saveFile(
-        dialogTitle: l10n.tr('save_backup'),
-        fileName: 'mako_meme_backup.zip',
-        bytes: bytes,
-      );
-      if (saved == null) {
-        // 用户取消或下载失败
-        return;
-      }
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.tr('export_success_msg'))),
-        );
-      }
-      return;
-    }
-
-    // 原生端：生成临时文件，让用户选择保存位置
-    final path = await storage.exportData();
-    if (path == null) {
+    final bytes = await storage.exportDataBytes();
+    if (bytes == null) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n.tr('export_failed_msg'))),
@@ -1252,21 +1237,75 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return;
     }
 
-    final file = File(path);
-    final saved = await FilePicker.platform.saveFile(
-      dialogTitle: l10n.tr('save_backup'),
-      fileName: 'mako_meme_backup.zip',
-      type: FileType.any,
-    );
-    if (saved != null) {
-      await file.copy(saved);
+    // Web 端：saveFile(bytes:) 触发浏览器下载
+    if (kIsWeb) {
+      final saved = await FilePicker.platform.saveFile(
+        dialogTitle: l10n.tr('save_backup'),
+        fileName: 'mako_meme_backup.zip',
+        bytes: bytes,
+      );
+      if (saved != null && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.tr('export_success_msg'))),
+        );
+      }
+      return;
+    }
+
+    // 桌面（Windows/Linux/macOS）：saveFile 返回路径，自己写入
+    if (defaultTargetPlatform == TargetPlatform.windows ||
+        defaultTargetPlatform == TargetPlatform.linux ||
+        defaultTargetPlatform == TargetPlatform.macOS) {
+      final path = await FilePicker.platform.saveFile(
+        dialogTitle: l10n.tr('save_backup'),
+        fileName: 'mako_meme_backup.zip',
+        type: FileType.any,
+      );
+      if (path == null) return;
+      try {
+        await File(path).writeAsBytes(bytes);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.tr('export_success_msg'))),
+          );
+        }
+      } catch (_) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.tr('export_failed_msg'))),
+          );
+        }
+      }
+      return;
+    }
+
+    // Android/iOS：SAF 返回的 content URI 无法用 File.copy 写入
+    // 改用 Share sheet 让用户选择保存目标（系统文件/云盘/分享等）
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final tempFile = File(p.join(tempDir.path, 'mako_meme_backup.zip'));
+      await tempFile.writeAsBytes(bytes);
+      await Share.shareXFiles([
+        XFile(tempFile.path, mimeType: 'application/zip', name: 'mako_meme_backup.zip'),
+      ]);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n.tr('export_success_msg'))),
         );
       }
+      // 延迟清理临时文件，给系统分享足够时间读取
+      Future.delayed(const Duration(minutes: 1), () {
+        try {
+          tempFile.delete();
+        } catch (_) {}
+      });
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.tr('export_failed_msg'))),
+        );
+      }
     }
-    await file.delete();
   }
 
   Future<void> _importZip(BuildContext ctx, L10n l10n) async {

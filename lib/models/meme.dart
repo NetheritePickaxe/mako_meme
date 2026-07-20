@@ -13,9 +13,19 @@ class Meme {
   static const String typeManga = 'manga';       // 漫画（多页图片）
   static const String typeMd = 'md';              // Markdown 文档
 
+  /// 系统图集分类：标记已导出到系统相册的 meme（用 tag 实现，不污染 allTags）
+  static const String typeSystemGallery = '__sys_gallery__';
+  static const String tagSystemGallery = '__sys_gallery__';
+
   static const List<String> allTypes = [
     typeEmoji, typeGif, typeImage, typeText, typePortrait, typeCg,
     typeCharacterCard, typeVector, typePsd, typePdf, typeNovel, typeManga, typeMd,
+  ];
+
+  /// 默认分类列表（用户可见的分类按钮）。md 归入文字分类，不单独显示
+  static const List<String> categoryTypes = [
+    typeEmoji, typeGif, typeImage, typeText, typePortrait, typeCg,
+    typeCharacterCard, typeVector, typePsd, typePdf, typeNovel, typeManga,
   ];
 
   /// 所有支持的图片/文档格式扩展名（不含点，小写）
@@ -70,12 +80,13 @@ class Meme {
     return filePath.substring(dot + 1).toLowerCase();
   }
 
-  /// 类型对应的 i18n 键名
+  /// 类型对应的 i18n 键名（md 归入文字，沿用 type_text）
   String get typeLabelKey {
     switch (type) {
       case typeEmoji: return 'type_emoji';
       case typeGif: return 'type_gif';
-      case typeText: return 'type_text';
+      case typeText:
+      case typeMd: return 'type_text';
       case typeImage: return 'type_image';
       case typePortrait: return 'type_portrait';
       case typeCg: return 'type_cg';
@@ -85,7 +96,6 @@ class Meme {
       case typePdf: return 'type_pdf';
       case typeNovel: return 'type_novel';
       case typeManga: return 'type_manga';
-      case typeMd: return 'type_md';
       default: return 'type_image';
     }
   }

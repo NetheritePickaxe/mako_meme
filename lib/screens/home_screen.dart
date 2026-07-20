@@ -875,7 +875,8 @@ class _HomeScreenState extends State<HomeScreen> {
       {'type': Meme.typePdf, 'label': l10n.tr('cat_pdf'), 'icon': Icons.picture_as_pdf_outlined},
       {'type': Meme.typeManga, 'label': l10n.tr('cat_manga'), 'icon': Icons.menu_book_outlined},
       {'type': Meme.typeNovel, 'label': l10n.tr('cat_novel'), 'icon': Icons.auto_stories_outlined},
-      {'type': Meme.typeMd, 'label': l10n.tr('cat_md'), 'icon': Icons.description_outlined},
+      {'type': Meme.typeSystemGallery, 'label': l10n.tr('cat_system_gallery'), 'icon': Icons.photo_library_outlined},
+      // md 归入文字分类，不单独显示
       // 用户自定义分类
       ...settings.customCategories.map((c) => {'type': c, 'label': c, 'icon': Icons.label_outline}),
     ];

@@ -78,6 +78,8 @@ class MemeProvider with ChangeNotifier {
     for (final m in _all) {
       s.addAll(m.tags);
     }
+    // 过滤掉 __ 开头的系统内部 tag（如系统图集标记），不污染用户标签列表
+    s.removeWhere((t) => t.startsWith('__'));
     return s.toList()..sort();
   }
 
@@ -596,7 +598,15 @@ class MemeProvider with ChangeNotifier {
       list = list.where((m) => _folderFilter.any((fid) => m.folderId == fid)).toList();
     }
     if (_typeFilter.isNotEmpty) {
-      list = list.where((m) => _typeFilter.contains(m.type)).toList();
+      // md 归入文字分类：选 typeText 时也匹配 typeMd
+      // 系统图集：选 __sys_gallery__ 时匹配含 __sys_gallery__ tag 的 meme
+      list = list.where((m) {
+        if (_typeFilter.contains(m.type)) return true;
+        if (m.type == Meme.typeMd && _typeFilter.contains(Meme.typeText)) return true;
+        if (_typeFilter.contains(Meme.typeSystemGallery) &&
+            m.tags.contains(Meme.tagSystemGallery)) return true;
+        return false;
+      }).toList();
     }
     if (_moodFilter != null) {
       list = list.where((m) => m.moods.any((mo) => mo['name'] == _moodFilter)).toList();

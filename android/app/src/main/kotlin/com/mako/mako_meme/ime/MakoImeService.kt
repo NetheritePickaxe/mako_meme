@@ -40,14 +40,20 @@ import androidx.recyclerview.widget.RecyclerView
 class MakoImeService : InputMethodService() {
 
     companion object {
-        /** 键盘高度（dp）。 */
-        private const val KEYBOARD_HEIGHT_DP = 280
+        /** 键盘高度（dp）。整体加大以容纳更大的按键。 */
+        private const val KEYBOARD_HEIGHT_DP = 340
         /** 网格列数。 */
         private const val GRID_SPAN = 4
         /** 按键圆角半径（dp）。 */
         private const val KEY_RADIUS_DP = 8
         /** Tab 圆角半径（dp）。 */
         private const val TAB_RADIUS_DP = 14
+        /** QWERTY 字母键文字大小。 */
+        private const val QWERTY_TEXT_SIZE = 20f
+        /** QWERTY 功能键文字大小。 */
+        private const val FUNC_TEXT_SIZE = 15f
+        /** QWERTY 行间距/键间距（dp）。 */
+        private const val QWERTY_GAP_DP = 4
     }
 
     private lateinit var repository: MemeRepository
@@ -341,7 +347,23 @@ class MakoImeService : InputMethodService() {
         return recyclerView
     }
 
-    /** QWERTY 键盘视图：圆角按键，参考 Gboard 风格。 */
+    /**
+     * QWERTY 键盘视图：圆角按键，参考系统输入法 / Rime 布局。
+     *
+     * 布局：
+     * ```
+     *  q w e r t y u i o p
+     *   a s d f g h j k l
+     *  ⇧ z x c v b n m  ⌫     ← 删除键在右下角"完成"上方
+     *  [表情]   空格    [完成]  ← 完成键在右下角
+     * ```
+     *
+     * 设计要点：
+     * - 字母键 1f 等宽，行 2/3 通过左右留白居中，视觉对齐
+     * - 删除键固定在第三行右侧，紧贴"完成"键上方
+     * - 字母键 textSize 20f，比之前 16f 大幅增加，便于点击
+     * - 键间距 4dp，按键整体变大
+     */
     private fun buildQwertyKeyboard(): View {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -353,26 +375,40 @@ class MakoImeService : InputMethodService() {
             setBackgroundColor(theme.bg)
             gravity = Gravity.CENTER_HORIZONTAL
         }
-        qwertyRows.forEach { row ->
-            val rowView = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER
-                layoutParams = LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    0,
-                    1f
-                )
-            }
-            row.forEach { ch ->
-                rowView.addView(qwertyKey(ch.toString(), 1f) {
-                    currentQuery += ch.toString()
-                    searchInput.text = currentQuery
-                    applyFilter()
-                })
-            }
-            root.addView(rowView)
+        // 第 1 行：q w e r t y u i o p（10 键）
+        root.addView(buildQwertyRow(qwertyRows[0]))
+        // 第 2 行：a s d f g h j k l（9 键，居中显示，左右留白）
+        root.addView(buildQwertyRow(qwertyRows[1], leftPadding = 0.5f, rightPadding = 0.5f))
+        // 第 3 行：⇧ z x c v b n m ⌫（左侧 shift 占位 + 7 字母 + 右侧删除键）
+        // 删除键位于右下角"完成"键的正上方
+        val row3 = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            )
         }
-        // 最后一行：退格 + 空格 + 完成
+        // 左侧占位 shift 键（暂未实现大小写，仅占位让 z 行与 a 行错落对齐）
+        row3.addView(funcKey("⇧", 1.5f) { /* TODO: 大小写切换 */ })
+        qwertyRows[2].forEach { ch ->
+            row3.addView(qwertyKey(ch.toString(), 1f) {
+                currentQuery += ch.toString()
+                searchInput.text = currentQuery
+                applyFilter()
+            })
+        }
+        // 右侧删除键（与下方"完成"键宽度一致，垂直对齐）
+        row3.addView(funcKey("⌫", 1.5f) {
+            if (currentQuery.isNotEmpty()) {
+                currentQuery = currentQuery.dropLast(1)
+                searchInput.text = currentQuery
+                applyFilter()
+            }
+        })
+        root.addView(row3)
+        // 第 4 行：[表情切换] + 空格 + [完成] —— 删除键的下方就是"完成"
         val lastRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
@@ -382,18 +418,17 @@ class MakoImeService : InputMethodService() {
                 1f
             )
         }
-        lastRow.addView(funcKey("⌫", 1.5f) {
-            if (currentQuery.isNotEmpty()) {
-                currentQuery = currentQuery.dropLast(1)
-                searchInput.text = currentQuery
-                applyFilter()
-            }
+        // 表情切换键（与左侧 shift 等宽，视觉对称）
+        lastRow.addView(funcKey("😀", 1.5f) {
+            // 切回表情网格查看搜索结果
+            if (qwertyMode) toggleQwerty()
         })
-        lastRow.addView(funcKey("空格", 4f) {
+        lastRow.addView(funcKey("空格", 5f) {
             currentQuery += " "
             searchInput.text = currentQuery
             applyFilter()
         })
+        // 完成键：右下角，与上方删除键垂直对齐
         lastRow.addView(accentKey("完成", 1.5f) {
             // 切回表情网格查看搜索结果
             if (qwertyMode) toggleQwerty()
@@ -402,11 +437,49 @@ class MakoImeService : InputMethodService() {
         return root
     }
 
+    /**
+     * 构造一行 QWERTY 字母键。
+     * [leftPadding]/[rightPadding] 用于让短行（如 a-l 9 键）居中显示。
+     */
+    private fun buildQwertyRow(
+        chars: List<Char>,
+        leftPadding: Float = 0f,
+        rightPadding: Float = 0f
+    ): View {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            )
+        }
+        if (leftPadding > 0f) {
+            row.addView(View(this).apply {
+                layoutParams = LinearLayout.LayoutParams(0, 1, leftPadding)
+            })
+        }
+        chars.forEach { ch ->
+            row.addView(qwertyKey(ch.toString(), 1f) {
+                currentQuery += ch.toString()
+                searchInput.text = currentQuery
+                applyFilter()
+            })
+        }
+        if (rightPadding > 0f) {
+            row.addView(View(this).apply {
+                layoutParams = LinearLayout.LayoutParams(0, 1, rightPadding)
+            })
+        }
+        return row
+    }
+
     /** QWERTY 字母键：圆角、keyBg 背景。 */
     private fun qwertyKey(label: String, weight: Float, onClick: () -> Unit): View {
         return TextView(this).apply {
             text = label
-            textSize = 16f
+            textSize = QWERTY_TEXT_SIZE
             gravity = Gravity.CENTER
             setTextColor(theme.text)
             typeface = Typeface.DEFAULT
@@ -415,7 +488,7 @@ class MakoImeService : InputMethodService() {
                 cornerRadius = dp(KEY_RADIUS_DP).toFloat()
             }
             val lp = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, weight)
-            lp.setMargins(dp(3), dp(3), dp(3), dp(3))
+            lp.setMargins(dp(QWERTY_GAP_DP), dp(QWERTY_GAP_DP), dp(QWERTY_GAP_DP), dp(QWERTY_GAP_DP))
             layoutParams = lp
             isClickable = true
             setOnClickListener {
@@ -429,7 +502,7 @@ class MakoImeService : InputMethodService() {
     private fun funcKey(label: String, weight: Float, onClick: () -> Unit): View {
         return TextView(this).apply {
             text = label
-            textSize = 13f
+            textSize = FUNC_TEXT_SIZE
             gravity = Gravity.CENTER
             setTextColor(theme.subText)
             background = android.graphics.drawable.GradientDrawable().apply {
@@ -437,7 +510,7 @@ class MakoImeService : InputMethodService() {
                 cornerRadius = dp(KEY_RADIUS_DP).toFloat()
             }
             val lp = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, weight)
-            lp.setMargins(dp(3), dp(3), dp(3), dp(3))
+            lp.setMargins(dp(QWERTY_GAP_DP), dp(QWERTY_GAP_DP), dp(QWERTY_GAP_DP), dp(QWERTY_GAP_DP))
             layoutParams = lp
             isClickable = true
             setOnClickListener {
@@ -451,7 +524,7 @@ class MakoImeService : InputMethodService() {
     private fun accentKey(label: String, weight: Float, onClick: () -> Unit): View {
         return TextView(this).apply {
             text = label
-            textSize = 13f
+            textSize = FUNC_TEXT_SIZE
             gravity = Gravity.CENTER
             setTextColor(theme.onAccent)
             background = android.graphics.drawable.GradientDrawable().apply {
@@ -459,7 +532,7 @@ class MakoImeService : InputMethodService() {
                 cornerRadius = dp(KEY_RADIUS_DP).toFloat()
             }
             val lp = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, weight)
-            lp.setMargins(dp(3), dp(3), dp(3), dp(3))
+            lp.setMargins(dp(QWERTY_GAP_DP), dp(QWERTY_GAP_DP), dp(QWERTY_GAP_DP), dp(QWERTY_GAP_DP))
             layoutParams = lp
             isClickable = true
             setOnClickListener {
