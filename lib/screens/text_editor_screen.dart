@@ -107,13 +107,46 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
         child: Scaffold(
           // 无 AppBar，body 直接延伸到状态栏区域
           extendBodyBehindAppBar: true,
-          body: Stack(
+          body: Column(
             children: [
-              // 编辑区占满整屏，顶部留出状态栏高度的 padding 以避免被遮挡
-              Positioned.fill(
+              // 顶部工具栏（退出全屏 / 粘贴 / 保存）—— SafeArea 避开状态栏
+              SafeArea(
+                bottom: false,
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.fullscreen_exit),
+                      tooltip: l10n.tr('collapse'),
+                      onPressed: _exitFullscreen,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.content_paste),
+                      tooltip: l10n.tr('paste'),
+                      onPressed: _pasteAtCursor,
+                    ),
+                    const Spacer(),
+                    if (_saving)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 12),
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    else
+                      TextButton.icon(
+                        onPressed: _save,
+                        icon: const Icon(Icons.check),
+                        label: Text(l10n.tr('save')),
+                      ),
+                  ],
+                ),
+              ),
+              // 编辑区：占据剩余空间
+              Expanded(
                 child: Padding(
                   padding: EdgeInsets.only(
-                    top: MediaQuery.of(context).padding.top,
                     bottom: MediaQuery.of(context).padding.bottom,
                     left: 16,
                     right: 16,
@@ -133,45 +166,6 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       contentPadding: const EdgeInsets.all(16),
                     ),
-                  ),
-                ),
-              ),
-              // 顶部悬浮工具栏（退出全屏 / 粘贴 / 保存）
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: SafeArea(
-                  bottom: false,
-                  child: Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.fullscreen_exit),
-                        tooltip: l10n.tr('collapse'),
-                        onPressed: _exitFullscreen,
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.content_paste),
-                        tooltip: l10n.tr('paste'),
-                        onPressed: _pasteAtCursor,
-                      ),
-                      const Spacer(),
-                      if (_saving)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 12),
-                          child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        )
-                      else
-                        TextButton.icon(
-                          onPressed: _save,
-                          icon: const Icon(Icons.check),
-                          label: Text(l10n.tr('save')),
-                        ),
-                    ],
                   ),
                 ),
               ),

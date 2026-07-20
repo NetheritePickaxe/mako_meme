@@ -274,13 +274,36 @@ class _FullscreenTextEditorState extends State<_FullscreenTextEditor> {
       ),
       child: Scaffold(
         extendBodyBehindAppBar: true,
-        body: Stack(
+        body: Column(
           children: [
-            // 编辑区占满整屏，顶部留出状态栏高度
-            Positioned.fill(
+            // 顶部工具栏 —— SafeArea 避开状态栏
+            SafeArea(
+              bottom: false,
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    tooltip: widget.saveLabel,
+                    onPressed: () => Navigator.of(context).pop(widget.controller.text),
+                  ),
+                  Expanded(
+                    child: Text(
+                      widget.title,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(widget.controller.text),
+                    child: Text(widget.saveLabel),
+                  ),
+                ],
+              ),
+            ),
+            // 编辑区：占据剩余空间
+            Expanded(
               child: Padding(
                 padding: EdgeInsets.only(
-                  top: MediaQuery.of(context).padding.top,
                   bottom: MediaQuery.of(context).padding.bottom,
                   left: 16,
                   right: 16,
@@ -295,35 +318,6 @@ class _FullscreenTextEditorState extends State<_FullscreenTextEditor> {
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                     contentPadding: const EdgeInsets.all(16),
                   ),
-                ),
-              ),
-            ),
-            // 顶部悬浮工具栏
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: SafeArea(
-                bottom: false,
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back),
-                      tooltip: widget.saveLabel,
-                      onPressed: () => Navigator.of(context).pop(widget.controller.text),
-                    ),
-                    Expanded(
-                      child: Text(
-                        widget.title,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleMedium,
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(widget.controller.text),
-                      child: Text(widget.saveLabel),
-                    ),
-                  ],
                 ),
               ),
             ),
