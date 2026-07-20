@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../models/meme.dart';
 import '../providers/meme_provider.dart';
@@ -230,8 +231,8 @@ class _CharacterCardEditorScreenState extends State<CharacterCardEditorScreen> {
   }
 }
 
-/// 全屏长文本编辑器：支持系统返回键确认（返回时自动保存草稿）
-class _FullscreenTextEditor extends StatelessWidget {
+/// 全屏长文本编辑器：隐藏状态栏的真正全屏，返回键保存草稿
+class _FullscreenTextEditor extends StatefulWidget {
   final String title;
   final TextEditingController controller;
   final String saveLabel;
@@ -243,29 +244,90 @@ class _FullscreenTextEditor extends StatelessWidget {
   });
 
   @override
+  State<_FullscreenTextEditor> createState() => _FullscreenTextEditorState();
+}
+
+class _FullscreenTextEditorState extends State<_FullscreenTextEditor> {
+  @override
+  void initState() {
+    super.initState();
+    // 进入沉浸式全屏：隐藏状态栏与导航栏
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  }
+
+  @override
+  void dispose() {
+    // 退出时恢复边到边模式
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(title, overflow: TextOverflow.ellipsis),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(controller.text),
-            child: Text(saveLabel),
-          ),
-        ],
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: TextField(
-          controller: controller,
-          maxLines: null,
-          expands: true,
-          autofocus: true,
-          textAlignVertical: TextAlignVertical.top,
-          decoration: InputDecoration(
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            contentPadding: const EdgeInsets.all(16),
-          ),
+      child: Scaffold(
+        extendBodyBehindAppBar: true,
+        body: Stack(
+          children: [
+            // 编辑区占满整屏，顶部留出状态栏高度
+            Positioned.fill(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  top: MediaQuery.of(context).padding.top,
+                  bottom: MediaQuery.of(context).padding.bottom,
+                  left: 16,
+                  right: 16,
+                ),
+                child: TextField(
+                  controller: widget.controller,
+                  maxLines: null,
+                  expands: true,
+                  autofocus: true,
+                  textAlignVertical: TextAlignVertical.top,
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    contentPadding: const EdgeInsets.all(16),
+                  ),
+                ),
+              ),
+            ),
+            // 顶部悬浮工具栏
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                bottom: false,
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back),
+                      tooltip: widget.saveLabel,
+                      onPressed: () => Navigator.of(context).pop(widget.controller.text),
+                    ),
+                    Expanded(
+                      child: Text(
+                        widget.title,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(widget.controller.text),
+                      child: Text(widget.saveLabel),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

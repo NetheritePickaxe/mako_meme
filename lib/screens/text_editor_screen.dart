@@ -3,10 +3,11 @@ import 'package:flutter/services.dart';
 import '../providers/locale_provider.dart';
 import 'package:provider/provider.dart';
 
-/// 文本/小说编辑弹窗
-/// - 默认为小弹窗（紧凑模式）
-/// - 点击展开按钮切换为全屏编辑模式
-/// - 仅纯文本编辑，不再要求标题（标题用首行/前 30 字符自动生成）
+/// 文本/小说编辑页面
+/// - 以全屏路由形式呈现（覆盖状态栏）
+/// - 默认紧凑模式：居中卡片式编辑区
+/// - 点击展开按钮切换为真正全屏：AppBar 隐藏，编辑区占满整屏
+/// - 仅纯文本编辑，标题用首行/前 30 字符自动生成
 class TextEditorScreen extends StatefulWidget {
   final String type;
   final Future<void> Function(String text, String? title) onSave;
@@ -38,6 +39,8 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
 
   @override
   void dispose() {
+    // 退出时恢复边到边模式（防止沉浸式残留）
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _textCtrl.dispose();
     super.dispose();
   }
@@ -47,7 +50,6 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
     if (text.isEmpty) return;
     setState(() => _saving = true);
     try {
-      // 不再强制要求标题；标题由存储层用前 30 字符自动生成
       await widget.onSave(text, null);
       if (mounted) Navigator.pop(context);
     } finally {
@@ -55,7 +57,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
     }
   }
 
-  /// 粘贴剪贴板内容：插入到光标位置（有选区时替换选区，无选区时追加到末尾）
+  /// 粘贴剪贴板内容：插入到光标位置
   Future<void> _pasteAtCursor() async {
     final data = await Clipboard.getData(Clipboard.kTextPlain);
     if (data?.text == null || data!.text!.isEmpty) return;
@@ -65,11 +67,9 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
     String newText;
     int pos;
     if (sel.isValid) {
-      // 有选区或有效光标：在光标位置插入（选区则替换选区）
       newText = text.substring(0, sel.start) + pasteText + text.substring(sel.end);
       pos = sel.start + pasteText.length;
     } else {
-      // 无有效光标：追加到末尾
       newText = text + pasteText;
       pos = newText.length;
     }
@@ -77,131 +77,176 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
     _textCtrl.selection = TextSelection(baseOffset: pos, extentOffset: pos);
   }
 
+  void _enterFullscreen() {
+    setState(() => _expanded = true);
+    // 隐藏系统状态栏与导航栏，实现真正沉浸式全屏
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  }
+
+  void _exitFullscreen() {
+    // 先恢复系统 UI，再切换状态，避免界面闪烁
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    setState(() => _expanded = false);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.read<LocaleProvider>().l10n;
     final theme = Theme.of(context);
     final isNovel = widget.type == 'novel';
+    final isDark = theme.brightness == Brightness.dark;
 
     if (_expanded) {
-      // 全屏模式：直接使用 Scaffold 填满整屏（含状态栏区域）
-      final isDark = theme.brightness == Brightness.dark;
+      // 真正全屏：隐藏状态栏，无 AppBar，编辑区占满整屏
       return AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
           statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
           statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
         ),
-        child: Material(
-          type: MaterialType.transparency,
-          child: Scaffold(
-            appBar: AppBar(
-              title: Text(isNovel ? l10n.tr('import_novel') : l10n.tr('import_text')),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.fullscreen_exit),
-                  tooltip: l10n.tr('collapse'),
-                  onPressed: () => setState(() => _expanded = false),
-                ),
-                IconButton(
-                  icon: _saving
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Icon(Icons.check),
-                  tooltip: l10n.tr('save'),
-                  onPressed: _saving ? null : _save,
-                ),
-              ],
-            ),
-            body: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: TextField(
-                controller: _textCtrl,
-                maxLines: null,
-                expands: true,
-                textAlignVertical: TextAlignVertical.top,
-                style: TextStyle(
-                  fontSize: isNovel ? 16 : 18,
-                  height: isNovel ? 1.8 : 1.5,
-                ),
-                decoration: InputDecoration(
-                  hintText: isNovel ? l10n.tr('novel_hint') : l10n.tr('hint_text_or_emoji'),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  contentPadding: const EdgeInsets.all(16),
+        child: Scaffold(
+          // 无 AppBar，body 直接延伸到状态栏区域
+          extendBodyBehindAppBar: true,
+          body: Stack(
+            children: [
+              // 编辑区占满整屏，顶部留出状态栏高度的 padding 以避免被遮挡
+              Positioned.fill(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    top: MediaQuery.of(context).padding.top,
+                    bottom: MediaQuery.of(context).padding.bottom,
+                    left: 16,
+                    right: 16,
+                  ),
+                  child: TextField(
+                    controller: _textCtrl,
+                    maxLines: null,
+                    expands: true,
+                    autofocus: true,
+                    textAlignVertical: TextAlignVertical.top,
+                    style: TextStyle(
+                      fontSize: isNovel ? 16 : 18,
+                      height: isNovel ? 1.8 : 1.5,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: isNovel ? l10n.tr('novel_hint') : l10n.tr('hint_text_or_emoji'),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      contentPadding: const EdgeInsets.all(16),
+                    ),
+                  ),
                 ),
               ),
-            ),
+              // 顶部悬浮工具栏（退出全屏 / 粘贴 / 保存）
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: SafeArea(
+                  bottom: false,
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.fullscreen_exit),
+                        tooltip: l10n.tr('collapse'),
+                        onPressed: _exitFullscreen,
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.content_paste),
+                        tooltip: l10n.tr('paste'),
+                        onPressed: _pasteAtCursor,
+                      ),
+                      const Spacer(),
+                      if (_saving)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 12),
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      else
+                        TextButton.icon(
+                          onPressed: _save,
+                          icon: const Icon(Icons.check),
+                          label: Text(l10n.tr('save')),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       );
     }
 
-    // 紧凑弹窗模式
-    return Dialog(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
+    // 紧凑模式：全屏路由 + 居中卡片
+    return Scaffold(
+      backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.95),
+      appBar: AppBar(
+        title: Text(isNovel ? l10n.tr('import_novel') : l10n.tr('import_text')),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.fullscreen),
+            tooltip: l10n.tr('expand'),
+            onPressed: _enterFullscreen,
+          ),
+        ],
+      ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Icon(Icons.text_fields, color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(
-                  isNovel ? l10n.tr('import_novel') : l10n.tr('import_text'),
-                  style: theme.textTheme.titleMedium,
+                SizedBox(
+                  height: 240,
+                  child: TextField(
+                    controller: _textCtrl,
+                    maxLines: null,
+                    expands: true,
+                    textAlignVertical: TextAlignVertical.top,
+                    autofocus: true,
+                    style: TextStyle(
+                      fontSize: isNovel ? 16 : 18,
+                      height: isNovel ? 1.8 : 1.5,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: isNovel ? l10n.tr('novel_hint') : l10n.tr('hint_text_or_emoji'),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      contentPadding: const EdgeInsets.all(12),
+                    ),
+                  ),
                 ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.fullscreen),
-                  tooltip: l10n.tr('expand'),
-                  onPressed: () => setState(() => _expanded = true),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.content_paste),
+                      tooltip: l10n.tr('paste'),
+                      onPressed: _pasteAtCursor,
+                    ),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text(l10n.tr('cancel')),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: _saving ? null : _save,
+                      child: _saving
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                          : Text(l10n.tr('save')),
+                    ),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 200,
-              child: TextField(
-                controller: _textCtrl,
-                maxLines: null,
-                expands: true,
-                textAlignVertical: TextAlignVertical.top,
-                style: TextStyle(
-                  fontSize: isNovel ? 16 : 18,
-                  height: isNovel ? 1.8 : 1.5,
-                ),
-                decoration: InputDecoration(
-                  hintText: isNovel ? l10n.tr('novel_hint') : l10n.tr('hint_text_or_emoji'),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  contentPadding: const EdgeInsets.all(12),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                // 左下角粘贴按钮
-                IconButton(
-                  icon: const Icon(Icons.content_paste),
-                  tooltip: l10n.tr('paste'),
-                  onPressed: _pasteAtCursor,
-                ),
-                const Spacer(),
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(l10n.tr('cancel')),
-                ),
-                const SizedBox(width: 8),
-                FilledButton(
-                  onPressed: _saving ? null : _save,
-                  child: _saving
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                      : Text(l10n.tr('save')),
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
     );

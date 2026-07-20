@@ -1489,11 +1489,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// 文本/小说编辑弹窗（紧凑弹窗 + 展开按钮）
   void _showTextEditor(BuildContext ctx, MemeProvider prov, {required String type}) {
-    showDialog(
-      context: ctx,
-      builder: (_) => TextEditorScreen(type: type, onSave: (text, title) async {
-        await prov.importText(text, name: title, type: type);
-      }),
+    Navigator.push(
+      ctx,
+      MaterialPageRoute(
+        builder: (_) => TextEditorScreen(type: type, onSave: (text, title) async {
+          await prov.importText(text, name: title, type: type);
+        }),
+      ),
     );
   }
 
