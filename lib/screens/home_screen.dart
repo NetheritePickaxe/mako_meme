@@ -137,14 +137,10 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: navIndex,
         onDestinationSelected: (i) => _onTabChanged(_navToLogic(i)),
-        // 显式胶囊形 indicator，配合 M3 默认 ripple 跟随 indicator 形状
-        indicatorShape: const StadiumBorder(),
-        height: 72,
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         destinations: [
           NavigationDestination(
-            icon: const Icon(Icons.collections_outlined),
-            selectedIcon: Icon(Icons.collections, color: theme.colorScheme.onSurface),
+            icon: const Icon(Icons.photo_library_outlined),
+            selectedIcon: Icon(Icons.photo_library, color: theme.colorScheme.onSurface),
             label: l10n.tr('nav_memes'),
           ),
           NavigationDestination(
@@ -159,8 +155,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           if (showMoodTab)
             NavigationDestination(
-              icon: const Icon(Icons.sentiment_satisfied_outlined),
-              selectedIcon: Icon(Icons.sentiment_satisfied, color: theme.colorScheme.onSurface),
+              icon: const Icon(Icons.mood_outlined),
+              selectedIcon: Icon(Icons.mood, color: theme.colorScheme.onSurface),
               label: l10n.tr('nav_moods'),
             ),
         ],
@@ -866,30 +862,31 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildCategoryChips(MemeProvider prov) {
     final l10n = context.read<LocaleProvider>().l10n;
     final settings = context.watch<SettingsProvider>();
-    final categories = <Map<String, String>>[
-      {'type': Meme.typeEmoji, 'label': l10n.tr('cat_emoji')},
-      {'type': Meme.typeGif, 'label': l10n.tr('cat_gif')},
-      {'type': Meme.typeImage, 'label': l10n.tr('cat_image')},
-      {'type': Meme.typeText, 'label': l10n.tr('cat_text')},
-      {'type': Meme.typePortrait, 'label': l10n.tr('cat_portrait')},
-      {'type': Meme.typeCg, 'label': l10n.tr('cat_cg')},
-      {'type': Meme.typeCharacterCard, 'label': l10n.tr('cat_character_card')},
-      {'type': Meme.typeVector, 'label': l10n.tr('cat_vector')},
-      {'type': Meme.typePsd, 'label': l10n.tr('cat_psd')},
-      {'type': Meme.typePdf, 'label': l10n.tr('cat_pdf')},
-      {'type': Meme.typeManga, 'label': l10n.tr('cat_manga')},
-      {'type': Meme.typeNovel, 'label': l10n.tr('cat_novel')},
+    final categories = <Map<String, dynamic>>[
+      {'type': Meme.typeEmoji, 'label': l10n.tr('cat_emoji'), 'icon': Icons.emoji_emotions_outlined},
+      {'type': Meme.typeGif, 'label': l10n.tr('cat_gif'), 'icon': Icons.animation},
+      {'type': Meme.typeImage, 'label': l10n.tr('cat_image'), 'icon': Icons.image_outlined},
+      {'type': Meme.typeText, 'label': l10n.tr('cat_text'), 'icon': Icons.text_fields},
+      {'type': Meme.typePortrait, 'label': l10n.tr('cat_portrait'), 'icon': Icons.accessibility_new},
+      {'type': Meme.typeCg, 'label': l10n.tr('cat_cg'), 'icon': Icons.wallpaper_outlined},
+      {'type': Meme.typeCharacterCard, 'label': l10n.tr('cat_character_card'), 'icon': Icons.contact_page_outlined},
+      {'type': Meme.typeVector, 'label': l10n.tr('cat_vector'), 'icon': Icons.polyline_outlined},
+      {'type': Meme.typePsd, 'label': l10n.tr('cat_psd'), 'icon': Icons.layers_outlined},
+      {'type': Meme.typePdf, 'label': l10n.tr('cat_pdf'), 'icon': Icons.picture_as_pdf_outlined},
+      {'type': Meme.typeManga, 'label': l10n.tr('cat_manga'), 'icon': Icons.menu_book_outlined},
+      {'type': Meme.typeNovel, 'label': l10n.tr('cat_novel'), 'icon': Icons.auto_stories_outlined},
+      {'type': Meme.typeMd, 'label': l10n.tr('cat_md'), 'icon': Icons.description_outlined},
       // 用户自定义分类
-      ...settings.customCategories.map((c) => {'type': c, 'label': c}),
+      ...settings.customCategories.map((c) => {'type': c, 'label': c, 'icon': Icons.label_outline}),
     ];
 
     // 过滤掉隐藏的分类
     final visibleCategories = categories
-        .where((c) => settings.isCategoryVisible(c['type']!))
+        .where((c) => settings.isCategoryVisible(c['type'] as String))
         .toList();
 
     return SizedBox(
-      height: 44,
+      height: 36,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -904,6 +901,7 @@ class _HomeScreenState extends State<HomeScreen> {
             return _buildRoundedChip(
               context: ctx,
               label: l10n.tr('cat_all'),
+              icon: Icons.grid_view_outlined,
               selected: selected,
               colorScheme: cs,
               onTap: () => prov.clearTypeFilter(),
@@ -911,13 +909,15 @@ class _HomeScreenState extends State<HomeScreen> {
           }
 
           final cat = visibleCategories[i - 1];
-          final type = cat['type']!;
-          final label = cat['label']!;
+          final type = cat['type'] as String;
+          final label = cat['label'] as String;
+          final icon = cat['icon'] as IconData;
           final selected = prov.typeFilter.contains(type);
 
           return _buildRoundedChip(
             context: ctx,
             label: label,
+            icon: icon,
             selected: selected,
             colorScheme: cs,
             onTap: () {
@@ -933,10 +933,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// 胶囊状分类按钮 — 纯文字，无图标，文字水平垂直居中
+  /// 扁平胶囊状分类按钮 — 图标 + 文字，水平垂直居中
   Widget _buildRoundedChip({
     required BuildContext context,
     required String label,
+    required IconData icon,
     required bool selected,
     required ColorScheme colorScheme,
     required VoidCallback onTap,
@@ -949,15 +950,22 @@ class _HomeScreenState extends State<HomeScreen> {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-          alignment: Alignment.center,
-          child: Text(label, style: TextStyle(
-            fontSize: 13,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-            color: selected ? colorScheme.onPrimary : colorScheme.onSurface,
-            height: 1.0,
-          )),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16,
+                  color: selected ? colorScheme.onPrimary : colorScheme.onSurface),
+              const SizedBox(width: 6),
+              Text(label, style: TextStyle(
+                fontSize: 12,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                color: selected ? colorScheme.onPrimary : colorScheme.onSurface,
+                height: 1.0,
+              )),
+            ],
+          ),
         ),
       ),
     );

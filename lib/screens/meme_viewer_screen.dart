@@ -15,6 +15,7 @@ import '../providers/locale_provider.dart';
 import '../providers/settings_provider.dart';
 import '../l10n/l10n.dart';
 import '../services/storage_service.dart';
+import '../services/pdf_opener.dart';
 import 'text_editor_screen.dart';
 import 'character_card_editor_screen.dart';
 
@@ -603,12 +604,10 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                 label: Text(l10n.tr('open_externally')),
               ),
             if (kIsWeb)
-              Text(
-                l10n.tr('pdf_web_hint'),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                ),
-                textAlign: TextAlign.center,
+              FilledButton.icon(
+                onPressed: () => _openPdfInBrowser(m),
+                icon: const Icon(Icons.open_in_new),
+                label: Text(l10n.tr('open_in_new_tab')),
               ),
           ],
         ),
@@ -623,6 +622,26 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
     final uri = Uri.file(file.path);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
+    }
+  }
+
+  /// Web 端：读取 PDF 字节并用浏览器新标签页打开预览
+  Future<void> _openPdfInBrowser(Meme m) async {
+    final storage = context.read<StorageService>();
+    final l10n = context.read<LocaleProvider>().l10n;
+    final bytes = await storage.readMemeBytes(m.filePath);
+    if (bytes == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.tr('pdf_web_hint'))),
+      );
+      return;
+    }
+    final ok = await openPdfInNewTab(bytes, m.name);
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.tr('pdf_web_hint'))),
+      );
     }
   }
 
