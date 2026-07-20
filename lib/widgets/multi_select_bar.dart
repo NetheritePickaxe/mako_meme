@@ -131,7 +131,7 @@ class MultiSelectBar extends StatelessWidget {
             ListTile(
               leading: const Icon(Icons.visibility),
               title: Text(l10n.tr('tool_phantom_tank')),
-              // 2 张：单张幻影坦克对话框；3+ 张：批量生成独立界面
+              // 2 张：单张幻影坦克对话框；3+ 张：批量生成独立界面（支持多对配对）
               enabled: imageMemes.length >= 2,
               subtitle: imageMemes.length < 2 ? Text(l10n.tr('phantom_need_two')) : null,
               onTap: imageMemes.length >= 2 ? () {

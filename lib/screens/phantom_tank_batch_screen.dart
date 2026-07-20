@@ -8,16 +8,24 @@ import '../services/image_tool_service.dart';
 import '../services/storage_service.dart';
 import '../l10n/l10n.dart';
 
+/// 一对前景-隐藏配对
+class _Pair {
+  Meme foreground;
+  Meme hidden;
+  _Pair({required this.foreground, required this.hidden});
+}
+
 /// 批量幻影坦克生成界面
 ///
-/// 用于从 3+ 张图片批量生成幻影坦克：
-/// - 用户选择一张前景图（默认第一张）
-/// - 其余 N-1 张作为隐藏图，逐张与前景合成
-/// - 共生成 N-1 张幻影坦克，保存为新 meme
-///
-/// 合成参数（彩色/黑白、亮度比例、色彩强度）对所有生成共享。
+/// 支持多对一一对应配对：
+/// - 用户可添加多个「前景图 + 隐藏图」配对
+/// - 每对生成一张幻影坦克
+/// - 支持批量添加多张前景图，自动与剩余图片按顺序配对
+/// - 合成参数（彩色/黑白、亮度比例、色彩强度）对所有生成共享
 class PhantomTankBatchScreen extends StatefulWidget {
+  /// 预选的图片列表，作为可配对资源池
   final List<Meme> memes;
+
   const PhantomTankBatchScreen({super.key, required this.memes});
 
   @override
@@ -25,12 +33,12 @@ class PhantomTankBatchScreen extends StatefulWidget {
 }
 
 class _PhantomTankBatchScreenState extends State<PhantomTankBatchScreen> {
-  int _foregroundIndex = 0;
+  final List<_Pair> _pairs = [];
   bool _colorMode = true;
   double _brightnessRatio = 1.0;
   double _colorIntensity = 1.0;
 
-  // 生成状态：null=未开始，否则为进度
+  // 生成状态
   int _done = 0;
   int _ok = 0;
   int _fail = 0;
@@ -38,16 +46,19 @@ class _PhantomTankBatchScreenState extends State<PhantomTankBatchScreen> {
   bool _finished = false;
 
   @override
+  void initState() {
+    super.initState();
+    // 默认预填：若 memes 至少 2 张，自动配对第 0 张前景 + 第 1 张隐藏
+    if (widget.memes.length >= 2) {
+      _pairs.add(_Pair(foreground: widget.memes[0], hidden: widget.memes[1]));
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = context.watch<LocaleProvider>().l10n;
     final cs = theme.colorScheme;
-
-    // 隐藏图列表 = 除前景外的所有图片
-    final hiddenList = <Meme>[];
-    for (var i = 0; i < widget.memes.length; i++) {
-      if (i != _foregroundIndex) hiddenList.add(widget.memes[i]);
-    }
 
     return Scaffold(
       appBar: AppBar(
@@ -61,14 +72,14 @@ class _PhantomTankBatchScreenState extends State<PhantomTankBatchScreen> {
         ],
       ),
       body: _generating || _finished
-          ? _buildProgressView(theme, l10n, hiddenList.length)
-          : _buildEditView(theme, l10n, cs, hiddenList),
-      bottomNavigationBar: _buildBottomBar(theme, l10n, cs, hiddenList.length),
+          ? _buildProgressView(theme, l10n, _pairs.length)
+          : _buildEditView(theme, l10n, cs),
+      bottomNavigationBar: _buildBottomBar(theme, l10n, cs),
     );
   }
 
-  /// 编辑视图：前景预览 + 隐藏图网格 + 参数调节
-  Widget _buildEditView(ThemeData theme, L10n l10n, ColorScheme cs, List<Meme> hiddenList) {
+  /// 编辑视图：配对列表 + 添加按钮 + 参数调节
+  Widget _buildEditView(ThemeData theme, L10n l10n, ColorScheme cs) {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -76,100 +87,142 @@ class _PhantomTankBatchScreenState extends State<PhantomTankBatchScreen> {
           style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
         const SizedBox(height: 16),
 
-        // 前景图预览
-        Text(l10n.tr('phantom_batch_foreground'),
-          style: theme.textTheme.titleSmall?.copyWith(color: cs.primary, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
-        _buildForegroundSelector(theme, l10n, cs),
-        const SizedBox(height: 16),
-
-        // 隐藏图网格
-        Text(l10n.tr('phantom_batch_hidden', args: {'count': hiddenList.length.toString()}),
-          style: theme.textTheme.titleSmall?.copyWith(color: cs.outline, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: hiddenList.length,
-          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: 100,
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
-            childAspectRatio: 1,
-          ),
-          itemBuilder: (ctx, i) => _buildThumb(theme, hiddenList[i]),
+        // 配对列表标题
+        Row(
+          children: [
+            Text(l10n.tr('phantom_batch_pairs'),
+              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(width: 8),
+            if (_pairs.isNotEmpty)
+              Text('${_pairs.length}',
+                style: theme.textTheme.bodySmall?.copyWith(color: cs.outline)),
+          ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 8),
 
+        if (_pairs.isEmpty)
+          // 空状态
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            child: Center(
+              child: Text(l10n.tr('phantom_batch_pairs_empty'),
+                style: theme.textTheme.bodyMedium?.copyWith(color: cs.outline),
+                textAlign: TextAlign.center),
+            ),
+          )
+        else
+          // 配对列表
+          ...List.generate(_pairs.length, (i) => _buildPairItem(theme, l10n, cs, i)),
+
+        const SizedBox(height: 12),
+
+        // 添加配对按钮区
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            OutlinedButton.icon(
+              icon: const Icon(Icons.add_link),
+              label: Text(l10n.tr('phantom_batch_add_pair')),
+              onPressed: _addPair,
+            ),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.add_photo_alternate_outlined),
+              label: Text(l10n.tr('phantom_batch_add_foregrounds')),
+              onPressed: _addForegroundsBatch,
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(l10n.tr('phantom_batch_pair_hint'),
+          style: theme.textTheme.bodySmall?.copyWith(color: cs.outline)),
+
+        const SizedBox(height: 16),
         // 参数调节
         _buildParamsPanel(theme, l10n, cs),
       ],
     );
   }
 
-  /// 前景图选择器：横向滚动所有图片，当前选中的高亮
-  Widget _buildForegroundSelector(ThemeData theme, L10n l10n, ColorScheme cs) {
-    return SizedBox(
-      height: 110,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: widget.memes.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (ctx, i) {
-          final m = widget.memes[i];
-          final selected = i == _foregroundIndex;
-          return GestureDetector(
-            onTap: () => setState(() => _foregroundIndex = i),
-            child: Container(
-              width: 100,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: selected ? cs.primary : cs.outlineVariant,
-                  width: selected ? 3 : 1,
-                ),
-              ),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: _buildThumb(theme, m),
-                  ),
-                  if (selected)
-                    Positioned(
-                      top: 4, right: 4,
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(
-                          color: cs.primary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(Icons.check, size: 12, color: cs.onPrimary),
-                      ),
-                    ),
-                  Positioned(
-                    left: 0, right: 0, bottom: 0,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: cs.surface.withValues(alpha: 0.8),
-                        borderRadius: const BorderRadius.only(
-                          bottomLeft: Radius.circular(6),
-                          bottomRight: Radius.circular(6),
-                        ),
-                      ),
-                      child: Text(m.name,
-                        maxLines: 1, overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 10)),
-                    ),
-                  ),
-                ],
-              ),
+  /// 单个配对项：[前景缩略图] [交换按钮] [隐藏缩略图] [删除按钮]
+  Widget _buildPairItem(ThemeData theme, L10n l10n, ColorScheme cs, int index) {
+    final pair = _pairs[index];
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Row(
+          children: [
+            // 前景
+            Expanded(child: _buildPairSlot(theme, l10n, cs, pair.foreground, true, index)),
+            // 中间交换按钮
+            IconButton(
+              icon: const Icon(Icons.swap_horiz),
+              tooltip: l10n.tr('phantom_batch_swap'),
+              onPressed: () => _swapPair(index),
+              visualDensity: VisualDensity.compact,
             ),
-          );
-        },
+            // 隐藏
+            Expanded(child: _buildPairSlot(theme, l10n, cs, pair.hidden, false, index)),
+            // 删除
+            IconButton(
+              icon: const Icon(Icons.close),
+              tooltip: l10n.tr('phantom_batch_remove'),
+              onPressed: () => setState(() => _pairs.removeAt(index)),
+              visualDensity: VisualDensity.compact,
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  /// 配对中的一个图片槽：点击可替换
+  Widget _buildPairSlot(ThemeData theme, L10n l10n, ColorScheme cs, Meme current, bool isForeground, int pairIndex) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          height: 24,
+          child: Text(
+            isForeground ? l10n.tr('phantom_batch_pair_foreground') : l10n.tr('phantom_batch_pair_hidden'),
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: isForeground ? cs.primary : cs.outline,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        GestureDetector(
+          onTap: () => _replaceImage(isForeground, pairIndex),
+          child: Container(
+            height: 80,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: cs.outlineVariant, width: 1),
+            ),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(7),
+                  child: _buildThumb(theme, current),
+                ),
+                Positioned(
+                  left: 0, right: 0, bottom: 0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    color: cs.surface.withValues(alpha: 0.85),
+                    child: Text(current.name,
+                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 10)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -181,7 +234,6 @@ class _PhantomTankBatchScreenState extends State<PhantomTankBatchScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 彩色/黑白
             Row(children: [
               ChoiceChip(
                 label: Text(l10n.tr('phantom_color')),
@@ -196,7 +248,6 @@ class _PhantomTankBatchScreenState extends State<PhantomTankBatchScreen> {
               ),
             ]),
             const SizedBox(height: 12),
-            // 亮度
             Text('${l10n.tr('phantom_brightness')}: ${_brightnessRatio.toStringAsFixed(2)}'),
             Slider(
               value: _brightnessRatio,
@@ -204,7 +255,6 @@ class _PhantomTankBatchScreenState extends State<PhantomTankBatchScreen> {
               label: _brightnessRatio.toStringAsFixed(2),
               onChanged: (v) => setState(() => _brightnessRatio = v),
             ),
-            // 色彩强度
             if (_colorMode) ...[
               Text('${l10n.tr('phantom_color_intensity')}: ${_colorIntensity.toStringAsFixed(2)}'),
               Slider(
@@ -288,33 +338,266 @@ class _PhantomTankBatchScreenState extends State<PhantomTankBatchScreen> {
   }
 
   /// 底部栏：生成按钮
-  Widget _buildBottomBar(ThemeData theme, L10n l10n, ColorScheme cs, int hiddenCount) {
+  Widget _buildBottomBar(ThemeData theme, L10n l10n, ColorScheme cs) {
+    final canGen = _pairs.isNotEmpty && !_generating;
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: FilledButton.icon(
-          onPressed: _generating ? null : () => _startGenerate(),
+          onPressed: canGen ? () => _startGenerate() : null,
           icon: const Icon(Icons.auto_awesome),
-          label: Text(l10n.tr('phantom_batch_generate_all',
-              args: {'count': hiddenCount.toString()})),
+          label: Text(_pairs.isEmpty
+              ? l10n.tr('phantom_batch_no_pairs')
+              : l10n.tr('phantom_batch_generate_all', args: {'count': _pairs.length.toString()})),
         ),
       ),
     );
   }
 
+  /// 添加一对配对：先选前景，再选隐藏
+  Future<void> _addPair() async {
+    final l10n = context.read<LocaleProvider>().l10n;
+    // 第 1 步：选前景
+    final fg = await _pickImageDialog(
+      title: l10n.tr('phantom_batch_select_foreground'),
+      excludeIds: const <String>{},
+    );
+    if (fg == null) return;
+    // 第 2 步：选隐藏（可复用同一张图）
+    final hd = await _pickImageDialog(
+      title: l10n.tr('phantom_batch_select_hidden'),
+      excludeIds: const <String>{},
+    );
+    if (hd == null) return;
+    setState(() {
+      _pairs.add(_Pair(foreground: fg, hidden: hd));
+    });
+  }
+
+  /// 批量添加前景：用户选多张前景图，剩余图片按顺序作为隐藏图配对
+  Future<void> _addForegroundsBatch() async {
+    final l10n = context.read<LocaleProvider>().l10n;
+    final selected = await _pickMultiImageDialog(
+      title: l10n.tr('phantom_batch_add_foregrounds'),
+      desc: l10n.tr('phantom_batch_add_foregrounds_desc'),
+    );
+    if (selected.isEmpty) return;
+    // 候选隐藏图池 = 所有 memes - 已选为前景的
+    final fgIds = selected.map((e) => e.id).toSet();
+    final hiddenPool = widget.memes.where((m) => !fgIds.contains(m.id)).toList();
+    if (hiddenPool.isEmpty) {
+      // 没有剩余图片，把每张前景自身当作隐藏（自配对）
+      setState(() {
+        for (final m in selected) {
+          _pairs.add(_Pair(foreground: m, hidden: m));
+        }
+      });
+      return;
+    }
+    setState(() {
+      for (var i = 0; i < selected.length; i++) {
+        final hidden = hiddenPool[i % hiddenPool.length];
+        _pairs.add(_Pair(foreground: selected[i], hidden: hidden));
+      }
+    });
+  }
+
+  /// 替换配对中的某张图
+  Future<void> _replaceImage(bool isForeground, int pairIndex) async {
+    final l10n = context.read<LocaleProvider>().l10n;
+    final picked = await _pickImageDialog(
+      title: isForeground
+          ? l10n.tr('phantom_batch_select_foreground')
+          : l10n.tr('phantom_batch_select_hidden'),
+      excludeIds: const <String>{},
+    );
+    if (picked == null) return;
+    setState(() {
+      if (isForeground) {
+        _pairs[pairIndex].foreground = picked;
+      } else {
+        _pairs[pairIndex].hidden = picked;
+      }
+    });
+  }
+
+  /// 交换配对中的前景与隐藏
+  void _swapPair(int index) {
+    setState(() {
+      final p = _pairs[index];
+      final tmp = p.foreground;
+      p.foreground = p.hidden;
+      p.hidden = tmp;
+    });
+  }
+
+  /// 单图选择对话框：从 widget.memes 中选一张
+  Future<Meme?> _pickImageDialog({
+    required String title,
+    required Set<String> excludeIds,
+  }) async {
+    final theme = Theme.of(context);
+    final candidates = widget.memes.where((m) => !excludeIds.contains(m.id)).toList();
+    if (candidates.isEmpty) return null;
+    return showDialog<Meme>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: GridView.builder(
+            shrinkWrap: true,
+            itemCount: candidates.length,
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 100,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              childAspectRatio: 1,
+            ),
+            itemBuilder: (c, i) {
+              final m = candidates[i];
+              return GestureDetector(
+                onTap: () => Navigator.pop(ctx, m),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: theme.colorScheme.outlineVariant),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(7),
+                    child: _buildThumb(theme, m),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(context.read<LocaleProvider>().l10n.tr('cancel')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 多图选择对话框：返回选中的多张图
+  Future<List<Meme>> _pickMultiImageDialog({
+    required String title,
+    String? desc,
+  }) async {
+    final theme = Theme.of(context);
+    final l10n = context.read<LocaleProvider>().l10n;
+    final selected = <String>{};
+    final result = await showDialog<List<Meme>>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSt) => AlertDialog(
+          title: Text(title),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (desc != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(desc, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline)),
+                  ),
+                Flexible(
+                  child: GridView.builder(
+                    shrinkWrap: true,
+                    itemCount: widget.memes.length,
+                    gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                      maxCrossAxisExtent: 100,
+                      mainAxisSpacing: 8,
+                      crossAxisSpacing: 8,
+                      childAspectRatio: 1,
+                    ),
+                    itemBuilder: (c, i) {
+                      final m = widget.memes[i];
+                      final isSel = selected.contains(m.id);
+                      return GestureDetector(
+                        onTap: () {
+                          setSt(() {
+                            if (isSel) {
+                              selected.remove(m.id);
+                            } else {
+                              selected.add(m.id);
+                            }
+                          });
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isSel ? theme.colorScheme.primary : theme.colorScheme.outlineVariant,
+                              width: isSel ? 3 : 1,
+                            ),
+                          ),
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(6),
+                                child: _buildThumb(theme, m),
+                              ),
+                              if (isSel)
+                                Positioned(
+                                  top: 2, right: 2,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(2),
+                                    decoration: BoxDecoration(
+                                      color: theme.colorScheme.primary,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(Icons.check, size: 12, color: theme.colorScheme.onPrimary),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(l10n.tr('cancel')),
+            ),
+            FilledButton(
+              onPressed: selected.isEmpty
+                  ? null
+                  : () {
+                      final picked = widget.memes.where((m) => selected.contains(m.id)).toList();
+                      Navigator.pop(ctx, picked);
+                    },
+              child: Text(l10n.tr('confirm')),
+            ),
+          ],
+        ),
+      ),
+    );
+    return result ?? [];
+  }
+
   /// 启动批量生成
   Future<void> _startGenerate() async {
+    if (_pairs.isEmpty) return;
     final prov = context.read<MemeProvider>();
     final tool = context.read<ImageToolService>();
     final l10n = context.read<LocaleProvider>().l10n;
     final messenger = ScaffoldMessenger.of(context);
 
-    final fg = widget.memes[_foregroundIndex];
-    final hiddenList = <Meme>[];
-    for (var i = 0; i < widget.memes.length; i++) {
-      if (i != _foregroundIndex) hiddenList.add(widget.memes[i]);
-    }
-    final total = hiddenList.length;
+    // 拍快照，避免生成过程中列表变化
+    final pairsSnapshot = List<_Pair>.from(_pairs);
+    final total = pairsSnapshot.length;
 
     setState(() {
       _generating = true;
@@ -325,13 +608,15 @@ class _PhantomTankBatchScreenState extends State<PhantomTankBatchScreen> {
     });
 
     for (var i = 0; i < total; i++) {
+      final p = pairsSnapshot[i];
       try {
         await tool.makePhantomTank(
-          fg.filePath, hiddenList[i].filePath,
+          p.foreground.filePath,
+          p.hidden.filePath,
           colorMode: _colorMode,
           brightnessRatio: _brightnessRatio,
           colorIntensity: _colorIntensity,
-          name: '${fg.name}_${hiddenList[i].name}_phantom',
+          name: '${p.foreground.name}_${p.hidden.name}_phantom',
         );
         _ok++;
       } catch (_) {
