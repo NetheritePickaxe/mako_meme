@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
@@ -100,16 +101,12 @@ class _HomeScreenState extends State<HomeScreen> {
     final rawNav = _currentTab == 3 ? 3 : _currentTab.clamp(0, showMoodTab ? 3 : 2);
     final navIndex = _logicToNav(rawNav);
 
-    // 系统返回键优先级：多选模式 → 退出多选
-    //                文件夹内 → 退出文件夹
-    //                情绪筛选 → 清除情绪筛选
-    //                其他 → 正常返回（退出 app）
-    final canPop = !prov.isMulti &&
-        prov.folderId == null &&
-        prov.moodFilter == null;
-
+    // 主页面始终拦截系统返回手势：
+    // 1. 让 Android 14+ 的左边缘滑动不再触发预测性返回动画，而是打开 drawer
+    // 2. 在 onPopInvokedWithResult 中按优先级处理（多选/文件夹/情绪/退出 app）
+    // 子页面（设置/查看器）的 canPop=true 不受影响，仍享受预测性返回动画
     return PopScope(
-      canPop: canPop,
+      canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
         if (prov.isMulti) {
@@ -118,6 +115,9 @@ class _HomeScreenState extends State<HomeScreen> {
           prov.selectFolder(null);
         } else if (prov.moodFilter != null) {
           prov.setMoodFilter(null);
+        } else {
+          // 主页面：退出 app
+          SystemNavigator.pop();
         }
       },
       child: Scaffold(
@@ -132,6 +132,8 @@ class _HomeScreenState extends State<HomeScreen> {
           child: MultiSelectBar(),
         ) : null,
       ),
+      // 增大左边缘触发宽度，让 drawer 更容易被左滑打开
+      drawerEdgeDragWidth: 40,
       drawer: _buildDrawer(context, prov),
       body: _buildBody(prov, l10n),
       bottomNavigationBar: NavigationBar(

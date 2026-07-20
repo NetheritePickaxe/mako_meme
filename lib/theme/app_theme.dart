@@ -78,6 +78,16 @@ class AppTheme {
       colorScheme: scheme,
       scaffoldBackgroundColor: pureBlack && isDark ? Colors.black : null,
       fontFamily: 'Noto Sans SC',
+      // 启用预测式返回页面切换动画（Android 14+）
+      // 配合 AndroidManifest 中 android:enableOnBackInvokedCallback="true"
+      // 用户从屏幕左/右边缘滑动时可以看到目标页面跟随手势滑入
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+        },
+      ),
       appBarTheme: AppBarTheme(
         centerTitle: false,
         elevation: 0,
