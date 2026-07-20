@@ -114,6 +114,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: Text(l10n.tr('export_data_desc')),
             onTap: () => _showExportOptions(context, l10n),
           ),
+          ListTile(
+            leading: const Icon(Icons.cleaning_services_outlined),
+            title: Text(l10n.tr('clean_invalid_memes')),
+            subtitle: Text(l10n.tr('clean_invalid_memes_desc')),
+            onTap: () => _cleanInvalidMemes(context, l10n),
+          ),
           const SizedBox(height: 16),
 
           _sectionHeader(l10n.tr('cloud_sync'), cs),
@@ -1221,6 +1227,106 @@ class _SettingsScreenState extends State<SettingsScreen> {
           content: Text(l10n.tr('saved_n_to', args: {'done': done.toString(), 'path': targetDir.path}) + (failed > 0 ? ' ($failed)' : '')),
           duration: const Duration(seconds: 4),
         ),
+      );
+    }
+  }
+
+  Future<void> _cleanInvalidMemes(BuildContext context, L10n l10n) async {
+    final storage = context.read<StorageService>();
+    // 扫描过程中显示进度条
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          content: Row(
+            children: [
+              const CircularProgressIndicator(strokeWidth: 2),
+              const SizedBox(width: 20),
+              Expanded(child: Text(l10n.tr('scanning_invalid'))),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final invalid = await storage.findInvalidMemes();
+    if (!context.mounted) return;
+    Navigator.of(context).pop(); // 关闭进度条
+
+    if (invalid.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.tr('no_invalid_memes'))),
+      );
+      return;
+    }
+
+    // 列出失效项让用户确认
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.tr('clean_invalid_memes')),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l10n.tr('invalid_memes_count', args: {'count': invalid.length.toString()}),
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 12),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 300),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: invalid.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (_, i) {
+                    final m = invalid[i];
+                    return ListTile(
+                      dense: true,
+                      leading: const Icon(Icons.image_not_supported_outlined,
+                          color: Colors.red, size: 20),
+                      title: Text(m.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      subtitle: Text(
+                        m.filePath,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 11),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l10n.tr('cancel')),
+          ),
+          FilledButton.tonal(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(l10n.tr('delete')),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+    if (!context.mounted) return;
+
+    // 执行批量删除
+    final ids = invalid.map((m) => m.id).toList();
+    await storage.deleteMemes(ids);
+    if (context.mounted) {
+      await context.read<MemeProvider>().loadAll();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.tr('invalid_memes_deleted', args: {'count': ids.length.toString()}))),
       );
     }
   }

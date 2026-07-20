@@ -1510,6 +1510,32 @@ class StorageService {
     }
   }
 
+  /// 扫描所有 meme，返回文件已失效（主文件不存在 / Web 端 bytes 丢失）的条目。
+  /// 文本类（text/novel/md）内容直接存储在 textContent 中，不依赖文件，跳过。
+  Future<List<Meme>> findInvalidMemes() async {
+    if (_memeBox == null) return [];
+    final all = getAllMemes();
+    final invalid = <Meme>[];
+    for (final m in all) {
+      // 文本类内容直接存储在 textContent 中，不依赖文件
+      if (m.isTextLike) continue;
+      // 没有文件路径的条目无法验证，跳过
+      if (m.filePath.isEmpty) continue;
+      bool missing = false;
+      if (kIsWeb) {
+        // Web 端：bytes 丢失（页面刷新后未重新导入）即视为失效
+        final bytes = await webStorageGetBinary(m.filePath);
+        if (bytes == null) missing = true;
+      } else {
+        // 原生端：主文件不存在即视为失效
+        final f = getMemeFile(m.filePath);
+        if (f == null || !await f.exists()) missing = true;
+      }
+      if (missing) invalid.add(m);
+    }
+    return invalid;
+  }
+
   Future<void> renameMeme(String id, String newName) async {
     if (_memeBox == null) return;
     final meme = _getMeme(id);

@@ -493,8 +493,22 @@ class _MemeCardState extends State<MemeCard> {
 
   Widget _placeholder() => Container(
     color: Colors.grey.shade200,
-    child: const Center(
-      child: Icon(Icons.broken_image_outlined, color: Colors.grey, size: 32),
+    child: Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.broken_image_outlined, color: Colors.red.shade300, size: 32),
+          const SizedBox(height: 4),
+          Text(
+            context.read<LocaleProvider>().l10n.tr('lost_label'),
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.red.shade400,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     ),
   );
 
@@ -605,9 +619,10 @@ class _MemeCardState extends State<MemeCard> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.cloud_off, size: 24, color: Colors.grey.shade500),
+                        Icon(Icons.image_not_supported_outlined, size: 32, color: Colors.red.shade300),
                         const SizedBox(height: 4),
-                        Text(context.read<LocaleProvider>().l10n.tr('lost_label'), style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+                        Text(context.read<LocaleProvider>().l10n.tr('lost_label'),
+                            style: TextStyle(fontSize: 10, color: Colors.red.shade400, fontWeight: FontWeight.w600)),
                       ],
                     ),
                   ),
