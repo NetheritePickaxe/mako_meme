@@ -2,7 +2,10 @@
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- 应用内部存储的 files 目录，用于分享 meme 图片 -->
     <files-path name="meme_files" path="." />
+    <!-- 应用内部 cache 目录，用于分享导出的 ZIP 临时文件 -->
+    <cache-path name="meme_cache" path="." />
     <!-- 外部存储的 pictures 目录，用于无障碍临时图片 -->
     <external-files-path name="meme_ext" path="." />
+    <external-cache-path name="meme_ext_cache" path="." />
     <external-path name="meme_public" path="." />
 </paths>

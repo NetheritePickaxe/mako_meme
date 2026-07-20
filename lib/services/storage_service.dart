@@ -1869,7 +1869,8 @@ class StorageService {
           }
         }
         if (bytes != null) {
-          archive.addFile(ArchiveFile.bytes('memes/${meme.filePath}', bytes));
+          // meme.filePath 已包含 'memes/' 前缀，直接用，避免 'memes/memes/xxx' 双重前缀
+          archive.addFile(ArchiveFile.bytes(meme.filePath, bytes));
         }
       }
 

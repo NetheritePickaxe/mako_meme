@@ -1096,6 +1096,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return;
     }
 
+    final isMobile = defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS;
+
     // 确定目标目录
     Directory? targetDir;
     try {
@@ -1115,26 +1118,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
         }
         targetDir = Directory(picturesPath);
       } else if (defaultTargetPlatform == TargetPlatform.android) {
-        // Android：优先尝试公共 Pictures 目录（会被相册扫描）
-        final publicDir = Directory('/storage/emulated/0/Pictures/Mako Meme');
-        try {
-          if (!await publicDir.exists()) await publicDir.create(recursive: true);
-          // 测试写入权限
-          final testFile = File(p.join(publicDir.path, '.mako_test'));
-          await testFile.writeAsString('test');
-          await testFile.delete();
-          targetDir = publicDir;
-        } catch (_) {
-          // 回退到应用专属外部存储（不会被相册自动扫描）
-          final ext = await getExternalStorageDirectory();
-          if (ext != null) {
-            targetDir = Directory(p.join(ext.path, 'Pictures', 'Mako Meme'));
-          }
+        // Android 10+ scoped storage 禁止直接写入公共目录，
+        // 用应用专属外部存储做中转，再通过 Share 让用户选择目标
+        final ext = await getExternalStorageDirectory();
+        if (ext != null) {
+          targetDir = Directory(p.join(ext.path, 'Mako Meme Export'));
         }
       } else if (defaultTargetPlatform == TargetPlatform.iOS) {
-        // iOS：保存到文档目录
-        final docs = await getApplicationDocumentsDirectory();
-        targetDir = Directory(p.join(docs.path, 'Mako Meme'));
+        // iOS：用临时目录做中转，再通过 Share 让用户选择目标
+        final temp = await getTemporaryDirectory();
+        targetDir = Directory(p.join(temp.path, 'mako_gallery_export'));
       }
     } catch (_) {}
 
@@ -1147,9 +1140,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return;
     }
 
-    if (!await targetDir.exists()) {
-      await targetDir.create(recursive: true);
-    }
+    // 清理并重建目标目录（避免上次导出的残留文件干扰）
+    try {
+      if (await targetDir.exists()) await targetDir.delete(recursive: true);
+    } catch (_) {}
+    await targetDir.create(recursive: true);
 
     if (!context.mounted) return;
 
@@ -1181,6 +1176,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     int failed = 0;
     // 收集成功导出的 meme，完成后打上「系统图集」标记 tag
     final exportedMemeIds = <String>{};
+    // 移动端：收集所有生成文件的路径，最后通过 Share 一次性分享
+    final exportedPaths = <String>[];
     for (final meme in memes) {
       try {
         final abs = storage.getMemeAbsolutePath(meme.filePath);
@@ -1199,6 +1196,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           counter++;
         }
         await srcFile.copy(finalPath);
+        exportedPaths.add(finalPath);
         exportedMemeIds.add(meme.id);
         done++;
       } catch (_) {
@@ -1220,8 +1218,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
 
     progressNotifier.dispose();
+    if (!context.mounted) return;
+    Navigator.of(context).pop(); // 关闭进度对话框
+
+    // 移动端：弹出 Share sheet 让用户选择保存到相册/文件/云盘
+    if (isMobile && exportedPaths.isNotEmpty) {
+      try {
+        await Share.shareXFiles(
+          exportedPaths.map((path) => XFile(path)).toList(),
+          subject: 'Mako Meme',
+        );
+      } catch (_) {}
+      // 延迟清理临时目录
+      Future.delayed(const Duration(minutes: 2), () {
+        try { targetDir.delete(recursive: true); } catch (_) {}
+      });
+    }
+
     if (context.mounted) {
-      Navigator.of(context).pop(); // 关闭进度对话框
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(l10n.tr('saved_n_to', args: {'done': done.toString(), 'path': targetDir.path}) + (failed > 0 ? ' ($failed)' : '')),
