@@ -74,6 +74,9 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
   // 单击图片切换，支持 PhotoView/InteractiveViewer 捏合缩放
   bool _isFullscreen = false;
 
+  // 角色卡预览展开/收起状态：默认收起，避免长内容撑爆详情面板
+  bool _cardExpanded = false;
+
   // 漫画内部页面滑动
   int _mangaPageIndex = 0;
   final _LruCache<String, Uint8List?> _mangaBytesCache = _LruCache(3);
@@ -1185,7 +1188,24 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                 ),
                 if (m.type == Meme.typeCharacterCard) ...[
                   const SizedBox(height: 8),
-                  ..._buildCharacterCardPreview(theme, l10n, m),
+                  // 角色卡预览标题栏：点击切换展开/收起，右侧浮动编辑按钮始终可见
+                  _buildCharacterCardHeader(theme, l10n, m),
+                  // 内容：收起时隐藏，展开时显示全部字段
+                  AnimatedCrossFade(
+                    duration: const Duration(milliseconds: 200),
+                    sizeCurve: Curves.easeInOut,
+                    crossFadeState: _cardExpanded
+                        ? CrossFadeState.showSecond
+                        : CrossFadeState.showFirst,
+                    firstChild: const SizedBox(width: double.infinity, height: 0),
+                    secondChild: Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: _buildCharacterCardPreview(theme, l10n, m),
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   SizedBox(
                     width: double.infinity,
@@ -1880,42 +1900,83 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
     }
 
     return [
-      Stack(
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: children,
+        ),
+      ),
+    ];
+  }
+
+  /// 角色卡预览标题栏：点击切换展开/收起，右侧始终显示编辑按钮
+  /// 默认收起，避免长内容撑爆详情面板；展开后显示全部字段
+  Widget _buildCharacterCardHeader(ThemeData theme, L10n l10n, Meme m) {
+    final name = (m.characterData?['name'] ?? '').toString();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
         children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: children,
+          Icon(
+            Icons.contact_page_outlined,
+            size: 18,
+            color: theme.colorScheme.primary,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              name.isNotEmpty ? name : l10n.tr('type_character_card'),
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-          // 右上角浮动小编辑按钮：角色卡可能非常长，
-          // 用户无需划到底部"编辑角色卡"按钮也能直接进入编辑
-          Positioned(
-            top: 4,
-            right: 4,
-            child: IconButton(
-              icon: const Icon(Icons.edit_outlined, size: 18),
-              tooltip: l10n.tr('edit_character_card'),
-              visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-              style: IconButton.styleFrom(
-                backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
-                foregroundColor: theme.colorScheme.primary,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              onPressed: _editCharacterCard,
+          // 编辑按钮：始终可见，无需展开即可点
+          IconButton(
+            icon: const Icon(Icons.edit_outlined, size: 18),
+            tooltip: l10n.tr('edit_character_card'),
+            visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+            style: IconButton.styleFrom(
+              foregroundColor: theme.colorScheme.primary,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
+            onPressed: _editCharacterCard,
+          ),
+          // 展开/收起切换按钮
+          IconButton(
+            icon: Icon(
+              _cardExpanded ? Icons.expand_less : Icons.expand_more,
+              size: 22,
+            ),
+            tooltip: _cardExpanded ? l10n.tr('collapse') : l10n.tr('expand'),
+            visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+            style: IconButton.styleFrom(
+              foregroundColor: theme.colorScheme.primary,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            onPressed: () => setState(() => _cardExpanded = !_cardExpanded),
           ),
         ],
       ),
-    ];
+    );
   }
 
   void _showTypeDialog() {
