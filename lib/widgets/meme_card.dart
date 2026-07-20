@@ -67,13 +67,16 @@ class _MemeCardState extends State<MemeCard> {
   void _loadBytes() {
     if (!_loading) return;
     final m = widget.meme;
-    // PDF 不需要加载图片字节
+    // PDF 仅在有缩略图（导入时已渲染封面）时才加载缩略图字节
     if (m.isPdf) {
-      _loading = false;
-      return;
+      if (m.thumbPath == null || m.thumbPath!.isEmpty) {
+        _loading = false;
+        return;
+      }
+      // 走和图片相同的加载路径，displayPath 已指向 thumbPath
     }
     final storage = context.read<StorageService>();
-    if (m.isImageType && _displayPath.isNotEmpty) {
+    if ((m.isImageType || (m.isPdf && m.thumbPath != null)) && _displayPath.isNotEmpty) {
       // 优先用导入时记录的宽高，避免每次都解析文件头
       if (m.width > 0 && m.height > 0) {
         _aspectRatio = m.width / m.height;
@@ -437,9 +440,14 @@ class _MemeCardState extends State<MemeCard> {
 
   /// 统一的缩略图渲染：PDF 显示图标，SVG 用 SvgPicture，其他用 Image.file/memory（带 cacheWidth 防止 OOM）
   Widget _buildThumbnail({required BoxFit fit}) {
-    // PDF：显示文档图标
+    // PDF：有缩略图显示封面，无缩略图显示图标
     if (widget.meme.isPdf) {
-      return _formatPlaceholder(Icons.picture_as_pdf, 'PDF');
+      if (widget.meme.thumbPath == null ||
+          widget.meme.thumbPath!.isEmpty ||
+          (_bytes == null && _file == null)) {
+        return _formatPlaceholder(Icons.picture_as_pdf, 'PDF');
+      }
+      // 走和普通图片相同的渲染分支（下方位图逻辑）
     }
     // SVG 矢量图：用 flutter_svg 渲染，无限缩放不失真
     if (widget.meme.isVector) {

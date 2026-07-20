@@ -570,17 +570,52 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
     ),
   );
 
-  /// PDF 查看器：显示文件图标 + 信息 + 外部打开按钮
-  /// 不内置 PDF 渲染引擎以避免增加包体，用户可点击按钮用系统应用打开
+  /// PDF 查看器：显示封面缩略图（若有）+ 文件信息 + 外部打开按钮
+  /// 不内置完整 PDF 渲染引擎以避免包体过大，封面用 pdfx 渲染第一页
   Widget _buildPdfView(ThemeData theme, Meme m) {
     final l10n = context.read<LocaleProvider>().l10n;
+    final storage = context.read<StorageService>();
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.picture_as_pdf, size: 80, color: theme.colorScheme.primary),
+            // 封面：有 thumbPath 显示渲染的封面，否则显示 PDF 图标
+            if (m.thumbPath != null && m.thumbPath!.isNotEmpty)
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.55,
+                  maxWidth: MediaQuery.of(context).size.width * 0.85,
+                ),
+                child: kIsWeb
+                    ? FutureBuilder<Uint8List?>(
+                        future: storage.readMemeBytes(m.thumbPath!),
+                        builder: (ctx, snap) {
+                          if (snap.data == null) {
+                            return Icon(Icons.picture_as_pdf, size: 80,
+                                color: theme.colorScheme.primary);
+                          }
+                          return InteractiveViewer(
+                            child: Image.memory(snap.data!, fit: BoxFit.contain),
+                          );
+                        },
+                      )
+                    : FutureBuilder<File?>(
+                        future: Future.value(storage.getMemeFile(m.thumbPath!)),
+                        builder: (ctx, snap) {
+                          if (snap.data == null || !snap.data!.existsSync()) {
+                            return Icon(Icons.picture_as_pdf, size: 80,
+                                color: theme.colorScheme.primary);
+                          }
+                          return InteractiveViewer(
+                            child: Image.file(snap.data!, fit: BoxFit.contain),
+                          );
+                        },
+                      ),
+              )
+            else
+              Icon(Icons.picture_as_pdf, size: 80, color: theme.colorScheme.primary),
             const SizedBox(height: 16),
             Text(
               m.name,
@@ -618,7 +653,17 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
   Future<void> _openPdfExternally(Meme m) async {
     final storage = context.read<StorageService>();
     final file = storage.getMemeFile(m.filePath);
-    if (file == null) return;
+    if (file == null || !await file.exists()) return;
+    // Android/iOS：file:// URI 因 scoped storage + FileProvider 限制，launchUrl 通常无效
+    // 改用系统分享菜单（Share sheet），让用户选择 PDF 阅读器打开
+    if (defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS) {
+      await Share.shareXFiles(
+        [XFile(file.path, mimeType: 'application/pdf', name: '${m.name}.pdf')],
+      );
+      return;
+    }
+    // 桌面端（Windows/macOS/linux）：用系统默认应用打开
     final uri = Uri.file(file.path);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
