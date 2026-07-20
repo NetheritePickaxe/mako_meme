@@ -17,6 +17,8 @@ class _MakoSearchBarState extends State<MakoSearchBar> {
   List<SearchSuggestion> _suggestions = [];
   String _lastHelpShown = '';
   String? _error;
+  // 仅在用户按下回车尝试执行后才显示红色错误提示，输入过程中不报红
+  bool _showError = false;
 
   @override
   void dispose() {
@@ -26,6 +28,8 @@ class _MakoSearchBarState extends State<MakoSearchBar> {
 
   void _onChanged(String v) {
     setState(() {
+      // 输入过程中隐藏错误提示，等用户再次回车时才重新检查显示
+      _showError = false;
       _updateError(v);
       // 始终更新补全建议：即使有错误，也展示可用的补全项帮助用户完成输入
       // 这样用户输入 /tag 时即使格式不完整也能看到 add/remove 等补全
@@ -160,7 +164,15 @@ class _MakoSearchBarState extends State<MakoSearchBar> {
   }
 
   Future<void> _onSubmitted(String v) async {
-    if (_error != null) return;
+    // 重新校验一次（防止 _onChanged 后文本被补全改过）
+    _updateError(v);
+    if (_error != null) {
+      // 回车后才显示红色错误提示
+      setState(() {
+        _showError = true;
+      });
+      return;
+    }
     final q = v.trim();
     if (q.isEmpty) {
       widget.onSearch(v);
@@ -176,6 +188,7 @@ class _MakoSearchBarState extends State<MakoSearchBar> {
       _suggestions = [];
       _lastHelpShown = '';
       _error = null;
+      _showError = false;
       widget.onSearch('');
       setState(() {});
       if (mounted && msg != null) {
@@ -197,7 +210,8 @@ class _MakoSearchBarState extends State<MakoSearchBar> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = context.watch<LocaleProvider>().l10n;
-    final hasError = _error != null;
+    // 仅在用户回车尝试执行后才显示红色错误 UI，输入过程中不报红
+    final hasError = _showError && _error != null;
     final errorColor = theme.colorScheme.error;
     final isCmd = _isCommandMode(_controller.text);
 
@@ -227,6 +241,7 @@ class _MakoSearchBarState extends State<MakoSearchBar> {
                         _suggestions = [];
                         _lastHelpShown = '';
                         _error = null;
+                        _showError = false;
                         widget.onSearch('');
                         setState(() {});
                       },
