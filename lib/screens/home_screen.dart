@@ -21,6 +21,7 @@ import '../widgets/meme_preview_panel.dart';
 import '../services/storage_service.dart';
 import '../screens/settings_screen.dart';
 import '../screens/text_editor_screen.dart';
+import '../screens/markdown_editor_screen.dart';
 import '../widgets/import_edit_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -1059,8 +1060,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 onSelected: (v) {
                   Navigator.pop(bCtx);
-                  if (v == 'novel') {
-                    _importNovel(ctx, prov);
+                  if (v == 'md') {
+                    _importMd(ctx, prov);
                   } else if (v == 'text_file') {
                     _importTextFile(ctx, prov);
                   } else {
@@ -1075,9 +1076,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     dense: true,
                     contentPadding: EdgeInsets.zero,
                   )),
-                  PopupMenuItem(value: 'novel', child: ListTile(
-                    leading: const Icon(Icons.menu_book, size: 20),
-                    title: Text(l10n.tr('import_as_novel'),
+                  PopupMenuItem(value: 'md', child: ListTile(
+                    leading: const Icon(Icons.description, size: 20),
+                    title: Text(l10n.tr('import_as_md'),
                       style: const TextStyle(fontSize: 14)),
                     dense: true,
                     contentPadding: EdgeInsets.zero,
@@ -1165,8 +1166,17 @@ class _HomeScreenState extends State<HomeScreen> {
     _showTextEditor(ctx, prov, type: Meme.typeText);
   }
 
-  void _importNovel(BuildContext ctx, MemeProvider prov) {
-    _showTextEditor(ctx, prov, type: Meme.typeNovel);
+  void _importMd(BuildContext ctx, MemeProvider prov) {
+    Navigator.push(
+      ctx,
+      MaterialPageRoute(
+        builder: (_) => MarkdownEditorScreen(
+          onSave: (text, title) async {
+            await prov.importText(text, name: title, type: Meme.typeMd);
+          },
+        ),
+      ),
+    );
   }
 
   /// 从文本文件导入（txt / md / doc / docx）
@@ -1489,13 +1499,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// 文本/小说编辑弹窗（紧凑弹窗 + 展开按钮）
   void _showTextEditor(BuildContext ctx, MemeProvider prov, {required String type}) {
-    Navigator.push(
+    TextEditorDialog.show(
       ctx,
-      MaterialPageRoute(
-        builder: (_) => TextEditorScreen(type: type, onSave: (text, title) async {
-          await prov.importText(text, name: title, type: type);
-        }),
-      ),
+      type: type,
+      onSave: (text, title) async {
+        await prov.importText(text, name: title, type: type);
+      },
     );
   }
 
@@ -1642,13 +1651,18 @@ class _EmojiRainOverlayState extends State<_EmojiRainOverlay>
   late AnimationController _controller;
   final List<_EmojiParticle> _particles = [];
   static const _emojis = ['🥰', '😍', '😘'];
+  // 最慢粒子的完成时间（controller value）= max_delay + 1/min_speed
+  // max_delay=0.4, min_speed=0.8 → 1/max=1.25 → 总 1.65
+  // controller duration 需让 value 达到 1.65 时所有粒子出屏
+  static const _maxControllerValue = 1.65;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 3500),
+      // 以最慢粒子出屏所需时间为基准，每秒约 0.5 个 controller value
+      duration: const Duration(milliseconds: 4000),
     );
     _spawnParticles();
     _controller.forward().then((_) {
@@ -1688,13 +1702,30 @@ class _EmojiRainOverlayState extends State<_EmojiRainOverlay>
         child: AnimatedBuilder(
           animation: _controller,
           builder: (ctx, _) {
+            // 按 _maxControllerValue 归一化，让最慢粒子在动画结束时刚好 t=1
+            final cv = _controller.value * _maxControllerValue;
+            // 检查是否所有粒子都已完全出屏
+            final allGone = _particles.every((p) {
+              final t = (cv - p.delay) * p.speed;
+              return t > 1.1;
+            });
+            if (allGone && _controller.value >= 1.0) {
+              // 全部出屏，触发关闭
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) Navigator.of(context).maybePop();
+              });
+            }
             return Stack(
               children: _particles.map((p) {
-                double t = (_controller.value - p.delay) * p.speed;
+                // t 表示粒子下落进度：0=顶部出发，1=刚出屏幕底部
+                double t = (cv - p.delay) * p.speed;
                 if (t <= 0) return const SizedBox.shrink();
-                if (t > 1) t = 1;
+                // t > 1 后继续向下超出屏幕，不再夹紧到 1
+                // 当 t > 1.1 时粒子已远离屏幕，返回空避免无谓绘制
+                if (t > 1.15) return const SizedBox.shrink();
                 final y = -60.0 + t * (size.height + 120);
                 final x = p.x * size.width + p.drift * size.width * t;
+                // 淡入（前 8%）+ 淡出（最后 15%）
                 final opacity = t < 0.08
                     ? t / 0.08
                     : (t > 0.85 ? (1 - t) / 0.15 : 1.0);

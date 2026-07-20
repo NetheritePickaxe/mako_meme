@@ -82,6 +82,8 @@ class MultiSelectBar extends StatelessWidget {
     // 仅对可处理的图片类型生效
     final imageMemes = selected.where((m) =>
         m.isImageType && !m.isVector && !m.isPsd && !m.isPdf).toList();
+    // 幻影坦克专用：再排除动图（GIF/APNG）
+    final staticImageMemes = imageMemes.where((m) => !m.isAnimated).toList();
     showModalBottomSheet(
       context: ctx,
       shape: const RoundedRectangleBorder(
@@ -131,17 +133,17 @@ class MultiSelectBar extends StatelessWidget {
             ListTile(
               leading: const Icon(Icons.visibility),
               title: Text(l10n.tr('tool_phantom_tank')),
-              // 2 张：单张幻影坦克对话框；3+ 张：批量生成独立界面（支持多对配对）
-              enabled: imageMemes.length >= 2,
-              subtitle: imageMemes.length < 2 ? Text(l10n.tr('phantom_need_two')) : null,
-              onTap: imageMemes.length >= 2 ? () {
+              // 幻影坦克仅支持静态图片，过滤掉 GIF/APNG 等动图
+              enabled: staticImageMemes.length >= 2,
+              subtitle: staticImageMemes.length < 2 ? Text(l10n.tr('phantom_need_two_static')) : null,
+              onTap: staticImageMemes.length >= 2 ? () {
                 Navigator.pop(bCtx);
-                if (imageMemes.length == 2) {
-                  _showPhantomTankDialog(ctx, prov, l10n, imageMemes);
+                if (staticImageMemes.length == 2) {
+                  _showPhantomTankDialog(ctx, prov, l10n, staticImageMemes);
                 } else {
                   // 3+ 张进入批量生成独立界面
                   Navigator.push(ctx, MaterialPageRoute(
-                    builder: (_) => PhantomTankBatchScreen(memes: imageMemes),
+                    builder: (_) => PhantomTankBatchScreen(memes: staticImageMemes),
                   ));
                 }
               } : null,

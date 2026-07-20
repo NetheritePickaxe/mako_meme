@@ -382,7 +382,7 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
     }
 
     // 小说：可滚动的长文阅读器，支持 Markdown 渲染
-    if (m.isNovel) {
+    if (m.isNovel || m.isMd) {
       return _buildNovelReader(theme, m);
     }
 
@@ -1607,16 +1607,14 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
   /// 编辑文本/小说内容 — 打开编辑弹窗
   void _editText(Meme m) {
     final prov = context.read<MemeProvider>();
-    showDialog(
-      context: context,
-      builder: (_) => TextEditorScreen(
-        type: m.type,
-        initialText: m.textContent,
-        initialTitle: m.name,
-        onSave: (text, title) async {
-          await prov.updateMemeText(m.id, text, name: title);
-        },
-      ),
+    TextEditorDialog.show(
+      context,
+      type: m.type,
+      initialText: m.textContent,
+      initialTitle: m.name,
+      onSave: (text, title) async {
+        await prov.updateMemeText(m.id, text, name: title);
+      },
     );
   }
 

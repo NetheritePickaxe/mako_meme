@@ -11,10 +11,11 @@ class Meme {
   static const String typePdf = 'pdf';          // PDF 文档
   static const String typeNovel = 'novel';       // 小说（长文本）
   static const String typeManga = 'manga';       // 漫画（多页图片）
+  static const String typeMd = 'md';              // Markdown 文档
 
   static const List<String> allTypes = [
     typeEmoji, typeGif, typeImage, typeText, typePortrait, typeCg,
-    typeCharacterCard, typeVector, typePsd, typePdf, typeNovel, typeManga,
+    typeCharacterCard, typeVector, typePsd, typePdf, typeNovel, typeManga, typeMd,
   ];
 
   /// 所有支持的图片/文档格式扩展名（不含点，小写）
@@ -53,8 +54,11 @@ class Meme {
   /// 是否为小说（长文本）
   bool get isNovel => type == typeNovel;
 
-  /// 是否为文本类（文本或小说）
-  bool get isTextLike => type == typeText || type == typeNovel;
+  /// 是否为 Markdown 文档
+  bool get isMd => type == typeMd;
+
+  /// 是否为文本类（文本、小说或 Markdown）
+  bool get isTextLike => type == typeText || type == typeNovel || type == typeMd;
 
   /// 实际显示用路径：有缩略图（PSD/ICO/TIF 转换的 PNG）时用 thumbPath，否则用 filePath
   String get displayPath => thumbPath ?? filePath;
@@ -81,6 +85,7 @@ class Meme {
       case typePdf: return 'type_pdf';
       case typeNovel: return 'type_novel';
       case typeManga: return 'type_manga';
+      case typeMd: return 'type_md';
       default: return 'type_image';
     }
   }
