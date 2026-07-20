@@ -264,14 +264,38 @@ class _HomeScreenState extends State<HomeScreen> {
           }
         },
         itemBuilder: (_) => [
-          CheckedPopupMenuItem(value: 'date', checked: prov.sortBy == SortBy.date, child: Text(l10n.tr('sort_by_date'))),
-          CheckedPopupMenuItem(value: 'name', checked: prov.sortBy == SortBy.name, child: Text(l10n.tr('sort_by_name'))),
-          CheckedPopupMenuItem(value: 'size', checked: prov.sortBy == SortBy.size, child: Text(l10n.tr('sort_by_size'))),
+          _buildSortItem(l10n.tr('sort_by_date'), 'date', prov.sortBy == SortBy.date),
+          _buildSortItem(l10n.tr('sort_by_name'), 'name', prov.sortBy == SortBy.name),
+          _buildSortItem(l10n.tr('sort_by_size'), 'size', prov.sortBy == SortBy.size),
           const PopupMenuDivider(),
-          PopupMenuItem(value: 'order', child: Text(prov.order == SortOrder.asc ? '↑ ${l10n.tr('asc')}' : '↓ ${l10n.tr('desc')}')),
+          _buildSortItem(
+            prov.order == SortOrder.asc ? '↑ ${l10n.tr('asc')}' : '↓ ${l10n.tr('desc')}',
+            'order',
+            false,
+          ),
         ],
       ),
     ];
+  }
+
+  /// 紧凑的排序菜单项：固定 36px 高度，左侧选中态打勾，避免默认 48px 显得过长
+  PopupMenuItem<String> _buildSortItem(String label, String value, bool selected) {
+    final theme = Theme.of(context);
+    return PopupMenuItem<String>(
+      value: value,
+      height: 36,
+      child: Row(
+        children: [
+          SizedBox(
+            width: 24,
+            child: selected
+                ? Icon(Icons.check, size: 16, color: theme.colorScheme.primary)
+                : const SizedBox.shrink(),
+          ),
+          Expanded(child: Text(label)),
+        ],
+      ),
+    );
   }
 
   Widget? _buildFab(MemeProvider prov) {

@@ -1,7 +1,7 @@
 name: mako_meme
 description: "跨平台表情包管理器"
 publish_to: 'none'
-version: 0.0.16+1
+version: 0.0.17+1
 
 environment:
   sdk: ">=3.10.3 <4.0.0"
