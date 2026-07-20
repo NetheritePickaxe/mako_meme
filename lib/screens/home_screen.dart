@@ -137,10 +137,14 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: navIndex,
         onDestinationSelected: (i) => _onTabChanged(_navToLogic(i)),
+        // 显式胶囊形 indicator，配合 M3 默认 ripple 跟随 indicator 形状
+        indicatorShape: const StadiumBorder(),
+        height: 72,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         destinations: [
           NavigationDestination(
-            icon: const Icon(Icons.photo_library_outlined),
-            selectedIcon: Icon(Icons.photo_library, color: theme.colorScheme.onSurface),
+            icon: const Icon(Icons.collections_outlined),
+            selectedIcon: Icon(Icons.collections, color: theme.colorScheme.onSurface),
             label: l10n.tr('nav_memes'),
           ),
           NavigationDestination(
@@ -155,8 +159,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           if (showMoodTab)
             NavigationDestination(
-              icon: const Icon(Icons.mood_outlined),
-              selectedIcon: Icon(Icons.mood, color: theme.colorScheme.onSurface),
+              icon: const Icon(Icons.sentiment_satisfied_outlined),
+              selectedIcon: Icon(Icons.sentiment_satisfied, color: theme.colorScheme.onSurface),
               label: l10n.tr('nav_moods'),
             ),
         ],
@@ -261,9 +265,6 @@ class _HomeScreenState extends State<HomeScreen> {
             case 'name': prov.setSort(SortBy.name); break;
             case 'size': prov.setSort(SortBy.size); break;
             case 'order': prov.toggleOrder(); break;
-            case 'excludeFoldered':
-              context.read<SettingsProvider>().setExcludeFoldered(!settings.excludeFoldered);
-              break;
           }
         },
         itemBuilder: (_) => [
@@ -272,12 +273,6 @@ class _HomeScreenState extends State<HomeScreen> {
           CheckedPopupMenuItem(value: 'size', checked: prov.sortBy == SortBy.size, child: Text(l10n.tr('sort_by_size'))),
           const PopupMenuDivider(),
           PopupMenuItem(value: 'order', child: Text(prov.order == SortOrder.asc ? '↑ ${l10n.tr('asc')}' : '↓ ${l10n.tr('desc')}')),
-          const PopupMenuDivider(),
-          CheckedPopupMenuItem(
-            value: 'excludeFoldered',
-            checked: settings.excludeFoldered,
-            child: Text(l10n.tr('exclude_foldered')),
-          ),
         ],
       ),
     ];

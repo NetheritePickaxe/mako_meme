@@ -93,6 +93,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
           _autoClassifyTile(settings, l10n),
           const Divider(indent: 16, endIndent: 16),
+          _excludeFolderedTile(settings, l10n),
+          const Divider(indent: 16, endIndent: 16),
           _importEditOnImportTile(settings, l10n),
           const Divider(indent: 16, endIndent: 16),
           _cardDisplayTile(settings, l10n),
@@ -475,6 +477,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
       subtitle: Text(l10n.tr('tag_subdivision_desc')),
       value: settings.tagSubdivision,
       onChanged: (v) => settings.setTagSubdivision(v),
+    );
+  }
+
+  /// 主界面排除已归入文件夹的图片（仅影响「表情」tab 顶层视图）
+  Widget _excludeFolderedTile(SettingsProvider settings, L10n l10n) {
+    return SwitchListTile(
+      secondary: const Icon(Icons.filter_alt_outlined),
+      title: Text(l10n.tr('exclude_foldered')),
+      subtitle: Text(l10n.tr('exclude_foldered_desc')),
+      value: settings.excludeFoldered,
+      onChanged: (v) => settings.setExcludeFoldered(v),
     );
   }
 
