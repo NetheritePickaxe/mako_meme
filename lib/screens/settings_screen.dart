@@ -1116,10 +1116,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Slider(
-                      value: HSLColor.fromColor(currentColor).lightness,
+                      value: HSVColor.fromColor(currentColor).value,
                       onChanged: (v) {
-                        final hsl = HSLColor.fromColor(currentColor);
-                        setModalState(() => setColor(hsl.withLightness(v).toColor()));
+                        final hsv = HSVColor.fromColor(currentColor);
+                        setModalState(() => setColor(hsv.withValue(v).toColor()));
                       },
                     ),
                   ),
