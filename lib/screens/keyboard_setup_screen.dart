@@ -100,20 +100,10 @@ class _KeyboardSetupScreenState extends State<KeyboardSetupScreen> with WidgetsB
                       actionLabel: _imeEnabled ? l10n.tr('open_ime_settings') : l10n.tr('enable_ime'),
                       onAction: () => ImeStatusService.openImeSettings(),
                     ),
-                    // 输入法已启用时显示「切换到本输入法」按钮
+                    // 输入法已启用时显示「切换到本输入法」卡片（与上方状态卡片样式一致）
                     if (_imeEnabled) ...[
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.icon(
-                          onPressed: () async {
-                            await ImeStatusService.showImePicker();
-                            if (mounted) _refreshStatus();
-                          },
-                          icon: const Icon(Icons.swap_horiz, size: 18),
-                          label: Text(l10n.tr('switch_to_ime')),
-                        ),
-                      ),
+                      const SizedBox(height: 12),
+                      _buildSwitchImeCard(l10n, cs),
                     ],
                     const SizedBox(height: 12),
                     // 无障碍状态
@@ -130,9 +120,6 @@ class _KeyboardSetupScreenState extends State<KeyboardSetupScreen> with WidgetsB
                       onAction: () => ImeStatusService.openAccessibilitySettings(),
                     ),
                     const SizedBox(height: 16),
-                    // 测试输入框：点击后弹出当前输入法键盘
-                    _buildTestInput(l10n, cs),
-                    const SizedBox(height: 16),
                     // 使用说明
                     _buildInstructions(l10n, cs),
                   ],
@@ -140,8 +127,8 @@ class _KeyboardSetupScreenState extends State<KeyboardSetupScreen> with WidgetsB
     );
   }
 
-  /// 测试输入框：用于验证输入法是否正常工作
-  Widget _buildTestInput(L10n l10n, ColorScheme cs) {
+  /// 「切换到本输入法」卡片：样式与上方状态卡片一致
+  Widget _buildSwitchImeCard(L10n l10n, ColorScheme cs) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -150,22 +137,31 @@ class _KeyboardSetupScreenState extends State<KeyboardSetupScreen> with WidgetsB
           children: [
             Row(
               children: [
-                Icon(Icons.edit_note, size: 18, color: cs.primary),
-                const SizedBox(width: 8),
-                Text(l10n.tr('test_input_title'),
-                    style: TextStyle(fontWeight: FontWeight.w600, color: cs.primary)),
+                Icon(Icons.swap_horiz, color: cs.primary),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(l10n.tr('switch_to_ime'),
+                          style: const TextStyle(fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 2),
+                      Text(l10n.tr('switch_to_ime_desc'),
+                          style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+                    ],
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 4),
-            Text(l10n.tr('test_input_desc'),
-                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
             const SizedBox(height: 12),
-            TextField(
-              decoration: InputDecoration(
-                hintText: l10n.tr('test_input_hint'),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                suffixIcon: const Icon(Icons.keyboard, size: 20),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.tonal(
+                onPressed: () async {
+                  await ImeStatusService.showImePicker();
+                  if (mounted) _refreshStatus();
+                },
+                child: Text(l10n.tr('switch_to_ime')),
               ),
             ),
           ],

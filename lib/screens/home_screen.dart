@@ -302,6 +302,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget? _buildFab(MemeProvider prov) {
     final theme = Theme.of(context);
+    // 系统图集分类为只读，不显示导入按钮
+    if (_currentTab == 0 && prov.typeFilter.contains(Meme.typeSystemGallery)) {
+      return null;
+    }
     if (_currentTab == 0) {
       return FloatingActionButton(
         onPressed: () => _showImportMenu(context, prov),
@@ -901,6 +905,9 @@ class _HomeScreenState extends State<HomeScreen> {
       {'type': Meme.typeManga, 'label': l10n.tr('cat_manga'), 'icon': Icons.menu_book_outlined},
       // 文件分类：包含 PDF 和其他文件类型
       {'type': Meme.typeFile, 'label': l10n.tr('cat_file'), 'icon': Icons.folder_outlined},
+      // 系统图集分类：仅在设置中启用后加入列表（仍受分类可见性控制）
+      if (settings.systemGalleryEnabled)
+        {'type': Meme.typeSystemGallery, 'label': l10n.tr('cat_system_gallery'), 'icon': Icons.photo_library_outlined},
       // md 归入文字分类，不单独显示
       // 用户自定义分类
       ...settings.customCategories.map((c) => {'type': c, 'label': c, 'icon': Icons.label_outline}),

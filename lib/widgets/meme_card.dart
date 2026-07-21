@@ -168,7 +168,18 @@ class _MemeCardState extends State<MemeCard> {
     final canReorder = widget.onReorder != null;
 
     // 桌面端：长按拖拽（用于排序或拖入文件夹），左键复制，右键菜单
+    // 系统图集虚拟 Meme 只读，不允许拖拽到文件夹
     if (_isDesktop) {
+      final draggable = !widget.meme.isSystemGallery;
+      final card = GestureDetector(
+        onTap: isMulti
+            ? () => prov.toggleSelect(widget.meme.id)
+            : (widget.previewMode ? _previewSelect : _copyToClipboard),
+        onDoubleTap: widget.previewMode && !isMulti ? _openViewer : null,
+        onSecondaryTapUp: (details) => _showContextMenu(details.globalPosition),
+        child: _buildInner(prov, isSelected, isMulti, theme),
+      );
+      if (!draggable) return card;
       return LongPressDraggable<Meme>(
         data: widget.meme,
         feedback: _buildFeedback(),
@@ -177,19 +188,13 @@ class _MemeCardState extends State<MemeCard> {
           child: _buildAspectRatioCard(prov, isSelected, isMulti, theme),
         ),
         onDragStarted: () => HapticFeedback.mediumImpact(),
-        child: GestureDetector(
-          onTap: isMulti
-              ? () => prov.toggleSelect(widget.meme.id)
-              : (widget.previewMode ? _previewSelect : _copyToClipboard),
-          onDoubleTap: widget.previewMode && !isMulti ? _openViewer : null,
-          onSecondaryTapUp: (details) => _showContextMenu(details.globalPosition),
-          child: _buildInner(prov, isSelected, isMulti, theme),
-        ),
+        child: card,
       );
     }
 
     // 移动端：多选模式下长按拖拽排序
-    if (isMulti && canReorder) {
+    // 系统图集虚拟 Meme 只读，不参与拖拽排序
+    if (isMulti && canReorder && !widget.meme.isSystemGallery) {
       final inner = _buildInner(prov, isSelected, isMulti, theme);
       return LongPressDraggable<Meme>(
         data: widget.meme,
@@ -738,6 +743,8 @@ class _MemeCardState extends State<MemeCard> {
 
   void _showContextMenu(Offset tapPosition) {
     final l10n = context.read<LocaleProvider>().l10n;
+    // 系统图集虚拟 Meme：只读，只支持预览/复制/分享，不支持编辑/分类/删除/收藏
+    final isReadOnly = widget.meme.isSystemGallery;
     showMenu(
       context: context,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -746,7 +753,7 @@ class _MemeCardState extends State<MemeCard> {
         Offset.zero & MediaQuery.of(context).size,
       ),
       items: <PopupMenuEntry<String>>[
-        if (_bytes == null && _file == null && !_loading)
+        if (!isReadOnly && _bytes == null && _file == null && !_loading)
           PopupMenuItem<String>(
             value: 'reimport',
             child: ListTile(leading: const Icon(Icons.refresh), title: Text(l10n.tr('reimport')), dense: true),
@@ -756,11 +763,11 @@ class _MemeCardState extends State<MemeCard> {
             value: 'preview',
             child: ListTile(leading: const Icon(Icons.zoom_in), title: Text(l10n.tr('preview_large')), dense: true),
           ),
-        PopupMenuItem<String>(
+        if (!isReadOnly) PopupMenuItem<String>(
           value: 'rename',
           child: ListTile(leading: const Icon(Icons.edit), title: Text(l10n.tr('rename')), dense: true),
         ),
-        PopupMenuItem<String>(
+        if (!isReadOnly) PopupMenuItem<String>(
           value: 'type',
           child: ListTile(leading: const Icon(Icons.label_outline), title: Text(l10n.tr('select_category')), dense: true),
         ),
@@ -772,7 +779,7 @@ class _MemeCardState extends State<MemeCard> {
           value: 'share',
           child: ListTile(leading: const Icon(Icons.share), title: Text(l10n.tr('share')), dense: true),
         ),
-        PopupMenuItem<String>(
+        if (!isReadOnly) PopupMenuItem<String>(
           value: 'favorite',
           child: ListTile(
             leading: Icon(Icons.favorite, color: widget.meme.isFavorite ? Colors.red : null),
@@ -780,16 +787,18 @@ class _MemeCardState extends State<MemeCard> {
             dense: true,
           ),
         ),
-        const PopupMenuDivider(),
-        PopupMenuItem<String>(
-          value: 'multi_select',
-          child: ListTile(leading: const Icon(Icons.checklist), title: Text(l10n.tr('multi_select')), dense: true),
-        ),
-        const PopupMenuDivider(),
-        PopupMenuItem<String>(
-          value: 'delete',
-          child: ListTile(leading: const Icon(Icons.delete, color: Colors.red), title: Text(l10n.tr('delete'), style: const TextStyle(color: Colors.red)), dense: true),
-        ),
+        if (!isReadOnly) ...[
+          const PopupMenuDivider(),
+          PopupMenuItem<String>(
+            value: 'multi_select',
+            child: ListTile(leading: const Icon(Icons.checklist), title: Text(l10n.tr('multi_select')), dense: true),
+          ),
+          const PopupMenuDivider(),
+          PopupMenuItem<String>(
+            value: 'delete',
+            child: ListTile(leading: const Icon(Icons.delete, color: Colors.red), title: Text(l10n.tr('delete'), style: const TextStyle(color: Colors.red)), dense: true),
+          ),
+        ],
       ],
     ).then((value) {
       if (value == null) return;

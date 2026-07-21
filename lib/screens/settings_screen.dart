@@ -14,6 +14,7 @@ import '../providers/locale_provider.dart';
 import '../l10n/l10n.dart';
 import '../models/meme.dart';
 import '../services/storage_service.dart';
+import '../services/system_gallery_service.dart';
 import '../services/update_service.dart';
 import 'keyboard_setup_screen.dart';
 import '../services/webdav_service.dart';
@@ -102,6 +103,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const Divider(indent: 16, endIndent: 16),
           _categoryManageTile(settings, l10n),
           const Divider(indent: 16, endIndent: 16),
+          if (defaultTargetPlatform == TargetPlatform.android ||
+              defaultTargetPlatform == TargetPlatform.windows) ...[
+            _systemGalleryTile(settings, l10n),
+            const Divider(indent: 16, endIndent: 16),
+          ],
           ListTile(
             leading: const Icon(Icons.file_download_outlined),
             title: Text(l10n.tr('import_data')),
@@ -552,6 +558,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       Meme.typeEmoji, Meme.typeGif, Meme.typeImage, Meme.typeText,
       Meme.typePortrait, Meme.typeCg, Meme.typeCharacterCard,
       Meme.typeVector, Meme.typePsd, Meme.typeManga, Meme.typeFile,
+      // 系统图集分类仅在启用后可在分类管理中切换可见性
+      if (settings.systemGalleryEnabled) Meme.typeSystemGallery,
     ];
     final visibleCount = builtinCats.where(settings.isCategoryVisible).length;
     final cs = Theme.of(context).colorScheme;
@@ -637,6 +645,136 @@ class _SettingsScreenState extends State<SettingsScreen> {
               }).toList(),
             ),
           ),
+      ],
+    );
+  }
+
+  /// 系统图集设置：开关 + 绑定目录管理
+  /// 启用后用户可添加要查看的系统图集目录（SAF/文件夹选择器），分类中展示这些目录的图片（只读）
+  Widget _systemGalleryTile(SettingsProvider settings, L10n l10n) {
+    final cs = Theme.of(context).colorScheme;
+    return ExpansionTile(
+      leading: const Icon(Icons.photo_library_outlined),
+      title: Text(l10n.tr('system_gallery_section')),
+      subtitle: Text(settings.systemGalleryEnabled
+          ? '${settings.systemGalleryPaths.length}'
+          : l10n.tr('disabled')),
+      shape: const Border(),
+      collapsedShape: const Border(),
+      tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+      childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      initiallyExpanded: false,
+      children: [
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(l10n.tr('system_gallery_enabled')),
+          subtitle: Text(l10n.tr('system_gallery_enabled_desc')),
+          value: settings.systemGalleryEnabled,
+          onChanged: (v) async {
+            await settings.setSystemGalleryEnabled(v);
+            if (v) {
+              // 启用时自动从隐藏分类中移除，让分类按钮立即可见
+              if (!settings.isCategoryVisible(Meme.typeSystemGallery)) {
+                await settings.toggleCategoryVisibility(Meme.typeSystemGallery);
+              }
+            }
+          },
+        ),
+        if (settings.systemGalleryEnabled) ...[
+          const SizedBox(height: 8),
+          // 已绑定的目录列表
+          if (settings.systemGalleryPaths.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  Icon(Icons.image_not_supported_outlined, size: 36, color: cs.outline),
+                  const SizedBox(height: 8),
+                  Text(l10n.tr('no_system_gallery'),
+                      style: TextStyle(fontWeight: FontWeight.w600, color: cs.onSurface)),
+                  const SizedBox(height: 4),
+                  Text(l10n.tr('no_system_gallery_desc'),
+                      style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                      textAlign: TextAlign.center),
+                ],
+              ),
+            )
+          else
+            ...settings.systemGalleryPaths.map((path) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.folder_outlined, size: 20, color: cs.primary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(path,
+                          style: const TextStyle(fontSize: 13),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 18),
+                      tooltip: l10n.tr('remove'),
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () async {
+                        await settings.removeSystemGalleryPath(path);
+                        if (context.mounted) {
+                          await context.read<MemeProvider>().refreshSystemGallery();
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            )),
+          const SizedBox(height: 8),
+          // 添加按钮
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.tonalIcon(
+              onPressed: () async {
+                final path = await SystemGalleryService.pickDirectory();
+                if (path == null) {
+                  // 用户取消或 SAF URI 转换失败（如选了 SD 卡根目录之外的非常规位置）
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(l10n.tr('pick_dir_failed'))),
+                    );
+                  }
+                  return;
+                }
+                await settings.addSystemGalleryPath(path);
+                if (context.mounted) {
+                  await context.read<MemeProvider>().refreshSystemGallery();
+                }
+              },
+              icon: const Icon(Icons.add),
+              label: Text(l10n.tr('add_system_gallery')),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // 只读提示
+          Row(
+            children: [
+              Icon(Icons.lock_outline, size: 14, color: cs.onSurfaceVariant),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(l10n.tr('system_gallery_read_only'),
+                    style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }
@@ -1187,6 +1325,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     int done = 0;
     int failed = 0;
+    // 构建 folderId → folderName 映射，按文件夹建子目录
+    final folders = storage.getAllFolders();
+    final folderNameById = <String, String>{};
+    for (final f in folders) {
+      folderNameById[f.id] = f.name;
+    }
     for (final meme in memes) {
       try {
         final abs = storage.getMemeAbsolutePath(meme.filePath);
@@ -1196,11 +1340,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
         // 用唯一文件名避免覆盖
         final ext = p.extension(meme.filePath);
         final destName = '${meme.name}$ext';
-        var finalPath = p.join(targetDir!.path, destName);
+        // 有 folderId 的 meme 放到子目录，无 folderId 的放根目录
+        // targetDir 在循环外已确认非空（早期 return 处理 null 情况）
+        Directory destDir = targetDir;
+        if (meme.folderId != null && folderNameById.containsKey(meme.folderId)) {
+          // 去掉路径分隔符，避免破坏目录结构
+          final folderName = folderNameById[meme.folderId]!
+              .replaceAll(RegExp(r'[/\\]'), '_');
+          destDir = Directory(p.join(targetDir.path, folderName));
+          if (!await destDir.exists()) await destDir.create(recursive: true);
+        }
+        var finalPath = p.join(destDir.path, destName);
         // 若重名，加序号
         var counter = 1;
         while (await File(finalPath).exists()) {
-          finalPath = p.join(targetDir.path, '${meme.name} ($counter)$ext');
+          finalPath = p.join(destDir.path, '${meme.name} ($counter)$ext');
           counter++;
         }
         await srcFile.copy(finalPath);

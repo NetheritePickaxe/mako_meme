@@ -559,7 +559,9 @@ class StorageService {
       return await webStorageGetBinary(filePath);
     }
     try {
-      final file = File(p.join(_basePath!, filePath));
+      final abs = getMemeAbsolutePath(filePath);
+      if (abs == null) return null;
+      final file = File(abs);
       if (await file.exists()) {
         return await file.readAsBytes();
       }
@@ -571,6 +573,8 @@ class StorageService {
   String? getMemeAbsolutePath(String filePath) {
     if (kIsWeb) return null;
     if (filePath.isEmpty) return null;
+    // 绝对路径（系统图集虚拟 Meme 的 filePath 为系统目录绝对路径）直接返回
+    if (p.isAbsolute(filePath)) return filePath;
     return p.join(_basePath!, filePath);
   }
 
@@ -1783,6 +1787,21 @@ class StorageService {
       final folders = getAllFolders();
       final allMemes = getAllMemes();
 
+      // 构建 folderId → folderName 映射，用于按文件夹组织 ZIP 内的物理路径
+      final folderNameById = <String, String>{};
+      for (final f in folders) {
+        folderNameById[f.id] = f.name;
+      }
+      // 文件夹名重复时加序号避免 ZIP 路径冲突
+      final usedNames = <String, int>{};
+      String safeFolderName(String name) {
+        // 去掉路径分隔符，避免破坏 ZIP 结构
+        final safe = name.replaceAll(RegExp(r'[/\\]'), '_');
+        final count = usedNames[safe] ?? 0;
+        usedNames[safe] = count + 1;
+        return count == 0 ? safe : '${safe}_$count';
+      }
+
       final archive = Archive();
 
       // meta.json
@@ -1807,7 +1826,8 @@ class StorageService {
         Uint8List.fromList(utf8.encode(jsonlBuf.toString())),
       ));
 
-      // memes/ 图片文件
+      // memes/ 图片文件：按 folderId 物理分到子目录
+      // 无 folder 的放 memes/xxx.png，有 folder 的放 memes/{folderName}/xxx.png
       for (final meme in allMemes) {
         if (meme.filePath.isEmpty) continue;
         Uint8List? bytes;
@@ -1820,8 +1840,16 @@ class StorageService {
           }
         }
         if (bytes != null) {
-          // meme.filePath 已包含 'memes/' 前缀，直接用，避免 'memes/memes/xxx' 双重前缀
-          archive.addFile(ArchiveFile.bytes(meme.filePath, bytes));
+          // 原 filePath 形如 'memes/uuid.png'，取 basename
+          final basename = p.basename(meme.filePath);
+          String zipPath;
+          if (meme.folderId != null && folderNameById.containsKey(meme.folderId)) {
+            final folderName = safeFolderName(folderNameById[meme.folderId!]!);
+            zipPath = 'memes/$folderName/$basename';
+          } else {
+            zipPath = 'memes/$basename';
+          }
+          archive.addFile(ArchiveFile.bytes(zipPath, bytes));
         }
       }
 
@@ -1918,7 +1946,7 @@ class StorageService {
       if (await srcImages.exists()) {
         final dstImages = Directory(p.join(_basePath!, 'memes'));
         if (!await dstImages.exists()) await dstImages.create(recursive: true);
-        await for (final f in srcImages.list()) {
+        await for (final f in srcImages.list(recursive: true)) {
           if (f is File) {
             await f.copy(p.join(dstImages.path, p.basename(f.path)));
           }
@@ -1999,7 +2027,7 @@ class StorageService {
       if (await srcImages.exists()) {
         final dstImages = Directory(p.join(_basePath!, 'memes'));
         if (!await dstImages.exists()) await dstImages.create(recursive: true);
-        await for (final f in srcImages.list()) {
+        await for (final f in srcImages.list(recursive: true)) {
           if (f is File) {
             await f.copy(p.join(dstImages.path, p.basename(f.path)));
           }

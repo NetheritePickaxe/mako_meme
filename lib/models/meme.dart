@@ -13,6 +13,9 @@ class Meme {
   static const String typeMd = 'md';              // Markdown 文档
   static const String typeNovel = 'novel';       // 小说（旧版本数据兼容）
   static const String typeFile = 'file';          // 其他文件（无法分类的）
+  /// 系统图集分类（虚拟类型，仅用于筛选系统目录中的图片，不存入数据库）
+  /// 虚拟 Meme 的 id 以 'sysgal://' 前缀标识，type 仍是其实际类型（image/gif/vector）
+  static const String typeSystemGallery = 'system_gallery';
 
   static const List<String> allTypes = [
     typeEmoji, typeGif, typeImage, typeText, typePortrait, typeCg,
@@ -67,6 +70,9 @@ class Meme {
   /// 是否为文件类（其他无法分类的文件）
   bool get isFile => type == typeFile;
 
+  /// 是否为系统图集虚拟 Meme（id 以 'sysgal://' 前缀标识，只读，不存数据库）
+  bool get isSystemGallery => id.startsWith('sysgal://');
+
   /// 是否为文本类（文本、Markdown 或旧版小说）
   bool get isTextLike => type == typeText || type == typeMd || type == typeNovel;
 
@@ -97,6 +103,7 @@ class Meme {
       case typeManga: return 'type_manga';
       case typeNovel: return 'type_novel';
       case typeFile: return 'type_file';
+      case typeSystemGallery: return 'cat_system_gallery';
       default: return 'type_image';
     }
   }

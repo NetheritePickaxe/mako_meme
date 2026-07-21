@@ -36,15 +36,21 @@ class SettingsProvider extends ChangeNotifier {
   bool _importEditOnImport = false;
 
   // 分类可见性 — 默认仅显示 emoji/gif/image/text 四类
-  // 其他（manga/vector/psd/pdf/portrait/cg/character_card/novel）默认隐藏，可在设置中开启
+  // 其他（manga/vector/psd/pdf/portrait/cg/character_card/novel/system_gallery）默认隐藏，可在设置中开启
   // 存储为逗号分隔的隐藏类型字符串
   Set<String> _hiddenCategories = {
     'manga', 'vector', 'psd', 'pdf',
     'portrait', 'cg', 'character_card', 'novel',
+    'system_gallery',
   };
 
   // 用户自定义分类（纯标签，无特殊功能）
   List<String> _customCategories = [];
+
+  // 系统图集分类：默认关闭。开启后可绑定系统目录查看图片（只读）
+  bool _systemGalleryEnabled = false;
+  // 已绑定的系统图集目录路径列表（绝对路径），用换行符分隔存储
+  List<String> _systemGalleryPaths = [];
 
   // WebDAV 配置
   bool _useWebDav = false;
@@ -123,6 +129,13 @@ class SettingsProvider extends ChangeNotifier {
     final savedCustom = _storage.getSetting('customCategories');
     if (savedCustom != null && savedCustom.isNotEmpty) {
       _customCategories = savedCustom.split(',').where((s) => s.isNotEmpty).toList();
+    }
+
+    // 加载系统图集配置
+    _systemGalleryEnabled = _storage.getSetting('systemGalleryEnabled') == 'true';
+    final savedPaths = _storage.getSetting('systemGalleryPaths');
+    if (savedPaths != null && savedPaths.isNotEmpty) {
+      _systemGalleryPaths = savedPaths.split('\n').where((s) => s.isNotEmpty).toList();
     }
 
     // 加载 WebDAV 配置
@@ -209,6 +222,8 @@ class SettingsProvider extends ChangeNotifier {
 
   Set<String> get hiddenCategories => Set.unmodifiable(_hiddenCategories);
   List<String> get customCategories => List.unmodifiable(_customCategories);
+  bool get systemGalleryEnabled => _systemGalleryEnabled;
+  List<String> get systemGalleryPaths => List.unmodifiable(_systemGalleryPaths);
 
   /// 判断某分类是否在主界面分类栏中可见
   bool isCategoryVisible(String type) => !_hiddenCategories.contains(type);
@@ -355,6 +370,28 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> removeCustomCategory(String name) async {
     _customCategories = _customCategories.where((c) => c != name).toList();
     await _storage.setSetting('customCategories', _customCategories.join(','));
+    notifyListeners();
+  }
+
+  /// 开关系统图集分类。关闭时清空 typeFilter 中的 system_gallery（由 provider 监听处理）。
+  Future<void> setSystemGalleryEnabled(bool v) async {
+    _systemGalleryEnabled = v;
+    await _storage.setSetting('systemGalleryEnabled', v ? 'true' : 'false');
+    notifyListeners();
+  }
+
+  /// 添加一个绑定的系统图集目录路径（去重）
+  Future<void> addSystemGalleryPath(String path) async {
+    if (path.isEmpty || _systemGalleryPaths.contains(path)) return;
+    _systemGalleryPaths = [..._systemGalleryPaths, path];
+    await _storage.setSetting('systemGalleryPaths', _systemGalleryPaths.join('\n'));
+    notifyListeners();
+  }
+
+  /// 移除一个绑定的系统图集目录路径
+  Future<void> removeSystemGalleryPath(String path) async {
+    _systemGalleryPaths = _systemGalleryPaths.where((p) => p != path).toList();
+    await _storage.setSetting('systemGalleryPaths', _systemGalleryPaths.join('\n'));
     notifyListeners();
   }
 
