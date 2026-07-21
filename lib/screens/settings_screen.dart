@@ -1231,7 +1231,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       } catch (_) {}
       // 延迟清理临时目录
       Future.delayed(const Duration(minutes: 2), () {
-        try { targetDir.delete(recursive: true); } catch (_) {}
+        try { targetDir?.delete(recursive: true); } catch (_) {}
       });
     }
 

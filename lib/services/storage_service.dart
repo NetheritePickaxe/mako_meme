@@ -498,7 +498,8 @@ class StorageService {
         await _saveMeme(updated, fileHash);
         return updated;
       } finally {
-        await doc.dispose();
+        // pdfx 2.9.2 的 PdfDocument 没有 dispose 方法，依赖 GC 释放原生资源
+        // 显式 close 在不同版本签名不一致，这里不做手动释放
       }
     } catch (_) {
       return meme;
