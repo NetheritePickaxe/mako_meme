@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:path/path.dart' as p;
 import 'package:share_plus/share_plus.dart';
@@ -1767,7 +1768,31 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
               fontWeight: FontWeight.w600,
             )),
             const SizedBox(height: 4),
-            SelectableText(value, style: theme.textTheme.bodySmall),
+            // 使用 MarkdownBody 渲染字段内容，支持 **粗体** / *斜体* / 列表 / 引用 / 代码块等
+            MarkdownBody(
+              data: value,
+              selectable: true,
+              styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
+                p: theme.textTheme.bodySmall,
+                h1: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                h2: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                h3: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold),
+                code: TextStyle(
+                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                  fontFamily: 'monospace',
+                  fontSize: 12,
+                ),
+                codeblockDecoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                blockquoteDecoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border(left: BorderSide(color: theme.colorScheme.primary, width: 2)),
+                ),
+              ),
+            ),
           ],
         ),
       );
@@ -1856,7 +1881,13 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.2)),
                 ),
-                child: SelectableText('[${e.key + 1}] $s', style: theme.textTheme.bodySmall),
+                child: MarkdownBody(
+                  data: '[${e.key + 1}] $s',
+                  selectable: true,
+                  styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
+                    p: theme.textTheme.bodySmall,
+                  ),
+                ),
               );
             }),
           ],
