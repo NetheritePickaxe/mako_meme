@@ -17,7 +17,8 @@ class ImageToolService {
   ImageToolService(this._storage);
 
   /// 支持的输出格式（image 包 4.x 未导出 WebP 编码器，故不支持输出 WebP）
-  static const outputFormats = ['png', 'jpg', 'bmp', 'gif'];
+  // GIF 不在此列：多图合成为 GIF 由「多图转 GIF/APNG」独立工具处理
+  static const outputFormats = ['png', 'jpg', 'bmp'];
 
   /// 读取图片为 [img.Image]（解码）
   /// 优先用 bytes（web），其次用 File（原生）

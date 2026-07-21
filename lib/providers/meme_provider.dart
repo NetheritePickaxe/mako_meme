@@ -458,7 +458,10 @@ class MemeProvider with ChangeNotifier {
         skipped++;
         continue;
       }
-      final newType = (ratio <= ratioThreshold) ? Meme.typeEmoji : Meme.typeImage;
+      // 归一化：宽高比取 max(ratio, 1/ratio)，让竖图（ratio<1）也能正确归类为图片
+      // 否则竖图（如 9:16，ratio=0.56）会被错误归入表情
+      final normalized = ratio >= 1 ? ratio : 1 / ratio;
+      final newType = (normalized <= ratioThreshold) ? Meme.typeEmoji : Meme.typeImage;
       if (newType != meme.type) {
         await _storage.setMemeType(meme.id, newType);
         if (newType == Meme.typeEmoji) {
@@ -677,11 +680,12 @@ class MemeProvider with ChangeNotifier {
       list = list.where((m) => _folderFilter.any((fid) => m.folderId == fid)).toList();
     }
     if (_typeFilter.isNotEmpty) {
-      // md 归入文字分类：选 typeText 时也匹配 typeMd
+      // md/novel 归入文字分类：选 typeText 时也匹配 typeMd、typeNovel
       // PDF 归入文件分类：选 typeFile 时也匹配 typePdf
       list = list.where((m) {
         if (_typeFilter.contains(m.type)) return true;
-        if (m.type == Meme.typeMd && _typeFilter.contains(Meme.typeText)) return true;
+        if ((m.type == Meme.typeMd || m.type == Meme.typeNovel) &&
+            _typeFilter.contains(Meme.typeText)) return true;
         if (m.type == Meme.typePdf && _typeFilter.contains(Meme.typeFile)) return true;
         return false;
       }).toList();

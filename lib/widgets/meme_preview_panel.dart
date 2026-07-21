@@ -302,36 +302,42 @@ class _MemePreviewPanelState extends State<MemePreviewPanel> {
 
   String _typeLabel(Meme m) {
     final l10n = context.read<LocaleProvider>().l10n;
+    // novel 归入文字，pdf 归入文件（分类已下线）
     switch (m.type) {
       case Meme.typeEmoji: return l10n.tr('type_emoji');
       case Meme.typeGif: return l10n.tr('type_gif');
-      case Meme.typeText: return l10n.tr('type_text');
-      case Meme.typeNovel: return l10n.tr('type_novel');
+      case Meme.typeText:
+      case Meme.typeMd:
+      case Meme.typeNovel: return l10n.tr('type_text');
       case Meme.typeManga: return l10n.tr('type_manga');
       case Meme.typePortrait: return l10n.tr('type_portrait');
       case Meme.typeCg: return l10n.tr('type_cg');
       case Meme.typeCharacterCard: return l10n.tr('type_character_card');
       case Meme.typeVector: return l10n.tr('type_vector');
       case Meme.typePsd: return l10n.tr('type_psd');
-      case Meme.typePdf: return l10n.tr('type_pdf');
+      case Meme.typePdf:
+      case Meme.typeFile: return l10n.tr('type_file');
       default: return l10n.tr('type_image');
     }
   }
 
   IconData _typeIcon(Meme m) {
+    // novel 归入文字，pdf 归入文件（分类已下线）
     switch (m.type) {
-      case Meme.typeEmoji: return Icons.face;
-      case Meme.typeGif: return Icons.gif;
+      case Meme.typeEmoji: return Icons.emoji_emotions_outlined;
+      case Meme.typeGif: return Icons.animation;
       case Meme.typeText:
+      case Meme.typeMd:
       case Meme.typeNovel: return Icons.text_fields;
-      case Meme.typeManga: return Icons.photo_library;
-      case Meme.typePortrait: return Icons.portrait;
-      case Meme.typeCg: return Icons.photo_library;
-      case Meme.typeCharacterCard: return Icons.person_outline;
-      case Meme.typeVector: return Icons.grain;
-      case Meme.typePsd: return Icons.layers;
-      case Meme.typePdf: return Icons.picture_as_pdf;
-      default: return Icons.image;
+      case Meme.typeManga: return Icons.menu_book_outlined;
+      case Meme.typePortrait: return Icons.accessibility_new;
+      case Meme.typeCg: return Icons.wallpaper_outlined;
+      case Meme.typeCharacterCard: return Icons.contact_page_outlined;
+      case Meme.typeVector: return Icons.polyline_outlined;
+      case Meme.typePsd: return Icons.layers_outlined;
+      case Meme.typePdf:
+      case Meme.typeFile: return Icons.folder_outlined;
+      default: return Icons.image_outlined;
     }
   }
 

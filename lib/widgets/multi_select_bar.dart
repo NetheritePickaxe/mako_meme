@@ -80,14 +80,17 @@ class MultiSelectBar extends StatelessWidget {
   }
 
   /// 图片工具底部菜单：格式转换 / 尺寸修改 / 转GIF-APNG / 幻影坦克
+  /// 未选图片时也允许打开菜单查看可用工具（所有项全灰、不可点）
   static void showToolsMenu(BuildContext ctx, MemeProvider prov, L10n l10n) {
     final selected = prov.selectedMemes;
     final canAnimate = selected.length >= 2;
-    // 仅对可处理的图片类型生效
+    // 仅对可处理的图片类型生效（排除矢量图/PSD/PDF 等需特殊解码的）
     final imageMemes = selected.where((m) =>
         m.isImageType && !m.isVector && !m.isPsd && !m.isPdf).toList();
-    // 幻影坦克专用：再排除动图（GIF/APNG）
-    final staticImageMemes = imageMemes.where((m) => !m.isAnimated).toList();
+    // 幻影坦克专用：仅接受 image/emoji 类型，再排除动图（GIF/APNG）
+    final phantomEligible = selected.where((m) =>
+        m.type == Meme.typeImage || m.type == Meme.typeEmoji).toList();
+    final staticImageMemes = phantomEligible.where((m) => !m.isAnimated).toList();
     showModalBottomSheet(
       context: ctx,
       shape: const RoundedRectangleBorder(
@@ -110,7 +113,7 @@ class MultiSelectBar extends StatelessWidget {
               title: Text(l10n.tr('tool_convert')),
               subtitle: Text(l10n.tr('convert')),
               enabled: imageMemes.isNotEmpty,
-              onTap: () {
+              onTap: imageMemes.isEmpty ? null : () {
                 Navigator.pop(bCtx);
                 _showConvertDialog(ctx, prov, l10n, imageMemes);
               },
@@ -119,7 +122,7 @@ class MultiSelectBar extends StatelessWidget {
               leading: const Icon(Icons.aspect_ratio),
               title: Text(l10n.tr('tool_resize')),
               enabled: imageMemes.isNotEmpty,
-              onTap: () {
+              onTap: imageMemes.isEmpty ? null : () {
                 Navigator.pop(bCtx);
                 _showResizeDialog(ctx, prov, l10n, imageMemes);
               },
@@ -137,7 +140,7 @@ class MultiSelectBar extends StatelessWidget {
             ListTile(
               leading: const Icon(Icons.visibility),
               title: Text(l10n.tr('tool_phantom_tank')),
-              // 幻影坦克仅支持静态图片，过滤掉 GIF/APNG 等动图
+              // 幻影坦克仅支持静态图片/表情，过滤掉 GIF/APNG 等动图及文字/md/pdf 等
               enabled: staticImageMemes.length >= 2,
               subtitle: staticImageMemes.length < 2 ? Text(l10n.tr('phantom_need_two_static')) : null,
               onTap: staticImageMemes.length >= 2 ? () {
@@ -562,13 +565,17 @@ class MultiSelectBar extends StatelessWidget {
   void _showTypeDialog(BuildContext ctx, MemeProvider prov, L10n l10n) {
     final settings = ctx.read<SettingsProvider>();
     final allTypes = [
-      {'type': Meme.typeEmoji, 'label': l10n.tr('type_emoji'), 'icon': Icons.face},
-      {'type': Meme.typeGif, 'label': l10n.tr('type_gif'), 'icon': Icons.gif},
-      {'type': Meme.typeImage, 'label': l10n.tr('type_image'), 'icon': Icons.image},
+      {'type': Meme.typeEmoji, 'label': l10n.tr('type_emoji'), 'icon': Icons.emoji_emotions_outlined},
+      {'type': Meme.typeGif, 'label': l10n.tr('type_gif'), 'icon': Icons.animation},
+      {'type': Meme.typeImage, 'label': l10n.tr('type_image'), 'icon': Icons.image_outlined},
       {'type': Meme.typeText, 'label': l10n.tr('type_text'), 'icon': Icons.text_fields},
-      {'type': Meme.typePortrait, 'label': l10n.tr('type_portrait'), 'icon': Icons.portrait},
-      {'type': Meme.typeCg, 'label': l10n.tr('type_cg'), 'icon': Icons.photo_library},
-      {'type': Meme.typeCharacterCard, 'label': l10n.tr('type_character_card'), 'icon': Icons.person_outline},
+      {'type': Meme.typePortrait, 'label': l10n.tr('type_portrait'), 'icon': Icons.accessibility_new},
+      {'type': Meme.typeCg, 'label': l10n.tr('type_cg'), 'icon': Icons.wallpaper_outlined},
+      {'type': Meme.typeCharacterCard, 'label': l10n.tr('type_character_card'), 'icon': Icons.contact_page_outlined},
+      {'type': Meme.typeVector, 'label': l10n.tr('type_vector'), 'icon': Icons.polyline_outlined},
+      {'type': Meme.typePsd, 'label': l10n.tr('type_psd'), 'icon': Icons.layers_outlined},
+      {'type': Meme.typeManga, 'label': l10n.tr('type_manga'), 'icon': Icons.menu_book_outlined},
+      {'type': Meme.typeFile, 'label': l10n.tr('type_file'), 'icon': Icons.folder_outlined},
     ];
     final types = allTypes.where((t) => settings.isCategoryVisible(t['type'] as String)).toList();
 

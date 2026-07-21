@@ -86,23 +86,25 @@ class Meme {
     return filePath.substring(dot + 1).toLowerCase();
   }
 
-  /// 类型对应的 i18n 键名（md 归入文字，沿用 type_text）
+  /// 类型对应的 i18n 键名
+  // md 归入文字（沿用 type_text）；novel 也归入文字（小说分类已下线，旧数据按文字显示）
+  // pdf 归入文件（PDF 分类已下线，旧数据按文件显示）
   String get typeLabelKey {
     switch (type) {
       case typeEmoji: return 'type_emoji';
       case typeGif: return 'type_gif';
       case typeText:
-      case typeMd: return 'type_text';
+      case typeMd:
+      case typeNovel: return 'type_text';
       case typeImage: return 'type_image';
       case typePortrait: return 'type_portrait';
       case typeCg: return 'type_cg';
       case typeCharacterCard: return 'type_character_card';
       case typeVector: return 'type_vector';
       case typePsd: return 'type_psd';
-      case typePdf: return 'type_pdf';
-      case typeManga: return 'type_manga';
-      case typeNovel: return 'type_novel';
+      case typePdf:
       case typeFile: return 'type_file';
+      case typeManga: return 'type_manga';
       case typeSystemGallery: return 'cat_system_gallery';
       default: return 'type_image';
     }

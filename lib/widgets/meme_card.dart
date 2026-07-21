@@ -533,17 +533,29 @@ class _MemeCardState extends State<MemeCard> {
   );
 
   Widget _buildCard(BuildContext context, MemeProvider prov, bool isSelected, bool isMulti, ThemeData theme) {
+    final cs = Theme.of(context).colorScheme;
+    // 选中边框采用 Positioned.fill overlay 而非外层 Container.border，
+    // 避免边框出现时挤压内容导致缩小动画 + 内圆角与外边框圆角不一致漏白角
+    final borderOverlay = Positioned.fill(
+      child: IgnorePointer(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: isSelected
+                ? Border.all(color: cs.primary, width: 3)
+                : widget.isPreviewSelected
+                    ? Border.all(color: cs.tertiary, width: 2)
+                    : null,
+          ),
+        ),
+      ),
+    );
+
     // 文字卡片：不用 Stack(fit: expand)，让内容自适应高度
     if (widget.meme.type == Meme.typeText) {
-      return AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+      return Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          border: isSelected
-              ? Border.all(color: Theme.of(context).colorScheme.primary, width: 3)
-              : widget.isPreviewSelected
-                  ? Border.all(color: Theme.of(context).colorScheme.tertiary, width: 2)
-                  : null,
           boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4, offset: const Offset(0, 2))],
         ),
         child: ClipRRect(
@@ -566,28 +578,29 @@ class _MemeCardState extends State<MemeCard> {
               if (widget.meme.isFavorite)
                 Positioned(top: 6, right: 6,
                   child: Container(padding: const EdgeInsets.all(3),
-                    decoration: BoxDecoration(color: Theme.of(context).colorScheme.tertiary, shape: BoxShape.circle),
-                    child: Icon(Icons.favorite, size: 14, color: Theme.of(context).colorScheme.onTertiary),
+                    decoration: BoxDecoration(color: cs.tertiary, shape: BoxShape.circle),
+                    child: Icon(Icons.favorite, size: 14, color: cs.onTertiary),
                   ),
                 ),
               if (isMulti)
                 Positioned(top: 6, left: 6,
                   child: Container(padding: const EdgeInsets.all(2),
                     decoration: BoxDecoration(
-                      color: isSelected ? Theme.of(context).colorScheme.primary : Colors.white.withValues(alpha: 0.8),
+                      color: isSelected ? cs.primary : Colors.white.withValues(alpha: 0.8),
                       shape: BoxShape.circle,
-                      border: Border.all(color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey.shade400, width: 2),
+                      border: Border.all(color: isSelected ? cs.primary : Colors.grey.shade400, width: 2),
                     ),
                     child: isSelected ? const Icon(Icons.check, size: 14, color: Colors.white) : const SizedBox(width: 14, height: 14),
                   ),
                 ),
               Positioned(bottom: 6, left: 6,
                 child: Container(padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                  decoration: BoxDecoration(color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.85), borderRadius: BorderRadius.circular(4)),
+                  decoration: BoxDecoration(color: cs.secondary.withValues(alpha: 0.85), borderRadius: BorderRadius.circular(4)),
                   child: Text(context.read<LocaleProvider>().l10n.tr('text_label'),
-                    style: TextStyle(color: Theme.of(context).colorScheme.onSecondary, fontSize: 10, fontWeight: FontWeight.bold)),
+                    style: TextStyle(color: cs.onSecondary, fontSize: 10, fontWeight: FontWeight.bold)),
                 ),
               ),
+              borderOverlay,
             ],
           ),
         ),
@@ -595,15 +608,9 @@ class _MemeCardState extends State<MemeCard> {
     }
 
     // 图片/表情等卡片：用 Stack(fit: expand) 撑满
-    return AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+    return Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          border: isSelected
-              ? Border.all(color: Theme.of(context).colorScheme.primary, width: 3)
-              : widget.isPreviewSelected
-                  ? Border.all(color: Theme.of(context).colorScheme.tertiary, width: 2)
-                  : null,
           boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4, offset: const Offset(0, 2))],
         ),
         child: ClipRRect(
@@ -688,6 +695,7 @@ class _MemeCardState extends State<MemeCard> {
                 ),
               // 底部叠加信息层（名称/标签/类型/后缀）
               _buildInfoOverlay(Theme.of(context)),
+              borderOverlay,
             ],
           ),
         ),
@@ -852,18 +860,17 @@ class _MemeCardState extends State<MemeCard> {
     final l10n = context.read<LocaleProvider>().l10n;
     final settings = context.read<SettingsProvider>();
     final allTypes = [
-      {'type': Meme.typeEmoji, 'label': l10n.tr('type_emoji'), 'icon': Icons.face},
-      {'type': Meme.typeGif, 'label': l10n.tr('type_gif'), 'icon': Icons.gif},
-      {'type': Meme.typeImage, 'label': l10n.tr('type_image'), 'icon': Icons.image},
+      {'type': Meme.typeEmoji, 'label': l10n.tr('type_emoji'), 'icon': Icons.emoji_emotions_outlined},
+      {'type': Meme.typeGif, 'label': l10n.tr('type_gif'), 'icon': Icons.animation},
+      {'type': Meme.typeImage, 'label': l10n.tr('type_image'), 'icon': Icons.image_outlined},
       {'type': Meme.typeText, 'label': l10n.tr('type_text'), 'icon': Icons.text_fields},
-      {'type': Meme.typeNovel, 'label': l10n.tr('type_novel'), 'icon': Icons.menu_book},
-      {'type': Meme.typeManga, 'label': l10n.tr('type_manga'), 'icon': Icons.photo_library},
-      {'type': Meme.typePortrait, 'label': l10n.tr('type_portrait'), 'icon': Icons.portrait},
-      {'type': Meme.typeCg, 'label': l10n.tr('type_cg'), 'icon': Icons.photo_library},
-      {'type': Meme.typeCharacterCard, 'label': l10n.tr('type_character_card'), 'icon': Icons.person_outline},
-      {'type': Meme.typeVector, 'label': l10n.tr('type_vector'), 'icon': Icons.grain},
-      {'type': Meme.typePsd, 'label': l10n.tr('type_psd'), 'icon': Icons.layers},
-      {'type': Meme.typePdf, 'label': l10n.tr('type_pdf'), 'icon': Icons.picture_as_pdf},
+      {'type': Meme.typePortrait, 'label': l10n.tr('type_portrait'), 'icon': Icons.accessibility_new},
+      {'type': Meme.typeCg, 'label': l10n.tr('type_cg'), 'icon': Icons.wallpaper_outlined},
+      {'type': Meme.typeCharacterCard, 'label': l10n.tr('type_character_card'), 'icon': Icons.contact_page_outlined},
+      {'type': Meme.typeVector, 'label': l10n.tr('type_vector'), 'icon': Icons.polyline_outlined},
+      {'type': Meme.typePsd, 'label': l10n.tr('type_psd'), 'icon': Icons.layers_outlined},
+      {'type': Meme.typeManga, 'label': l10n.tr('type_manga'), 'icon': Icons.menu_book_outlined},
+      {'type': Meme.typeFile, 'label': l10n.tr('type_file'), 'icon': Icons.folder_outlined},
     ];
     // 仅显示已启用的分类 + 当前 meme 所属分类（即便被隐藏也可保持）
     final types = allTypes.where((t) {
@@ -881,7 +888,12 @@ class _MemeCardState extends State<MemeCard> {
             final type = t['type'] as String;
             final label = t['label'] as String;
             final icon = t['icon'] as IconData;
-            final selected = widget.meme.type == type;
+            // 同分类下的旧类型也视为选中（pdf→file, novel/md→text）
+            final selected = widget.meme.type == type ||
+                (type == Meme.typeFile && widget.meme.type == Meme.typePdf) ||
+                (type == Meme.typeText &&
+                    (widget.meme.type == Meme.typeMd ||
+                     widget.meme.type == Meme.typeNovel));
             return ListTile(
               leading: Icon(icon, color: selected ? Theme.of(dCtx).colorScheme.primary : null),
               title: Text(label),

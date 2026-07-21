@@ -74,11 +74,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// 点击侧边栏 Logo：弹出满屏 emoji 特效（不关闭抽屉）
+  // barrierDismissible=false：避免用户点击操作时被透明 barrier 拦截并关闭特效
+  // 特效仅由动画结束自动关闭，点击完全穿透到下层 UI
   void _showEmojiEffect(BuildContext ctx) {
     showDialog(
       context: ctx,
       barrierColor: Colors.transparent,
-      barrierDismissible: true,
+      barrierDismissible: false,
       builder: (_) => const _EmojiRainOverlay(),
     );
   }
@@ -231,21 +233,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<Widget> _buildActions(MemeProvider prov, L10n l10n, SettingsProvider settings) {
     return [
-      // 工具按钮仅在多选模式下显示，需选中 1+ 才可点击
+      // 工具按钮仅在多选模式下显示；未选时也允许点击查看可用工具（菜单内全灰）
       if (prov.isMulti)
         Builder(
           builder: (ctx) => IconButton(
             icon: const Icon(Icons.build_outlined),
             tooltip: l10n.tr('tools'),
-            onPressed: () {
-              if (prov.selected.isEmpty) {
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  SnackBar(content: Text(l10n.tr('tools_need_select'))),
-                );
-                return;
-              }
-              MultiSelectBar.showToolsMenu(ctx, prov, l10n);
-            },
+            onPressed: () => MultiSelectBar.showToolsMenu(ctx, prov, l10n),
           ),
         ),
       IconButton(

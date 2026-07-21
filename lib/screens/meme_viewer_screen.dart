@@ -1561,15 +1561,16 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
   }
 
   String _typeLabel(String type, L10n l10n) {
+    // novel 归入文字，pdf 归入文件（分类已下线）
     switch (type) {
       case Meme.typeEmoji:
         return l10n.tr('type_emoji');
       case Meme.typeGif:
         return l10n.tr('type_gif');
       case Meme.typeText:
-        return l10n.tr('type_text');
+      case Meme.typeMd:
       case Meme.typeNovel:
-        return l10n.tr('type_novel');
+        return l10n.tr('type_text');
       case Meme.typeManga:
         return l10n.tr('type_manga');
       case Meme.typePortrait:
@@ -1578,30 +1579,46 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
         return l10n.tr('type_cg');
       case Meme.typeCharacterCard:
         return l10n.tr('type_character_card');
+      case Meme.typeVector:
+        return l10n.tr('type_vector');
+      case Meme.typePsd:
+        return l10n.tr('type_psd');
+      case Meme.typePdf:
+      case Meme.typeFile:
+        return l10n.tr('type_file');
       default:
         return l10n.tr('type_image');
     }
   }
 
   IconData _typeIcon(String type) {
+    // novel 归入文字，pdf 归入文件（分类已下线）
     switch (type) {
       case Meme.typeEmoji:
-        return Icons.face;
+        return Icons.emoji_emotions_outlined;
       case Meme.typeGif:
-        return Icons.gif;
+        return Icons.animation;
       case Meme.typeText:
+      case Meme.typeMd:
       case Meme.typeNovel:
         return Icons.text_fields;
       case Meme.typeManga:
-        return Icons.photo_library;
+        return Icons.menu_book_outlined;
       case Meme.typePortrait:
-        return Icons.portrait;
+        return Icons.accessibility_new;
       case Meme.typeCg:
-        return Icons.photo_library;
+        return Icons.wallpaper_outlined;
       case Meme.typeCharacterCard:
-        return Icons.person_outline;
+        return Icons.contact_page_outlined;
+      case Meme.typeVector:
+        return Icons.polyline_outlined;
+      case Meme.typePsd:
+        return Icons.layers_outlined;
+      case Meme.typePdf:
+      case Meme.typeFile:
+        return Icons.folder_outlined;
       default:
-        return Icons.image;
+        return Icons.image_outlined;
     }
   }
 
@@ -2019,20 +2036,28 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
     final l10n = context.read<LocaleProvider>().l10n;
     final settings = context.read<SettingsProvider>();
     final allTypes = [
-      {'type': Meme.typeEmoji, 'label': l10n.tr('type_emoji'), 'icon': Icons.face},
-      {'type': Meme.typeGif, 'label': l10n.tr('type_gif'), 'icon': Icons.gif},
-      {'type': Meme.typeImage, 'label': l10n.tr('type_image'), 'icon': Icons.image},
+      {'type': Meme.typeEmoji, 'label': l10n.tr('type_emoji'), 'icon': Icons.emoji_emotions_outlined},
+      {'type': Meme.typeGif, 'label': l10n.tr('type_gif'), 'icon': Icons.animation},
+      {'type': Meme.typeImage, 'label': l10n.tr('type_image'), 'icon': Icons.image_outlined},
       {'type': Meme.typeText, 'label': l10n.tr('type_text'), 'icon': Icons.text_fields},
-      {'type': Meme.typeNovel, 'label': l10n.tr('type_novel'), 'icon': Icons.menu_book},
-      {'type': Meme.typeManga, 'label': l10n.tr('type_manga'), 'icon': Icons.photo_library},
-      {'type': Meme.typePortrait, 'label': l10n.tr('type_portrait'), 'icon': Icons.portrait},
-      {'type': Meme.typeCg, 'label': l10n.tr('type_cg'), 'icon': Icons.photo_library},
-      {'type': Meme.typeCharacterCard, 'label': l10n.tr('type_character_card'), 'icon': Icons.person_outline},
+      {'type': Meme.typePortrait, 'label': l10n.tr('type_portrait'), 'icon': Icons.accessibility_new},
+      {'type': Meme.typeCg, 'label': l10n.tr('type_cg'), 'icon': Icons.wallpaper_outlined},
+      {'type': Meme.typeCharacterCard, 'label': l10n.tr('type_character_card'), 'icon': Icons.contact_page_outlined},
+      {'type': Meme.typeVector, 'label': l10n.tr('type_vector'), 'icon': Icons.polyline_outlined},
+      {'type': Meme.typePsd, 'label': l10n.tr('type_psd'), 'icon': Icons.layers_outlined},
+      {'type': Meme.typeManga, 'label': l10n.tr('type_manga'), 'icon': Icons.menu_book_outlined},
+      {'type': Meme.typeFile, 'label': l10n.tr('type_file'), 'icon': Icons.folder_outlined},
     ];
     // 仅显示已启用的分类 + 当前 meme 所属分类（即便被隐藏也可保持）
+    // 同分类下的旧类型也视为已启用（pdf→file, novel→text）
     final types = allTypes.where((t) {
       final type = t['type'] as String;
-      return settings.isCategoryVisible(type) || _meme.type == type;
+      if (settings.isCategoryVisible(type)) return true;
+      if (_meme.type == type) return true;
+      if (type == Meme.typeFile && _meme.type == Meme.typePdf) return true;
+      if (type == Meme.typeText &&
+          (_meme.type == Meme.typeMd || _meme.type == Meme.typeNovel)) return true;
+      return false;
     }).toList();
 
     showDialog(
@@ -2045,7 +2070,12 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
             final type = t['type'] as String;
             final label = t['label'] as String;
             final icon = t['icon'] as IconData;
-            final selected = _meme.type == type;
+            // 同分类下的旧类型也视为选中（pdf→file, novel/md→text）
+            final selected = _meme.type == type ||
+                (type == Meme.typeFile && _meme.type == Meme.typePdf) ||
+                (type == Meme.typeText &&
+                    (_meme.type == Meme.typeMd ||
+                     _meme.type == Meme.typeNovel));
             return ListTile(
               leading: Icon(icon, color: selected ? Theme.of(dCtx).colorScheme.primary : null),
               title: Text(label),
