@@ -487,11 +487,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  /// 预测式返回 / 页面切换风格：aosp / muix / zoom / classic
+  /// 预测式返回 / 页面切换风格：aosp / zoom / classic
   Widget _predictiveBackTile(SettingsProvider settings, L10n l10n) {
     final options = [
       ('aosp', l10n.tr('pb_aosp')),
-      ('muix', l10n.tr('pb_muix')),
       ('zoom', l10n.tr('pb_zoom')),
       ('classic', l10n.tr('pb_classic')),
     ];

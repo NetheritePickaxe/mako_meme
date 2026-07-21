@@ -79,9 +79,8 @@ class AppTheme {
       colorScheme: scheme,
       scaffoldBackgroundColor: pureBlack && isDark ? Colors.black : null,
       fontFamily: 'Noto Sans SC',
-      // 页面切换风格：aosp / muix / zoom / classic，由设置选择
+      // 页面切换风格：aosp / zoom / classic，由设置选择
       // aosp = PredictiveBackPageTransitionsBuilder（Android 14+ 原生预测式返回）
-      // muix = 自定义 _MuixPageTransitionsBuilder（水平滑动 + 轻微缩放，类 MIUI/HyperOS）
       // zoom = ZoomPageTransitionsBuilder（Android 10 Material 缩放）
       // classic = FadeUpwardsPageTransitionsBuilder（Android 8 经典向上淡入）
       pageTransitionsTheme: PageTransitionsTheme(
@@ -190,8 +189,6 @@ class AppTheme {
   /// 根据风格字符串返回对应的 PageTransitionsBuilder
   static PageTransitionsBuilder _pageTransitionBuilder(String mode) {
     switch (mode) {
-      case 'muix':
-        return const _MuixPageTransitionsBuilder();
       case 'zoom':
         return const ZoomPageTransitionsBuilder();
       case 'classic':
@@ -203,58 +200,3 @@ class AppTheme {
   }
 }
 
-/// MIUI / HyperOS 风格页面过渡：新页面从右侧 30% 滑入 + 轻微缩放，
-/// 老页面被覆盖时向左滑动 + 略微缩小，整体类似 iOS push 但更柔和。
-class _MuixPageTransitionsBuilder extends PageTransitionsBuilder {
-  const _MuixPageTransitionsBuilder();
-
-  @override
-  Widget buildTransitions<T>(
-    PageRoute<T>? route,
-    BuildContext? context,
-    Animation<double> animation,
-    Animation<double> secondaryAnimation,
-    Widget? child,
-  ) {
-    final primaryCurved = CurvedAnimation(
-      parent: animation,
-      curve: Curves.easeOutCubic,
-      reverseCurve: Curves.easeInCubic,
-    );
-    final secondaryCurved = CurvedAnimation(
-      parent: secondaryAnimation,
-      curve: Curves.easeOutCubic,
-      reverseCurve: Curves.easeInCubic,
-    );
-    // 入场：从右侧 30% 滑入 + 0.92→1.0 缩放
-    final slideIn = Tween<Offset>(
-      begin: const Offset(0.3, 0),
-      end: Offset.zero,
-    ).animate(primaryCurved);
-    final scaleIn = Tween<double>(begin: 0.92, end: 1.0).animate(primaryCurved);
-    // 退场：向左 30% 滑出 + 1.0→0.96 缩放
-    final slideOut = Tween<Offset>(
-      begin: Offset.zero,
-      end: const Offset(-0.3, 0),
-    ).animate(secondaryCurved);
-    final scaleOut = Tween<double>(begin: 1.0, end: 0.96).animate(secondaryCurved);
-
-    Widget result = child ?? const SizedBox.shrink();
-    // 入场变换包裹在退场变换内侧
-    result = SlideTransition(
-      position: slideIn,
-      child: ScaleTransition(
-        scale: scaleIn,
-        child: result,
-      ),
-    );
-    // 退场变换在最外层
-    return SlideTransition(
-      position: slideOut,
-      child: ScaleTransition(
-        scale: scaleOut,
-        child: result,
-      ),
-    );
-  }
-}
