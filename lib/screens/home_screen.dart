@@ -248,7 +248,7 @@ class _HomeScreenState extends State<HomeScreen> {
         onPressed: () => prov.toggleMulti(),
       ),
       PopupMenuButton<String>(
-        icon: const Icon(Icons.sort, size: 28),
+        icon: const Icon(Icons.sort),
         tooltip: l10n.tr('sort'),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         onSelected: (v) {
@@ -274,21 +274,21 @@ class _HomeScreenState extends State<HomeScreen> {
     ];
   }
 
-  /// 紧凑的排序菜单项：固定 36px 高度，左侧选中态打勾，避免默认 48px 显得过长
+  /// 紧凑的排序菜单项：固定 44px 高度，左侧选中态打勾
   PopupMenuItem<String> _buildSortItem(String label, String value, bool selected) {
     final theme = Theme.of(context);
     return PopupMenuItem<String>(
       value: value,
-      height: 36,
+      height: 44,
       child: Row(
         children: [
           SizedBox(
-            width: 24,
+            width: 28,
             child: selected
-                ? Icon(Icons.check, size: 16, color: theme.colorScheme.primary)
+                ? Icon(Icons.check, size: 20, color: theme.colorScheme.primary)
                 : const SizedBox.shrink(),
           ),
-          Expanded(child: Text(label)),
+          Expanded(child: Text(label, style: const TextStyle(fontSize: 16))),
         ],
       ),
     );
