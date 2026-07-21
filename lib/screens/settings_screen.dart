@@ -993,7 +993,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _customPresetCard(SettingsProvider settings, ColorScheme cs, L10n l10n) {
     final selected = settings.presetIndex >= AppTheme.presets.length;
     return InkWell(
-      onTap: () => _showCustomColorPicker(context, settings, cs, l10n),
+      onTap: () => settings.selectCustomPreset(),
       borderRadius: BorderRadius.circular(12),
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
@@ -1015,7 +1015,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 style: TextStyle(fontSize: 14, fontWeight: selected ? FontWeight.w600 : FontWeight.normal),
               ),
             ),
-            Icon(Icons.edit, size: 18, color: cs.primary),
+            // 编辑按钮：点击才打开色轮弹窗修改 customSeed
+            // 用 InkWell 包裹独立捕获点击，避免冒泡到外层卡片
+            InkWell(
+              onTap: () => _showCustomColorPicker(context, settings, cs, l10n),
+              borderRadius: BorderRadius.circular(16),
+              child: Padding(
+                padding: const EdgeInsets.all(6),
+                child: Icon(Icons.edit, size: 18, color: cs.primary),
+              ),
+            ),
             if (selected) ...[
               const SizedBox(width: 8),
               Icon(Icons.check_circle, color: cs.primary, size: 20),

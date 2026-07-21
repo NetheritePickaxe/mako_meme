@@ -9,7 +9,7 @@ class SettingsProvider extends ChangeNotifier {
   final StorageService _storage;
   ThemeMode _themeMode = ThemeMode.system;
   int _presetIndex = 0;
-  Color _customSeed = AppTheme.defaultSeed;
+  Color _customSeed = Colors.white;
   bool _useMonet = true;
   bool _pureBlack = false;
   int _gridColumns = 0; // 0 = 自动
@@ -86,9 +86,10 @@ class SettingsProvider extends ChangeNotifier {
       }
     }
     // 兼容旧版 customPrimary（旧自定义三色），新版只用 customSeed
+    // 默认白色：首次进入自定义配色未编辑过时显示白色色块
     _customSeed = _parseColor(_storage.getSetting('customSeed')) ??
         _parseColor(_storage.getSetting('customPrimary')) ??
-        AppTheme.defaultSeed;
+        Colors.white;
     _useMonet = _storage.getSetting('useMonet') != 'false';
     _pureBlack = _storage.getSetting('pureBlack') == 'true';
     final savedCols = int.tryParse(_storage.getSetting('gridColumns') ?? '');
@@ -411,6 +412,17 @@ class SettingsProvider extends ChangeNotifier {
     await _storage.setSetting('presetIndex', _presetIndex.toString());
     await _storage.setSetting('useMonet', 'false');
     await _storage.setSetting('customSeed', '#${seed.toARGB32().toRadixString(16).padLeft(8, '0')}');
+    _syncImeTheme();
+    notifyListeners();
+  }
+
+  /// 仅选中自定义预设（不改 customSeed）。
+  /// 点击自定义配色卡片时调用，与编辑按钮解耦：编辑按钮才修改 customSeed。
+  Future<void> selectCustomPreset() async {
+    _presetIndex = AppTheme.presets.length;
+    _useMonet = false;
+    await _storage.setSetting('presetIndex', _presetIndex.toString());
+    await _storage.setSetting('useMonet', 'false');
     _syncImeTheme();
     notifyListeners();
   }

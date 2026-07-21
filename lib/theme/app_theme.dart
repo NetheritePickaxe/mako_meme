@@ -28,15 +28,15 @@ class AppTheme {
   static const Color defaultSeed = Color(0xFF6366F1);
 
   /// 预设种子色板
-  /// 顺序：默认 → 5 个主题配色（用户自定义）→ 其他自然命名配色
+  /// 顺序：5 个主题配色（用户自定义）→ 靛蓝 → 其他自然命名配色
   static const presets = <ColorSchemePreset>[
-    ColorSchemePreset(name: '靛蓝', seed: Color(0xFF6366F1)),
     // 用户自定义主题配色（置顶）
     ColorSchemePreset(name: '巫女大人', seed: Color(0xFFFBFBFE)),
     ColorSchemePreset(name: '下流忍者', seed: Color(0xFFB8B3E5)),
     ColorSchemePreset(name: '幼刀丛雨', seed: Color(0xFFBCD5AA)),
     ColorSchemePreset(name: '世界之大', seed: Color(0xFFFCF06B)),
     ColorSchemePreset(name: '田心屋', seed: Color(0xFFFFB1B5)),
+    ColorSchemePreset(name: '靛蓝', seed: Color(0xFF6366F1)),
     // 其他自然命名配色
     ColorSchemePreset(name: '林荫', seed: Color(0xFF2E7D32)),
     ColorSchemePreset(name: '琥珀', seed: Color(0xFF8D6E63)),
