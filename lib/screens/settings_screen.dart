@@ -1922,10 +1922,12 @@ class _WheelPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    // 用 SweepGradient 绘制色相环（圆盘），颜色从顶部开始顺时针
+    // 用 SweepGradient 绘制色相环（圆盘），颜色从顶部（12 点钟）开始顺时针
+    // startAngle: -pi/2 让 hue=0 的红色从顶部开始，与交互坐标和指示器角度对齐
     final sweepPaint = Paint()
       ..shader = SweepGradient(
         center: Alignment.center,
+        startAngle: -pi / 2,
         colors: [
           HSVColor.fromAHSV(1.0, 0, 1.0, 1.0).toColor(),
           HSVColor.fromAHSV(1.0, 60, 1.0, 1.0).toColor(),
