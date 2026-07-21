@@ -248,7 +248,7 @@ class _HomeScreenState extends State<HomeScreen> {
         onPressed: () => prov.toggleMulti(),
       ),
       PopupMenuButton<String>(
-        icon: const Icon(Icons.sort),
+        icon: const Icon(Icons.sort, size: 28),
         tooltip: l10n.tr('sort'),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         onSelected: (v) {
