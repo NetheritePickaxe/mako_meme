@@ -17,7 +17,6 @@ import 'webdav_service.dart';
 import 'admin_service.dart';
 import 'psd_service.dart';
 import 'sprite_service.dart';
-import 'package:pdfx/pdfx.dart';
 
 /// 图片宽高信息
 class ImageDimensions {
@@ -451,59 +450,10 @@ class StorageService {
       meme = await _processRasterConversion(meme, file, bytes, fileHash);
     }
 
-    // PDF 封面渲染：用系统 PdfRenderer/pdfium 渲染第一页为 PNG 缩略图
-    // Web 端跳过（pdfx 需要 pdfjs，且 Web 端有新标签页预览）
-    if (memeType == Meme.typePdf && !kIsWeb && !isHugeFile) {
-      meme = await _processPdfImport(meme, file, bytes, fileHash);
-    }
+    // PDF 不再渲染封面（pdfx 在 Windows CI 上下载 pdfium 失败）
+    // PDF 显示图标占位 + 外部打开按钮
 
     return meme;
-  }
-
-  /// PDF 导入后处理：渲染第一页为 PNG 作为缩略图
-  Future<Meme> _processPdfImport(
-    Meme meme,
-    PlatformFile file,
-    Uint8List? inMemoryBytes,
-    String? fileHash,
-  ) async {
-    try {
-      Uint8List? pdfBytes;
-      if (inMemoryBytes != null) {
-        pdfBytes = inMemoryBytes;
-      } else if (file.path != null && !kIsWeb) {
-        pdfBytes = await File(file.path!).readAsBytes();
-      }
-      if (pdfBytes == null) return meme;
-
-      final doc = await PdfDocument.openData(pdfBytes);
-      try {
-        final page = await doc.getPage(1);
-        // 限制最大宽度 600 像素，避免超大页面导致 OOM
-        const maxWidth = 600.0;
-        final scale = page.width > 0 ? (maxWidth / page.width).clamp(0.5, 2.0) : 1.0;
-        final pageImage = await page.render(
-          width: page.width * scale,
-          height: page.height * scale,
-          format: PdfPageImageFormat.png,
-          backgroundColor: '#FFFFFF',
-        );
-        if (pageImage == null || pageImage.bytes.isEmpty) return meme;
-        final thumbPath = await _saveThumbPng(meme.id, pageImage.bytes);
-        final updated = meme.copyWith(
-          thumbPath: thumbPath,
-          width: page.width.toInt(),
-          height: page.height.toInt(),
-        );
-        await _saveMeme(updated, fileHash);
-        return updated;
-      } finally {
-        // pdfx 2.9.2 的 PdfDocument 没有 dispose 方法，依赖 GC 释放原生资源
-        // 显式 close 在不同版本签名不一致，这里不做手动释放
-      }
-    } catch (_) {
-      return meme;
-    }
   }
 
   /// 保存缩略图 PNG 字节到存储，返回存储路径
