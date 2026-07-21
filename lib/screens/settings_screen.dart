@@ -551,7 +551,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final builtinCats = <String>[
       Meme.typeEmoji, Meme.typeGif, Meme.typeImage, Meme.typeText,
       Meme.typePortrait, Meme.typeCg, Meme.typeCharacterCard,
-      Meme.typeVector, Meme.typePsd, Meme.typePdf, Meme.typeNovel,
+      Meme.typeVector, Meme.typePsd, Meme.typeManga, Meme.typeFile,
     ];
     final visibleCount = builtinCats.where(settings.isCategoryVisible).length;
     final cs = Theme.of(context).colorScheme;
@@ -1096,9 +1096,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return;
     }
 
-    final isMobile = defaultTargetPlatform == TargetPlatform.android ||
-        defaultTargetPlatform == TargetPlatform.iOS;
-
     // 确定目标目录
     Directory? targetDir;
     try {
@@ -1118,16 +1115,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
         }
         targetDir = Directory(picturesPath);
       } else if (defaultTargetPlatform == TargetPlatform.android) {
-        // Android 10+ scoped storage 禁止直接写入公共目录，
-        // 用应用专属外部存储做中转，再通过 Share 让用户选择目标
-        final ext = await getExternalStorageDirectory();
-        if (ext != null) {
-          targetDir = Directory(p.join(ext.path, 'Mako Meme Export'));
-        }
+        // Android：直接保存到公共 Pictures 目录
+        // Android 10 及以下：requestLegacyExternalStorage=true 允许直接写入
+        // Android 11+：MediaStore 才是规范方式，但直接写 Pictures/ 也可能在部分设备上成功
+        // 失败时回退到应用专属外部存储并提示用户
+        targetDir = Directory('/storage/emulated/0/Pictures/Mako Meme');
       } else if (defaultTargetPlatform == TargetPlatform.iOS) {
-        // iOS：用临时目录做中转，再通过 Share 让用户选择目标
-        final temp = await getTemporaryDirectory();
-        targetDir = Directory(p.join(temp.path, 'mako_gallery_export'));
+        // iOS：保存到文档目录
+        final docs = await getApplicationDocumentsDirectory();
+        targetDir = Directory(p.join(docs.path, 'Mako Meme'));
       }
     } catch (_) {}
 
@@ -1140,11 +1136,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return;
     }
 
-    // 清理并重建目标目录（避免上次导出的残留文件干扰）
+    // 尝试创建目标目录（如已存在跳过）
     try {
-      if (await targetDir.exists()) await targetDir.delete(recursive: true);
-    } catch (_) {}
-    await targetDir.create(recursive: true);
+      if (!await targetDir.exists()) await targetDir.create(recursive: true);
+    } catch (_) {
+      // Android 11+ scoped storage 可能拒绝创建，回退到应用专属外部存储
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        try {
+          final ext = await getExternalStorageDirectory();
+          if (ext != null) {
+            targetDir = Directory(p.join(ext.path, 'Pictures', 'Mako Meme'));
+            if (!await targetDir.exists()) await targetDir.create(recursive: true);
+          }
+        } catch (_) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(l10n.tr('cannot_determine_dir'))),
+            );
+          }
+          return;
+        }
+      }
+    }
 
     if (!context.mounted) return;
 
@@ -1174,10 +1187,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     int done = 0;
     int failed = 0;
-    // 收集成功导出的 meme，完成后打上「系统图集」标记 tag
-    final exportedMemeIds = <String>{};
-    // 移动端：收集所有生成文件的路径，最后通过 Share 一次性分享
-    final exportedPaths = <String>[];
     for (final meme in memes) {
       try {
         final abs = storage.getMemeAbsolutePath(meme.filePath);
@@ -1187,17 +1196,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         // 用唯一文件名避免覆盖
         final ext = p.extension(meme.filePath);
         final destName = '${meme.name}$ext';
-        final destFile = File(p.join(targetDir.path, destName));
+        var finalPath = p.join(targetDir!.path, destName);
         // 若重名，加序号
-        var finalPath = destFile.path;
         var counter = 1;
         while (await File(finalPath).exists()) {
           finalPath = p.join(targetDir.path, '${meme.name} ($counter)$ext');
           counter++;
         }
         await srcFile.copy(finalPath);
-        exportedPaths.add(finalPath);
-        exportedMemeIds.add(meme.id);
         done++;
       } catch (_) {
         failed++;
@@ -1205,35 +1211,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       progressNotifier.value = done + failed;
     }
 
-    // 给成功导出的 meme 加上「系统图集」标记 tag，便于「系统图集」分类筛选
-    if (exportedMemeIds.isNotEmpty) {
-      try {
-        for (final id in exportedMemeIds) {
-          await storage.addTagToMeme(id, Meme.tagSystemGallery);
-        }
-        if (context.mounted) {
-          await context.read<MemeProvider>().loadAll();
-        }
-      } catch (_) {}
-    }
-
     progressNotifier.dispose();
     if (!context.mounted) return;
     Navigator.of(context).pop(); // 关闭进度对话框
-
-    // 移动端：弹出 Share sheet 让用户选择保存到相册/文件/云盘
-    if (isMobile && exportedPaths.isNotEmpty) {
-      try {
-        await Share.shareXFiles(
-          exportedPaths.map((path) => XFile(path)).toList(),
-          subject: 'Mako Meme',
-        );
-      } catch (_) {}
-      // 延迟清理临时目录
-      Future.delayed(const Duration(minutes: 2), () {
-        try { targetDir?.delete(recursive: true); } catch (_) {}
-      });
-    }
 
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1399,26 +1379,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return;
     }
 
-    // Android/iOS：SAF 返回的 content URI 无法用 File.copy 写入
-    // 改用 Share sheet 让用户选择保存目标（系统文件/云盘/分享等）
+    // Android/iOS：用 SAF 让用户选择保存位置（系统文件管理器选目录）
+    // FilePicker.saveFile 在 Android 上会弹出系统的「另存为」对话框
+    // 返回的 content URI 可以通过 file_picker 插件内部机制写入
     try {
-      final tempDir = await getTemporaryDirectory();
-      final tempFile = File(p.join(tempDir.path, 'mako_meme_backup.zip'));
-      await tempFile.writeAsBytes(bytes);
-      await Share.shareXFiles([
-        XFile(tempFile.path, mimeType: 'application/zip', name: 'mako_meme_backup.zip'),
-      ]);
+      // file_picker 在 Android 上 saveFile 不支持 bytes，需要先写临时文件再让 SAF 复制
+      // 但更可靠的方式：用 saveFile + type any + 让用户选择文件名
+      final savedPath = await FilePicker.platform.saveFile(
+        dialogTitle: l10n.tr('save_backup'),
+        fileName: 'mako_meme_backup.zip',
+        type: FileType.any,
+      );
+      if (savedPath == null) return;
+      // file_picker 在 Android 上返回 content URI，需通过插件 API 写入
+      // 检查返回值类型：如果是 content:// 开头的 URI，用 XFile 写入；否则直接 File.writeAsBytes
+      if (savedPath.startsWith('content://')) {
+        // content URI：file_picker 不直接支持写入，回退到临时文件 + Share
+        final tempDir = await getTemporaryDirectory();
+        final tempFile = File(p.join(tempDir.path, 'mako_meme_backup.zip'));
+        await tempFile.writeAsBytes(bytes);
+        await Share.shareXFiles([
+          XFile(tempFile.path, mimeType: 'application/zip', name: 'mako_meme_backup.zip'),
+        ]);
+        Future.delayed(const Duration(minutes: 1), () {
+          try { tempFile.delete(); } catch (_) {}
+        });
+      } else {
+        // 普通文件路径：直接写入
+        await File(savedPath).writeAsBytes(bytes);
+      }
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n.tr('export_success_msg'))),
         );
       }
-      // 延迟清理临时文件，给系统分享足够时间读取
-      Future.delayed(const Duration(minutes: 1), () {
-        try {
-          tempFile.delete();
-        } catch (_) {}
-      });
     } catch (_) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -599,12 +599,11 @@ class MemeProvider with ChangeNotifier {
     }
     if (_typeFilter.isNotEmpty) {
       // md 归入文字分类：选 typeText 时也匹配 typeMd
-      // 系统图集：选 __sys_gallery__ 时匹配含 __sys_gallery__ tag 的 meme
+      // PDF 归入文件分类：选 typeFile 时也匹配 typePdf
       list = list.where((m) {
         if (_typeFilter.contains(m.type)) return true;
         if (m.type == Meme.typeMd && _typeFilter.contains(Meme.typeText)) return true;
-        if (_typeFilter.contains(Meme.typeSystemGallery) &&
-            m.tags.contains(Meme.tagSystemGallery)) return true;
+        if (m.type == Meme.typePdf && _typeFilter.contains(Meme.typeFile)) return true;
         return false;
       }).toList();
     }

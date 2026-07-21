@@ -9,23 +9,20 @@ class Meme {
   static const String typeVector = 'vector';   // SVG 矢量图
   static const String typePsd = 'psd';          // PSD 多图层
   static const String typePdf = 'pdf';          // PDF 文档
-  static const String typeNovel = 'novel';       // 小说（长文本）
   static const String typeManga = 'manga';       // 漫画（多页图片）
   static const String typeMd = 'md';              // Markdown 文档
-
-  /// 系统图集分类：标记已导出到系统相册的 meme（用 tag 实现，不污染 allTags）
-  static const String typeSystemGallery = '__sys_gallery__';
-  static const String tagSystemGallery = '__sys_gallery__';
+  static const String typeNovel = 'novel';       // 小说（旧版本数据兼容）
+  static const String typeFile = 'file';          // 其他文件（无法分类的）
 
   static const List<String> allTypes = [
     typeEmoji, typeGif, typeImage, typeText, typePortrait, typeCg,
-    typeCharacterCard, typeVector, typePsd, typePdf, typeNovel, typeManga, typeMd,
+    typeCharacterCard, typeVector, typePsd, typePdf, typeManga, typeMd, typeFile,
   ];
 
   /// 默认分类列表（用户可见的分类按钮）。md 归入文字分类，不单独显示
   static const List<String> categoryTypes = [
     typeEmoji, typeGif, typeImage, typeText, typePortrait, typeCg,
-    typeCharacterCard, typeVector, typePsd, typePdf, typeNovel, typeManga,
+    typeCharacterCard, typeVector, typePsd, typeManga, typeFile,
   ];
 
   /// 所有支持的图片/文档格式扩展名（不含点，小写）
@@ -37,7 +34,7 @@ class Meme {
   bool get isImageType => type == typeImage || type == typeGif ||
       type == typeEmoji || type == typePortrait || type == typeCg ||
       type == typeCharacterCard || type == typeVector || type == typePsd ||
-      type == typePdf || type == typeNovel || type == typeManga;
+      type == typePdf || type == typeManga;
 
   /// 是否为动画类型（GIF / APNG）
   bool get isAnimated => type == typeGif || mimeType == 'image/apng';
@@ -61,14 +58,17 @@ class Meme {
   /// 是否为漫画（多页图片）
   bool get isManga => type == typeManga;
 
-  /// 是否为小说（长文本）
-  bool get isNovel => type == typeNovel;
-
   /// 是否为 Markdown 文档
   bool get isMd => type == typeMd;
 
-  /// 是否为文本类（文本、小说或 Markdown）
-  bool get isTextLike => type == typeText || type == typeNovel || type == typeMd;
+  /// 是否为小说（长文本，旧版本数据兼容）
+  bool get isNovel => type == typeNovel;
+
+  /// 是否为文件类（其他无法分类的文件）
+  bool get isFile => type == typeFile;
+
+  /// 是否为文本类（文本、Markdown 或旧版小说）
+  bool get isTextLike => type == typeText || type == typeMd || type == typeNovel;
 
   /// 实际显示用路径：有缩略图（PSD/ICO/TIF 转换的 PNG）时用 thumbPath，否则用 filePath
   String get displayPath => thumbPath ?? filePath;
@@ -94,8 +94,9 @@ class Meme {
       case typeVector: return 'type_vector';
       case typePsd: return 'type_psd';
       case typePdf: return 'type_pdf';
-      case typeNovel: return 'type_novel';
       case typeManga: return 'type_manga';
+      case typeNovel: return 'type_novel';
+      case typeFile: return 'type_file';
       default: return 'type_image';
     }
   }
