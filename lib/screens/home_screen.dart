@@ -123,6 +123,8 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       },
       child: Scaffold(
+      // FAB 不随输入法上升（导入按钮/新建文件夹按钮）
+      resizeToAvoidBottomInset: false,
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         backgroundColor: theme.colorScheme.surface,
