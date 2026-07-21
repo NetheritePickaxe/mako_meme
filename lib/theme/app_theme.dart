@@ -72,19 +72,21 @@ class AppTheme {
   /// 通用 M3 组件主题。
   ///
   /// 把所有组件主题集中在这里，避免 light/dark/preset 各分支重复定义。
-  static ThemeData _build(ColorScheme scheme, {bool pureBlack = false}) {
+  static ThemeData _build(ColorScheme scheme, {bool pureBlack = false, String predictiveBack = 'aosp'}) {
     final isDark = scheme.brightness == Brightness.dark;
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
       scaffoldBackgroundColor: pureBlack && isDark ? Colors.black : null,
       fontFamily: 'Noto Sans SC',
-      // 启用预测式返回页面切换动画（Android 14+）
-      // 配合 AndroidManifest 中 android:enableOnBackInvokedCallback="true"
-      // 用户从屏幕左/右边缘滑动时可以看到目标页面跟随手势滑入
+      // 页面切换风格：aosp / muix / zoom / classic，由设置选择
+      // aosp = PredictiveBackPageTransitionsBuilder（Android 14+ 原生预测式返回）
+      // muix = 自定义 _MuixPageTransitionsBuilder（水平滑动 + 轻微缩放，类 MIUI/HyperOS）
+      // zoom = ZoomPageTransitionsBuilder（Android 10 Material 缩放）
+      // classic = FadeUpwardsPageTransitionsBuilder（Android 8 经典向上淡入）
       pageTransitionsTheme: PageTransitionsTheme(
         builders: {
-          TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
+          TargetPlatform.android: _pageTransitionBuilder(predictiveBack),
           TargetPlatform.iOS: const CupertinoPageTransitionsBuilder(),
           TargetPlatform.macOS: const CupertinoPageTransitionsBuilder(),
         },
@@ -178,10 +180,81 @@ class AppTheme {
   }
 
   /// 浅色主题（动态颜色或预设/自定义种子）
-  static ThemeData light(Color seed) =>
-      _build(_scheme(seed, Brightness.light));
+  static ThemeData light(Color seed, {String predictiveBack = 'aosp'}) =>
+      _build(_scheme(seed, Brightness.light), predictiveBack: predictiveBack);
 
   /// 暗色主题（动态颜色或预设/自定义种子）
-  static ThemeData dark(Color seed, {bool pureBlack = false}) =>
-      _build(_scheme(seed, Brightness.dark, pureBlack: pureBlack), pureBlack: pureBlack);
+  static ThemeData dark(Color seed, {bool pureBlack = false, String predictiveBack = 'aosp'}) =>
+      _build(_scheme(seed, Brightness.dark, pureBlack: pureBlack), pureBlack: pureBlack, predictiveBack: predictiveBack);
+
+  /// 根据风格字符串返回对应的 PageTransitionsBuilder
+  static PageTransitionsBuilder _pageTransitionBuilder(String mode) {
+    switch (mode) {
+      case 'muix':
+        return const _MuixPageTransitionsBuilder();
+      case 'zoom':
+        return const ZoomPageTransitionsBuilder();
+      case 'classic':
+        return const FadeUpwardsPageTransitionsBuilder();
+      case 'aosp':
+      default:
+        return PredictiveBackPageTransitionsBuilder();
+    }
+  }
+}
+
+/// MIUI / HyperOS 风格页面过渡：新页面从右侧 30% 滑入 + 轻微缩放，
+/// 老页面被覆盖时向左滑动 + 略微缩小，整体类似 iOS push 但更柔和。
+class _MuixPageTransitionsBuilder extends PageTransitionsBuilder {
+  const _MuixPageTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T>? route,
+    BuildContext? context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget? child,
+  ) {
+    final primaryCurved = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+    final secondaryCurved = CurvedAnimation(
+      parent: secondaryAnimation,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+    // 入场：从右侧 30% 滑入 + 0.92→1.0 缩放
+    final slideIn = Tween<Offset>(
+      begin: const Offset(0.3, 0),
+      end: Offset.zero,
+    ).animate(primaryCurved);
+    final scaleIn = Tween<double>(begin: 0.92, end: 1.0).animate(primaryCurved);
+    // 退场：向左 30% 滑出 + 1.0→0.96 缩放
+    final slideOut = Tween<Offset>(
+      begin: Offset.zero,
+      end: const Offset(-0.3, 0),
+    ).animate(secondaryCurved);
+    final scaleOut = Tween<double>(begin: 1.0, end: 0.96).animate(secondaryCurved);
+
+    Widget result = child ?? const SizedBox.shrink();
+    // 入场变换包裹在退场变换内侧
+    result = SlideTransition(
+      position: slideIn,
+      child: ScaleTransition(
+        scale: scaleIn,
+        child: result,
+      ),
+    );
+    // 退场变换在最外层
+    return SlideTransition(
+      position: slideOut,
+      child: ScaleTransition(
+        scale: scaleOut,
+        child: result,
+      ),
+    );
+  }
 }

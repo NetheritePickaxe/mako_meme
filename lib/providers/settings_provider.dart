@@ -16,6 +16,8 @@ class SettingsProvider extends ChangeNotifier {
   bool _autoClassify = true; // 导入时按画幅自动归类
   double _classifyRatio = 1.1; // 宽高比阈值，<=此值视为正方形(表情)
   bool _landscapePreview = false; // 横屏模式：左侧大图预览
+  // 预测式返回 / 页面切换风格：'aosp' / 'muix' / 'zoom' / 'classic'
+  String _predictiveBack = 'aosp';
 
   // 卡片显示选项
   bool _showCardName = false;
@@ -98,6 +100,10 @@ class SettingsProvider extends ChangeNotifier {
     final savedRatio = double.tryParse(_storage.getSetting('classifyRatio') ?? '');
     if (savedRatio != null && savedRatio > 0.5 && savedRatio < 3.0) _classifyRatio = savedRatio;
     _landscapePreview = _storage.getSetting('landscapePreview') == 'true';
+    final savedPb = _storage.getSetting('predictiveBack');
+    if (savedPb == 'aosp' || savedPb == 'muix' || savedPb == 'zoom' || savedPb == 'classic') {
+      _predictiveBack = savedPb;
+    }
 
     // 加载卡片显示选项
     _showCardName = _storage.getSetting('showCardName') == 'true';
@@ -209,6 +215,7 @@ class SettingsProvider extends ChangeNotifier {
   bool get autoClassify => _autoClassify;
   double get classifyRatio => _classifyRatio;
   bool get landscapePreview => _landscapePreview;
+  String get predictiveBack => _predictiveBack;
   bool get showCardName => _showCardName;
   bool get showCardTags => _showCardTags;
   bool get showCardType => _showCardType;
@@ -298,6 +305,13 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setLandscapePreview(bool v) async {
     _landscapePreview = v;
     await _storage.setSetting('landscapePreview', v.toString());
+    notifyListeners();
+  }
+
+  Future<void> setPredictiveBack(String v) async {
+    if (v != 'aosp' && v != 'muix' && v != 'zoom' && v != 'classic') return;
+    _predictiveBack = v;
+    await _storage.setSetting('predictiveBack', v);
     notifyListeners();
   }
 

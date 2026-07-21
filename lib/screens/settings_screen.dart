@@ -74,6 +74,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _mobileLongPressTile(settings, l10n),
             const Divider(indent: 16, endIndent: 16),
           ],
+          if (defaultTargetPlatform == TargetPlatform.android) ...[
+            _predictiveBackTile(settings, l10n),
+            const Divider(indent: 16, endIndent: 16),
+          ],
           _tagSubdivisionTile(settings, l10n),
           const Divider(indent: 16, endIndent: 16),
           if (defaultTargetPlatform == TargetPlatform.android) ...[
@@ -478,6 +482,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
         style: ButtonStyle(
           visualDensity: VisualDensity.compact,
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+      ),
+    );
+  }
+
+  /// 预测式返回 / 页面切换风格：aosp / muix / zoom / classic
+  Widget _predictiveBackTile(SettingsProvider settings, L10n l10n) {
+    final options = [
+      ('aosp', l10n.tr('pb_aosp')),
+      ('muix', l10n.tr('pb_muix')),
+      ('zoom', l10n.tr('pb_zoom')),
+      ('classic', l10n.tr('pb_classic')),
+    ];
+    final currentLabel = options.firstWhere((e) => e.$1 == settings.predictiveBack,
+        orElse: () => options.first).$2;
+    return ListTile(
+      leading: const Icon(Icons.swap_horiz),
+      title: Text(l10n.tr('predictive_back')),
+      subtitle: Text(currentLabel),
+      trailing: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: DropdownButton<String>(
+          value: settings.predictiveBack,
+          underline: const SizedBox(),
+          isDense: true,
+          borderRadius: BorderRadius.circular(16),
+          items: options
+              .map((e) => DropdownMenuItem(value: e.$1, child: Text(e.$2)))
+              .toList(),
+          onChanged: (v) { if (v != null) settings.setPredictiveBack(v); },
         ),
       ),
     );
