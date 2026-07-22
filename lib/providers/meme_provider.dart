@@ -8,6 +8,7 @@ import '../services/search_query.dart';
 import '../services/system_gallery_service.dart';
 import '../services/webdav_service.dart';
 import 'settings_provider.dart';
+import '../utils/lru_cache.dart';
 
 enum SortBy { date, name, size }
 enum SortOrder { asc, desc }
@@ -707,6 +708,7 @@ class MemeProvider with ChangeNotifier {
   }
 
   Future<void> clearCache() async {
+    thumbCache.clear();
     await _storage.clearThumbnailCache();
     await loadAll();
   }

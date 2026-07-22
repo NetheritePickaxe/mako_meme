@@ -13,6 +13,7 @@ import '../providers/locale_provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/storage_service.dart';
 import '../screens/meme_viewer_screen.dart';
+import '../utils/lru_cache.dart';
 
 class MemeCard extends StatefulWidget {
   final Meme meme;
@@ -82,9 +83,17 @@ class _MemeCardState extends State<MemeCard> {
         _aspectRatio = m.width / m.height;
       }
       if (kIsWeb) {
+        final cached = thumbCache.get(_displayPath);
+        if (cached != null) {
+          _bytes = cached;
+          _loading = false;
+          if (mounted) setState(() {});
+          return;
+        }
         // Web：读 bytes
         debugPrint('[MakoCard] _loadBytes WEB: id=${m.id}, displayPath="$_displayPath", type=${m.type}');
         storage.readMemeBytes(_displayPath).then((b) {
+          thumbCache.put(_displayPath, b);
           if (mounted) {
             setState(() {
               _bytes = b;

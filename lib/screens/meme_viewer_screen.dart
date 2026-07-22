@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:collection';
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -20,36 +19,13 @@ import '../services/storage_service.dart';
 import '../services/pdf_opener.dart';
 import 'text_editor_screen.dart';
 import 'character_card_editor_screen.dart';
+import '../utils/lru_cache.dart';
 
 /// 是否为移动平台
 bool _isMobilePlatform() {
   if (kIsWeb) return false;
   final p = defaultTargetPlatform;
   return p == TargetPlatform.android || p == TargetPlatform.iOS;
-}
-
-/// LRU 缓存：限制条目数，超出时淘汰最久未访问的
-class _LruCache<K, V> {
-  final int maxSize;
-  final LinkedHashMap<K, V> _map = LinkedHashMap();
-
-  _LruCache(this.maxSize);
-
-  V? get(K key) {
-    final v = _map.remove(key);
-    if (v != null) _map[key] = v;
-    return v;
-  }
-
-  void put(K key, V value) {
-    _map.remove(key);
-    _map[key] = value;
-    while (_map.length > maxSize) {
-      _map.remove(_map.keys.first);
-    }
-  }
-
-  bool containsKey(K key) => _map.containsKey(key);
 }
 
 class MemeViewerScreen extends StatefulWidget {
@@ -65,8 +41,8 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
   late PageController _controller;
   late int _currentIndex;
   // LRU 缓存：最多保留 3 项，避免来回滑动时内存累积导致 OOM
-  final _LruCache<int, Uint8List?> _bytesCache = _LruCache(3);
-  final _LruCache<int, File?> _fileCache = _LruCache(3);
+  final LruCache<int, Uint8List?> _bytesCache = LruCache(3);
+  final LruCache<int, File?> _fileCache = LruCache(3);
 
   // 详情面板当前占据屏幕高度的比例（0.0~1.0）
   // 拖动面板时实时更新，图片区域随之收缩，保证图片始终可见
@@ -93,14 +69,14 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
 
   // 漫画内部页面滑动
   int _mangaPageIndex = 0;
-  final _LruCache<String, Uint8List?> _mangaBytesCache = _LruCache(3);
-  final _LruCache<String, File?> _mangaFileCache = _LruCache(3);
+  final LruCache<String, Uint8List?> _mangaBytesCache = LruCache(3);
+  final LruCache<String, File?> _mangaFileCache = LruCache(3);
 
   // 立绘/CG 精灵图层可见性状态：memeId -> {layerZOrder: visible}
   // 用户切换图层面板后覆盖默认 visible
   final Map<String, Map<int, bool>> _spriteVisibility = {};
   // 立绘/CG 图层字节缓存：layerPath -> bytes（web）/ File（native 已用 path 直接读）
-  final _LruCache<String, Uint8List?> _spriteBytesCache = _LruCache(8);
+  final LruCache<String, Uint8List?> _spriteBytesCache = LruCache(8);
 
   // 序列帧
   int _currentSpriteFrame = 0;
