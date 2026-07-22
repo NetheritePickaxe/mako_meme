@@ -1490,7 +1490,7 @@ class StorageService {
         await File(file.path!).copy(dest.path);
       } else if (file.bytes != null) {
         bytes = file.bytes!;
-        await dest.writeAsBytes(bytes!);
+        await dest.writeAsBytes(bytes);
       }
     }
 
