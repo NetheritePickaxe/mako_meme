@@ -54,7 +54,8 @@ lib/
 | Analyze | `flutter analyze` (CI enforces `--no-fatal-infos`) |
 | Build web | `flutter build web` |
 | Build web (wasm) | `flutter build web --wasm` |
-| Build Android | `flutter build apk --release` |
+| Build Android (fat) | `flutter build apk --release` |
+| Build Android (split-per-abi) | `flutter build apk --release --split-per-abi` |
 | Build Windows | `flutter build windows --release` |
 | Serve web locally | `python -m http.server 58722 --directory build/web` |
 | Serve web (WASM) | `python tools/serve_wasm.py 58722 build/web` |
