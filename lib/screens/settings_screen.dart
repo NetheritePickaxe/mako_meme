@@ -103,6 +103,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const Divider(indent: 16, endIndent: 16),
           _importEditOnImportTile(settings, l10n),
           const Divider(indent: 16, endIndent: 16),
+          _autoFolderCoverTile(settings, l10n),
+          const Divider(indent: 16, endIndent: 16),
           _cardDisplayTile(settings, l10n),
           const Divider(indent: 16, endIndent: 16),
           _categoryManageTile(settings, l10n),
@@ -582,6 +584,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
       subtitle: Text(l10n.tr('import_edit_on_import_desc')),
       value: settings.importEditOnImport,
       onChanged: (v) => settings.setImportEditOnImport(v),
+    );
+  }
+
+  Widget _autoFolderCoverTile(SettingsProvider settings, L10n l10n) {
+    return SwitchListTile(
+      secondary: const Icon(Icons.photo_library_outlined),
+      title: Text(l10n.tr('auto_folder_cover')),
+      subtitle: Text(l10n.tr('auto_folder_cover_desc')),
+      value: settings.autoFolderCover,
+      onChanged: (v) => settings.setAutoFolderCover(v),
     );
   }
 

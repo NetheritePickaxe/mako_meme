@@ -451,5 +451,12 @@
   "finish": "Finish",
   "previous": "Previous",
   "next": "Next",
-  "deleted_hint": "Deleted"
+  "deleted_hint": "Deleted",
+  "set_cover": "Set Cover",
+  "remove_cover": "Remove Cover",
+  "auto_folder_cover": "Auto Folder Cover",
+  "auto_folder_cover_desc": "Auto-set the first meme as folder cover when moving",
+  "pick_cover_title": "Pick Cover Image",
+  "cover_removed": "Cover removed",
+  "cover_set_success": "Cover set successfully"
 }

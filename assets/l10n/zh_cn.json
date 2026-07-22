@@ -451,5 +451,12 @@
   "finish": "完成",
   "previous": "上一张",
   "next": "下一张",
-  "deleted_hint": "已删除"
+  "deleted_hint": "已删除",
+  "set_cover": "设置封面",
+  "remove_cover": "移除封面",
+  "auto_folder_cover": "自动文件夹封面",
+  "auto_folder_cover_desc": "移动表情到文件夹时自动将第一张设为封面",
+  "pick_cover_title": "选择封面图片",
+  "cover_removed": "封面已移除",
+  "cover_set_success": "封面设置成功"
 }

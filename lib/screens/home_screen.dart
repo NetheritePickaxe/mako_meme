@@ -1713,6 +1713,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _showFolderMenu(BuildContext ctx, MemeProvider prov, MemeFolder folder) {
     final l10n = context.read<LocaleProvider>().l10n;
+    final hasCover = folder.coverMemeId != null;
     showModalBottomSheet(
       context: ctx,
       builder: (bCtx) => SafeArea(
@@ -1724,6 +1725,28 @@ class _HomeScreenState extends State<HomeScreen> {
               title: Text(l10n.tr('rename')),
               onTap: () { Navigator.pop(bCtx); _renameFolder(ctx, prov, folder); },
             ),
+            ListTile(
+              leading: const Icon(Icons.image_outlined),
+              title: Text(l10n.tr('set_cover')),
+              onTap: () async {
+                Navigator.pop(bCtx);
+                await _pickAndSetFolderCover(ctx, prov, folder);
+              },
+            ),
+            if (hasCover)
+              ListTile(
+                leading: const Icon(Icons.image_not_supported_outlined),
+                title: Text(l10n.tr('remove_cover')),
+                onTap: () async {
+                  Navigator.pop(bCtx);
+                  await prov.removeFolderCover(folder.id);
+                  if (ctx.mounted) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      SnackBar(content: Text(l10n.tr('cover_removed')), duration: const Duration(seconds: 1)),
+                    );
+                  }
+                },
+              ),
             ListTile(
               leading: const Icon(Icons.delete, color: Colors.red),
               title: Text(l10n.tr('delete'), style: const TextStyle(color: Colors.red)),
@@ -1747,6 +1770,25 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _pickAndSetFolderCover(BuildContext ctx, MemeProvider prov, MemeFolder folder) async {
+    final l10n = context.read<LocaleProvider>().l10n;
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      allowMultiple: false,
+    );
+    if (result == null || result.files.isEmpty) return;
+    if (!ctx.mounted) return;
+    final imported = await prov.importFiles(result.files);
+    if (imported.isNotEmpty) {
+      await prov.setFolderCover(folder.id, imported.first.id);
+      if (ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(content: Text(l10n.tr('cover_set_success')), duration: const Duration(seconds: 1)),
+        );
+      }
+    }
   }
 
   void _renameFolder(BuildContext ctx, MemeProvider prov, MemeFolder folder) {

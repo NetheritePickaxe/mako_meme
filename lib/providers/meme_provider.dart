@@ -421,6 +421,13 @@ class MemeProvider with ChangeNotifier {
   Future<void> moveToFolder(String memeId, String? folderId) async {
     await _storage.moveToFolder(memeId, folderId);
     _refreshMeme(memeId);
+    if (folderId != null && _settings.autoFolderCover) {
+      final folder = _folders.where((f) => f.id == folderId).firstOrNull;
+      if (folder != null && folder.coverMemeId == null) {
+        await _storage.updateFolderCover(folderId, memeId);
+        await loadAll();
+      }
+    }
   }
 
   Future<void> renameMeme(String id, String newName) async {
@@ -485,6 +492,16 @@ class MemeProvider with ChangeNotifier {
 
   Future<void> updateFolderCover(String folderId, String? coverMemeId) async {
     await _storage.updateFolderCover(folderId, coverMemeId);
+    await loadAll();
+  }
+
+  Future<void> setFolderCover(String folderId, String memeId) async {
+    await _storage.updateFolderCover(folderId, memeId);
+    await loadAll();
+  }
+
+  Future<void> removeFolderCover(String folderId) async {
+    await _storage.updateFolderCover(folderId, null);
     await loadAll();
   }
 
@@ -659,6 +676,8 @@ class MemeProvider with ChangeNotifier {
       }
     }
   }
+
+  Meme? getMemeById(String id) => _all.where((m) => m.id == id).firstOrNull;
 
   int countInFolder(String folderId) =>
       _all.where((m) => m.folderId == folderId).length;

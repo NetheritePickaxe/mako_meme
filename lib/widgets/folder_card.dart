@@ -1,16 +1,17 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:provider/provider.dart';
 import '../models/folder.dart';
 import '../models/meme.dart';
 import '../providers/meme_provider.dart';
 import '../providers/locale_provider.dart';
+import '../services/storage_service.dart';
 
-/// 文件夹卡片 — 也是一个拖放目标，接收表情包拖入
 class FolderCard extends StatelessWidget {
   final MemeFolder folder;
   final int count;
   final bool isActive;
-  /// 选中后回调（在 selectFolder 之后调用）
   final VoidCallback? onSelected;
 
   const FolderCard({
@@ -30,7 +31,6 @@ class FolderCard extends StatelessWidget {
     final isMulti = prov.isMulti;
     final isFolderSelected = prov.selectedFolders.contains(folder.id);
 
-    // 多选模式：点击切换选中，显示复选框，禁用拖放
     if (isMulti) {
       return AspectRatio(
         aspectRatio: 1,
@@ -48,7 +48,6 @@ class FolderCard extends StatelessWidget {
       );
     }
 
-    // 普通模式：点击进入文件夹，右键菜单，支持拖入表情包
     return AspectRatio(
       aspectRatio: 1,
       child: DragTarget<Meme>(
@@ -111,19 +110,8 @@ class FolderCard extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // 纯色背景
-          Container(
-            color: isDragOver
-                ? color.withValues(alpha: 0.2)
-                : isActive
-                    ? color.withValues(alpha: 0.15)
-                    : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-            child: Center(
-              child: Icon(Icons.folder, size: 40, color: color.withValues(alpha: 0.6)),
-            ),
-          ),
-
-          // 文件夹名称（底部左侧）
+          _buildBackground(context, color, isDragOver),
+          _buildCoverImage(context, color),
           Positioned(
             left: 8,
             right: 8,
@@ -139,8 +127,6 @@ class FolderCard extends StatelessWidget {
               ),
             ),
           ),
-
-          // 多选复选框
           if (showCheckbox)
             Positioned(
               top: 6,
@@ -162,15 +148,58 @@ class FolderCard extends StatelessWidget {
                     : const SizedBox(width: 14, height: 14),
               ),
             ),
+          if (folder.coverMemeId != null)
+            Positioned(
+              top: 6,
+              right: 6,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                decoration: BoxDecoration(
+                  color: Colors.black38,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  '$count',
+                  style: const TextStyle(color: Colors.white, fontSize: 10),
+                ),
+              ),
+            ),
         ],
       ),
     );
+  }
+
+  Widget _buildBackground(BuildContext context, Color color, bool isDragOver) {
+    return Container(
+      color: isDragOver
+          ? color.withValues(alpha: 0.2)
+          : isActive
+              ? color.withValues(alpha: 0.15)
+              : Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+    );
+  }
+
+  Widget _buildCoverImage(BuildContext context, Color color) {
+    if (folder.coverMemeId == null) {
+      return Center(
+        child: Icon(Icons.folder, size: 48, color: color.withValues(alpha: 0.6)),
+      );
+    }
+    final prov = context.read<MemeProvider>();
+    final meme = prov.getMemeById(folder.coverMemeId!);
+    if (meme == null || meme.filePath.isEmpty) {
+      return Center(
+        child: Icon(Icons.folder, size: 48, color: color.withValues(alpha: 0.6)),
+      );
+    }
+    return _FolderCoverImage(meme: meme, color: color);
   }
 
   void _showFolderContextMenu(Offset globalPos, BuildContext context, MemeFolder folder) {
     final l10n = context.read<LocaleProvider>().l10n;
     final renderBox = context.findRenderObject() as RenderBox;
     final localPosition = renderBox.globalToLocal(globalPos);
+    final hasCover = folder.coverMemeId != null;
     showMenu(
       context: context,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -184,11 +213,20 @@ class FolderCard extends StatelessWidget {
           child: ListTile(leading: const Icon(Icons.edit), title: Text(l10n.tr('rename')), dense: true),
         ),
         PopupMenuItem<String>(
+          value: 'set_cover',
+          child: ListTile(leading: const Icon(Icons.image_outlined), title: Text(l10n.tr('set_cover')), dense: true),
+        ),
+        if (hasCover)
+          PopupMenuItem<String>(
+            value: 'remove_cover',
+            child: ListTile(leading: const Icon(Icons.image_not_supported_outlined), title: Text(l10n.tr('remove_cover')), dense: true),
+          ),
+        PopupMenuItem<String>(
           value: 'delete',
           child: ListTile(leading: const Icon(Icons.delete_outline), title: Text(l10n.tr('delete')), dense: true),
         ),
       ],
-    ).then((value) {
+    ).then((value) async {
       if (value == null) return;
       if (!context.mounted) return;
       final prov = context.read<MemeProvider>();
@@ -196,8 +234,36 @@ class FolderCard extends StatelessWidget {
         _showRenameDialog(context, folder);
       } else if (value == 'delete') {
         _confirmDeleteFolder(context, prov, folder);
+      } else if (value == 'set_cover') {
+        await _pickAndSetCover(context, folder, prov);
+      } else if (value == 'remove_cover') {
+        await prov.removeFolderCover(folder.id);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.tr('cover_removed')), duration: const Duration(seconds: 1)),
+          );
+        }
       }
     });
+  }
+
+  Future<void> _pickAndSetCover(BuildContext context, MemeFolder folder, MemeProvider prov) async {
+    final l10n = context.read<LocaleProvider>().l10n;
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      allowMultiple: false,
+    );
+    if (result == null || result.files.isEmpty) return;
+    if (!context.mounted) return;
+    final imported = await prov.importFiles(result.files);
+    if (imported.isNotEmpty) {
+      await prov.setFolderCover(folder.id, imported.first.id);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.tr('cover_set_success')), duration: const Duration(seconds: 1)),
+        );
+      }
+    }
   }
 
   void _showRenameDialog(BuildContext context, MemeFolder folder) {
@@ -246,6 +312,56 @@ class FolderCard extends StatelessWidget {
             child: Text(l10n.tr('delete')),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _FolderCoverImage extends StatefulWidget {
+  final Meme meme;
+  final Color color;
+
+  const _FolderCoverImage({required this.meme, required this.color});
+
+  @override
+  State<_FolderCoverImage> createState() => _FolderCoverImageState();
+}
+
+class _FolderCoverImageState extends State<_FolderCoverImage> {
+  Uint8List? _bytes;
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final storage = context.read<StorageService>();
+    final bytes = await storage.readMemeBytes(widget.meme.filePath);
+    if (mounted) {
+      setState(() {
+        _bytes = bytes;
+        _loaded = true;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_loaded || _bytes == null) {
+      return Center(
+        child: Icon(Icons.folder, size: 48, color: widget.color.withValues(alpha: 0.6)),
+      );
+    }
+    return Image.memory(
+      _bytes!,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      errorBuilder: (_, __, ___) => Center(
+        child: Icon(Icons.folder, size: 48, color: widget.color.withValues(alpha: 0.6)),
       ),
     );
   }
