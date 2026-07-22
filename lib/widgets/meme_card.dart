@@ -673,6 +673,21 @@ class _MemeCardState extends State<MemeCard> {
                     ),
                   ),
                 ),
+              if (widget.meme.isSpriteSheet && widget.meme.spriteSheet != null)
+                Positioned(top: 6, right: widget.meme.isFavorite || widget.meme.isManga ? 60 : 6,
+                  child: Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.65), borderRadius: BorderRadius.circular(8)),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.view_carousel, size: 12, color: Colors.white),
+                        const SizedBox(width: 3),
+                        Text('${widget.meme.spriteSheet!['frameCount']}',
+                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+                ),
               if (isMulti)
                 Positioned(top: 6, left: 6,
                   child: Container(padding: const EdgeInsets.all(2),
@@ -873,6 +888,7 @@ class _MemeCardState extends State<MemeCard> {
       {'type': Meme.typeVector, 'label': l10n.tr('type_vector'), 'icon': Icons.polyline_outlined},
       {'type': Meme.typePsd, 'label': l10n.tr('type_psd'), 'icon': Icons.layers_outlined},
       {'type': Meme.typeManga, 'label': l10n.tr('type_manga'), 'icon': Icons.menu_book_outlined},
+      {'type': Meme.typeSpriteSheet, 'label': l10n.tr('type_sprite_sheet'), 'icon': Icons.view_carousel},
       {'type': Meme.typeFile, 'label': l10n.tr('type_file'), 'icon': Icons.folder_outlined},
     ];
     // 仅显示已启用的分类 + 当前 meme 所属分类（即便被隐藏也可保持）

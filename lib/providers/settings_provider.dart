@@ -43,7 +43,7 @@ class SettingsProvider extends ChangeNotifier {
   Set<String> _hiddenCategories = {
     'manga', 'vector', 'psd', 'pdf',
     'portrait', 'cg', 'character_card', 'novel',
-    'system_gallery',
+    'system_gallery', 'sprite_sheet',
   };
 
   // 用户自定义分类（纯标签，无特殊功能）
@@ -101,7 +101,7 @@ class SettingsProvider extends ChangeNotifier {
     if (savedRatio != null && savedRatio > 0.5 && savedRatio < 3.0) _classifyRatio = savedRatio;
     _landscapePreview = _storage.getSetting('landscapePreview') == 'true';
     final savedPb = _storage.getSetting('predictiveBack');
-    if (savedPb == 'aosp' || savedPb == 'zoom' || savedPb == 'classic') {
+    if (savedPb == 'none' || savedPb == 'aosp' || savedPb == 'zoom' || savedPb == 'classic') {
       _predictiveBack = savedPb!;
     }
 
@@ -309,7 +309,7 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   Future<void> setPredictiveBack(String v) async {
-    if (v != 'aosp' && v != 'zoom' && v != 'classic') return;
+    if (v != 'none' && v != 'aosp' && v != 'zoom' && v != 'classic') return;
     _predictiveBack = v;
     await _storage.setSetting('predictiveBack', v);
     notifyListeners();

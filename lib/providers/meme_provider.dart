@@ -622,6 +622,24 @@ class MemeProvider with ChangeNotifier {
     return meme;
   }
 
+  /// 导入序列帧图片
+  Future<Meme> importSpriteSheet(
+    PlatformFile file, {
+    required int cols,
+    required int rows,
+    String? name,
+  }) async {
+    final meme = await _storage.importSpriteSheet(
+      file,
+      cols: cols,
+      rows: rows,
+      name: name,
+      folderId: _folderId,
+    );
+    await loadAll();
+    return meme;
+  }
+
   /// 同步所有 meme 到 WebDAV
   Future<void> syncAllToWebDav() async {
     if (!_settings.useWebDav || _settings.webDavBaseUrl == null) return;

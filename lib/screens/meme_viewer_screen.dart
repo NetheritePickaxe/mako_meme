@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:collection';
+import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -88,6 +89,10 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
   final Map<String, Map<int, bool>> _spriteVisibility = {};
   // 立绘/CG 图层字节缓存：layerPath -> bytes（web）/ File（native 已用 path 直接读）
   final _LruCache<String, Uint8List?> _spriteBytesCache = _LruCache(8);
+
+  // 序列帧
+  int _currentSpriteFrame = 0;
+  ui.Image? _ssImage;
 
   @override
   void initState() {
@@ -212,7 +217,9 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
               Text(
                 _meme.isManga
                     ? '${_currentIndex + 1} / ${widget.memes.length}  ·  ${l10n.tr('manga_page_label')} ${_mangaPageIndex + 1} / ${_meme.pages.length}'
-                    : '${_currentIndex + 1} / ${widget.memes.length}',
+                    : _meme.isSpriteSheet && _meme.spriteSheet != null
+                        ? '${_currentIndex + 1} / ${widget.memes.length}  ·  ${l10n.tr('sprite_sheet_frame_label')} ${_currentSpriteFrame + 1} / ${_meme.spriteSheet!['frameCount']}'
+                        : '${_currentIndex + 1} / ${widget.memes.length}',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
@@ -319,6 +326,11 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
     // 立绘/CG 精灵图层合成视图
     if (m.isSprite) {
       return _buildSpriteView(theme, m);
+    }
+
+    // 序列帧视图
+    if (m.isSpriteSheet) {
+      return _buildSpriteSheetView(theme, m);
     }
 
     if (m.isImageType && m.displayPath.isNotEmpty) {
@@ -895,6 +907,102 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
     final b = await storage.readMemeBytes(path);
     _spriteBytesCache.put(path, b);
     return b;
+  }
+
+  /// 加载序列帧原图并解码为 ui.Image
+  Future<void> _loadSpriteSheetImage(Meme m) async {
+    if (_ssImage != null) return;
+    final storage = context.read<StorageService>();
+    try {
+      Uint8List? bytes;
+      if (kIsWeb) {
+        bytes = await storage.readMemeBytes(m.displayPath);
+      } else {
+        final file = storage.getMemeFile(m.displayPath);
+        if (file != null) bytes = await file.readAsBytes();
+      }
+      if (bytes == null) return;
+      final codec = await ui.instantiateImageCodec(bytes);
+      final frame = await codec.getNextFrame();
+      if (mounted) setState(() => _ssImage = frame.image);
+    } catch (_) {}
+  }
+
+  /// 序列帧查看器
+  Widget _buildSpriteSheetView(ThemeData theme, Meme m) {
+    final ss = m.spriteSheet;
+    if (ss == null) {
+      return Center(child: Text('No sprite sheet data',
+        style: theme.textTheme.bodyMedium));
+    }
+    final cols = ss['cols'] as int;
+    final rows = ss['rows'] as int;
+    final frameW = ss['frameWidth'] as int;
+    final frameH = ss['frameHeight'] as int;
+    final frameCount = ss['frameCount'] as int;
+    final l10n = context.read<LocaleProvider>().l10n;
+
+    _loadSpriteSheetImage(m);
+
+    if (_ssImage == null) {
+      return Center(
+        child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.primary),
+      );
+    }
+
+    return Column(
+      children: [
+        Expanded(
+          child: Center(
+            child: InteractiveViewer(
+              minScale: 0.5,
+              maxScale: 8.0,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: CustomPaint(
+                  painter: _FramePainter(
+                    image: _ssImage!,
+                    frameIndex: _currentSpriteFrame,
+                    cols: cols,
+                    rows: rows,
+                  ),
+                  size: Size(frameW.toDouble(), frameH.toDouble()),
+                ),
+              ),
+            ),
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.skip_previous),
+                onPressed: _currentSpriteFrame > 0
+                    ? () => setState(() => _currentSpriteFrame--)
+                    : null,
+                tooltip: l10n.tr('previous'),
+              ),
+              Text(
+                '${_currentSpriteFrame + 1} / $frameCount',
+                style: theme.textTheme.titleSmall,
+              ),
+              IconButton(
+                icon: const Icon(Icons.skip_next),
+                onPressed: _currentSpriteFrame < frameCount - 1
+                    ? () => setState(() => _currentSpriteFrame++)
+                    : null,
+                tooltip: l10n.tr('next'),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   /// 立绘/CG 图层面板：可切换差分可见性
@@ -1573,6 +1681,8 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
         return l10n.tr('type_text');
       case Meme.typeManga:
         return l10n.tr('type_manga');
+      case Meme.typeSpriteSheet:
+        return l10n.tr('type_sprite_sheet');
       case Meme.typePortrait:
         return l10n.tr('type_portrait');
       case Meme.typeCg:
@@ -1604,6 +1714,8 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
         return Icons.text_fields;
       case Meme.typeManga:
         return Icons.menu_book_outlined;
+      case Meme.typeSpriteSheet:
+        return Icons.view_carousel;
       case Meme.typePortrait:
         return Icons.accessibility_new;
       case Meme.typeCg:
@@ -2046,6 +2158,7 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
       {'type': Meme.typeVector, 'label': l10n.tr('type_vector'), 'icon': Icons.polyline_outlined},
       {'type': Meme.typePsd, 'label': l10n.tr('type_psd'), 'icon': Icons.layers_outlined},
       {'type': Meme.typeManga, 'label': l10n.tr('type_manga'), 'icon': Icons.menu_book_outlined},
+      {'type': Meme.typeSpriteSheet, 'label': l10n.tr('type_sprite_sheet'), 'icon': Icons.view_carousel},
       {'type': Meme.typeFile, 'label': l10n.tr('type_file'), 'icon': Icons.folder_outlined},
     ];
     // 仅显示已启用的分类 + 当前 meme 所属分类（即便被隐藏也可保持）
@@ -2117,4 +2230,34 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
       }
     }
   }
+}
+
+/// 序列帧绘制器：从原图裁剪指定帧区域
+class _FramePainter extends CustomPainter {
+  final ui.Image image;
+  final int frameIndex;
+  final int cols;
+  final int rows;
+
+  _FramePainter({
+    required this.image,
+    required this.frameIndex,
+    required this.cols,
+    required this.rows,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final frameW = image.width / cols;
+    final frameH = image.height / rows;
+    final col = frameIndex % cols;
+    final row = frameIndex ~/ cols;
+    final src = Rect.fromLTWH(col * frameW, row * frameH, frameW, frameH);
+    final dst = Offset.zero & size;
+    canvas.drawImageRect(image, src, dst, Paint());
+  }
+
+  @override
+  bool shouldRepaint(_FramePainter old) =>
+      old.frameIndex != frameIndex || old.image != image;
 }

@@ -13,6 +13,7 @@ class Meme {
   static const String typeMd = 'md';              // Markdown 文档
   static const String typeNovel = 'novel';       // 小说（旧版本数据兼容）
   static const String typeFile = 'file';          // 其他文件（无法分类的）
+  static const String typeSpriteSheet = 'sprite_sheet'; // 序列帧（单图多帧网格）
   /// 系统图集分类（虚拟类型，仅用于筛选系统目录中的图片，不存入数据库）
   /// 虚拟 Meme 的 id 以 'sysgal://' 前缀标识，type 仍是其实际类型（image/gif/vector）
   static const String typeSystemGallery = 'system_gallery';
@@ -20,6 +21,7 @@ class Meme {
   static const List<String> allTypes = [
     typeEmoji, typeGif, typeImage, typeText, typePortrait, typeCg,
     typeCharacterCard, typeVector, typePsd, typePdf, typeManga, typeMd, typeFile,
+    typeSpriteSheet,
   ];
 
   /// 默认分类列表（用户可见的分类按钮）。md 归入文字分类，不单独显示
@@ -37,7 +39,7 @@ class Meme {
   bool get isImageType => type == typeImage || type == typeGif ||
       type == typeEmoji || type == typePortrait || type == typeCg ||
       type == typeCharacterCard || type == typeVector || type == typePsd ||
-      type == typePdf || type == typeManga;
+      type == typePdf || type == typeManga || type == typeSpriteSheet;
 
   /// 是否为动画类型（GIF / APNG）
   bool get isAnimated => type == typeGif || mimeType == 'image/apng';
@@ -69,6 +71,9 @@ class Meme {
 
   /// 是否为文件类（其他无法分类的文件）
   bool get isFile => type == typeFile;
+
+  /// 是否为序列帧（单图多帧网格）
+  bool get isSpriteSheet => type == typeSpriteSheet;
 
   /// 是否为系统图集虚拟 Meme（id 以 'sysgal://' 前缀标识，只读，不存数据库）
   bool get isSystemGallery => id.startsWith('sysgal://');
@@ -105,6 +110,7 @@ class Meme {
       case typePdf:
       case typeFile: return 'type_file';
       case typeManga: return 'type_manga';
+      case typeSpriteSheet: return 'type_sprite_sheet';
       case typeSystemGallery: return 'cat_system_gallery';
       default: return 'type_image';
     }
@@ -137,6 +143,8 @@ class Meme {
   final List<Map<String, dynamic>> moods;
   /// 漫画多页路径列表（每页为相对存储路径，filePath 为首页/封面）
   final List<String> pages;
+  /// 序列帧配置：{cols, rows, frameWidth, frameHeight, frameCount, frameDelays}
+  final Map<String, dynamic>? spriteSheet;
 
   Meme({
     required this.id,
@@ -159,6 +167,7 @@ class Meme {
     this.spriteLayers,
     this.moods = const [],
     this.pages = const [],
+    this.spriteSheet,
   });
 
   Map<String, dynamic> toMap() => {
@@ -182,6 +191,7 @@ class Meme {
     'spriteLayers': spriteLayers,
     'moods': moods,
     'pages': pages,
+    'spriteSheet': spriteSheet,
   };
 
   factory Meme.fromMap(Map<String, dynamic> map) => Meme(
@@ -218,6 +228,9 @@ class Meme {
     pages: map['pages'] != null
         ? List<String>.from(map['pages'] as List)
         : const [],
+    spriteSheet: map['spriteSheet'] is Map
+        ? Map<String, dynamic>.from(map['spriteSheet'] as Map)
+        : null,
   );
 
   Meme copyWith({
@@ -241,6 +254,7 @@ class Meme {
     List<Map<String, dynamic>>? spriteLayers,
     List<Map<String, dynamic>>? moods,
     List<String>? pages,
+    Map<String, dynamic>? spriteSheet,
   }) => Meme(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -262,5 +276,6 @@ class Meme {
     spriteLayers: spriteLayers ?? this.spriteLayers,
     moods: moods ?? this.moods,
     pages: pages ?? this.pages,
+    spriteSheet: spriteSheet ?? this.spriteSheet,
   );
 }

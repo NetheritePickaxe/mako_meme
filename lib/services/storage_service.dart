@@ -1457,6 +1457,87 @@ class StorageService {
     return meme;
   }
 
+  /// 导入序列帧图片：单图多帧网格
+  /// [file] 源图片
+  /// [cols] 列数
+  /// [rows] 行数
+  /// 存储为 sprite_sheet 类型，记录帧配置元数据
+  Future<Meme> importSpriteSheet(
+    PlatformFile file, {
+    required int cols,
+    required int rows,
+    String? name,
+    String? folderId,
+  }) async {
+    final id = _uuid.v4();
+    final ext = _guessExt(file.name);
+    final fileName = '$id$ext';
+    final now = DateTime.now();
+
+    Uint8List? bytes;
+    String filePath;
+    if (kIsWeb) {
+      bytes = file.bytes;
+      filePath = 'memes/$fileName';
+      if (bytes != null) {
+        await webStorageSetBinary(filePath, bytes);
+      }
+    } else {
+      filePath = 'memes/$fileName';
+      final dest = File(p.join(_basePath!, filePath));
+      await dest.create(recursive: true);
+      if (file.path != null) {
+        await File(file.path!).copy(dest.path);
+      } else if (file.bytes != null) {
+        bytes = file.bytes!;
+        await dest.writeAsBytes(bytes!);
+      }
+    }
+
+    // 解析图片宽高，计算帧尺寸
+    int imgWidth = 0, imgHeight = 0;
+    if (!kIsWeb) {
+      final dims = await getImageDimensions(filePath);
+      if (dims != null) {
+        imgWidth = dims.width;
+        imgHeight = dims.height;
+      }
+    } else if (bytes != null) {
+      final dims = _parseImageDimensionsFromHeader(bytes);
+      if (dims != null) {
+        imgWidth = dims.width;
+        imgHeight = dims.height;
+      }
+    }
+
+    final frameW = imgWidth ~/ cols;
+    final frameH = imgHeight ~/ rows;
+    final spriteSheet = <String, dynamic>{
+      'cols': cols,
+      'rows': rows,
+      'frameWidth': frameW,
+      'frameHeight': frameH,
+      'frameCount': cols * rows,
+    };
+
+    final meme = Meme(
+      id: id,
+      name: name ?? p.basenameWithoutExtension(file.name),
+      filePath: filePath,
+      folderId: folderId,
+      tags: const [],
+      createdAt: now,
+      mimeType: _guessMime(ext),
+      fileSize: bytes?.length ?? file.size,
+      type: Meme.typeSpriteSheet,
+      width: imgWidth,
+      height: imgHeight,
+      spriteSheet: spriteSheet,
+    );
+    await _saveMeme(meme, null);
+    return meme;
+  }
+
   Future<void> deleteMeme(String id) async {
     if (_memeBox == null) return;
     final meme = _getMeme(id);

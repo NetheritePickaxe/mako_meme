@@ -1049,6 +1049,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     _showMangaImportMenu(ctx, prov);
                   } else if (v == 'sprite') {
                     _showSpriteImportMenu(ctx, prov);
+                  } else if (v == 'sprite_sheet') {
+                    _importSpriteSheet(ctx, prov);
                   } else {
                     _importFiles(ctx, prov);
                   }
@@ -1057,6 +1059,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   PopupMenuItem(value: 'normal', child: ListTile(
                     leading: const Icon(Icons.folder_open, size: 20),
                     title: Text(l10n.tr('import_from_files'),
+                      style: const TextStyle(fontSize: 14)),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                  )),
+                  PopupMenuItem(value: 'sprite_sheet', child: ListTile(
+                    leading: const Icon(Icons.view_carousel, size: 20),
+                    title: Text(l10n.tr('import_as_sprite_sheet'),
                       style: const TextStyle(fontSize: 14)),
                     dense: true,
                     contentPadding: EdgeInsets.zero,
@@ -1383,6 +1392,96 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  /// 导入序列帧图片：选图 → 输入行列 → 存储
+  Future<void> _importSpriteSheet(BuildContext ctx, MemeProvider prov) async {
+    final l10n = context.read<LocaleProvider>().l10n;
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp'],
+    );
+    if (result == null || result.files.isEmpty) return;
+    if (!ctx.mounted) return;
+
+    final file = result.files.first;
+    int cols = 4, rows = 4;
+    final config = await showDialog<Map<String, int>>(
+      context: ctx,
+      builder: (dCtx) {
+        final colCtrl = TextEditingController(text: '4');
+        final rowCtrl = TextEditingController(text: '4');
+        return AlertDialog(
+          title: Text(l10n.tr('import_sprite_sheet')),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(l10n.tr('sprite_sheet_desc',
+                args: {'name': file.name})),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: colCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: l10n.tr('sprite_sheet_cols'),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: rowCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: l10n.tr('sprite_sheet_rows'),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dCtx), child: Text(l10n.tr('cancel'))),
+            FilledButton(
+              onPressed: () {
+                final c = int.tryParse(colCtrl.text.trim()) ?? 4;
+                final r = int.tryParse(rowCtrl.text.trim()) ?? 4;
+                if (c < 1 || r < 1) return;
+                Navigator.pop(dCtx, {'cols': c, 'rows': r});
+              },
+              child: Text(l10n.tr('import')),
+            ),
+          ],
+        );
+      },
+    );
+    if (config == null || !ctx.mounted) return;
+    cols = config['cols']!;
+    rows = config['rows']!;
+
+    try {
+      await prov.importSpriteSheet(file, cols: cols, rows: rows);
+      if (ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(content: Text(l10n.tr('sprite_sheet_imported',
+            args: {'count': (cols * rows).toString()})),
+            duration: const Duration(seconds: 2)),
+        );
+      }
+    } catch (e) {
+      if (ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(content: Text(l10n.tr('import_failed'))),
+        );
+      }
+    }
   }
 
   /// 多图合并为立绘/CG
