@@ -256,7 +256,6 @@ class _ImportEditDialogState extends State<ImportEditDialog> {
                         decoration: InputDecoration(
                           labelText: l10n.tr('meme_name'),
                           prefixIcon: const Icon(Icons.title, size: 20),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -269,7 +268,6 @@ class _ImportEditDialogState extends State<ImportEditDialog> {
                               decoration: InputDecoration(
                                 labelText: l10n.tr('add_tag'),
                                 prefixIcon: const Icon(Icons.tag, size: 20),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                 isDense: true,
                               ),
                               onSubmitted: (_) => _addTag(),
@@ -302,7 +300,6 @@ class _ImportEditDialogState extends State<ImportEditDialog> {
                         decoration: InputDecoration(
                           labelText: l10n.tr('folder'),
                           prefixIcon: const Icon(Icons.folder_outlined, size: 20),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                         items: [
                           DropdownMenuItem<String?>(

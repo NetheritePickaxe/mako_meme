@@ -685,7 +685,10 @@ class _MemeCardState extends State<MemeCard> {
                   ),
                 ),
               if (widget.meme.type != Meme.typeImage &&
-                  !(context.watch<SettingsProvider>().showCardType))
+                  (context.watch<MemeProvider>().typeFilter.isEmpty &&
+                      context.watch<MemeProvider>().tagFilter.isEmpty &&
+                      context.watch<MemeProvider>().moodFilter == null ||
+                      context.watch<SettingsProvider>().showCardType))
                 Positioned(bottom: 6, left: 6,
                   child: Container(padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                     decoration: BoxDecoration(color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.85), borderRadius: BorderRadius.circular(4)),

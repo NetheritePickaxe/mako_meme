@@ -155,7 +155,20 @@ class _MakoSearchBarState extends State<MakoSearchBar> {
         newText = '[$before,${s.insert}]';
       }
     } else {
-      newText = s.insert;
+      // 普通模式：#tag / @folder 补全支持逗号多值
+      final textTrimmed = _controller.text;
+      final segments = textTrimmed.split(',');
+      final last = segments.last.trim();
+      if (last.startsWith('#') || last.startsWith('@')) {
+        final lastComma = textTrimmed.lastIndexOf(',');
+        if (lastComma == -1) {
+          newText = s.insert;
+        } else {
+          newText = '${textTrimmed.substring(0, lastComma + 1)}${s.insert}';
+        }
+      } else {
+        newText = s.insert;
+      }
     }
 
     _controller.text = newText;
@@ -182,7 +195,8 @@ class _MakoSearchBarState extends State<MakoSearchBar> {
     // 命令模式：执行命令
     if (_isCommandMode(q)) {
       final prov = context.read<MemeProvider>();
-      final msg = await prov.executeCommand(q);
+      final l10n = context.read<LocaleProvider>().l10n;
+      final msg = prov.executeCommand(q);
       // 清空搜索框
       _controller.clear();
       _suggestions = [];
@@ -194,7 +208,7 @@ class _MakoSearchBarState extends State<MakoSearchBar> {
       if (mounted && msg != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(msg),
+            content: Text(l10n.tr(msg.key, args: msg.args)),
             duration: const Duration(seconds: 2),
             behavior: SnackBarBehavior.floating,
           ),
@@ -283,25 +297,6 @@ class _MakoSearchBarState extends State<MakoSearchBar> {
             onSubmitted: _onSubmitted,
           ),
         ),
-        // 命令模式提示
-        if (isCmd && !hasError)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(28, 0, 16, 4),
-            child: Row(
-              children: [
-                Icon(Icons.play_arrow, size: 14, color: theme.colorScheme.primary),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    l10n.tr('command_mode_hint'),
-                    style: TextStyle(fontSize: 12, color: theme.colorScheme.primary),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
         // 错误提示
         if (hasError)
           Padding(

@@ -3,11 +3,11 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'services/storage_service.dart';
+import 'services/admin_service.dart';
 import 'services/share_receiver_service.dart';
 import 'providers/meme_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/locale_provider.dart';
-import 'services/admin_service.dart';
 import 'services/image_tool_service.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
@@ -47,7 +47,6 @@ Future<void> main() async {
           return prov;
         }),
         Provider.value(value: storage),
-        Provider.value(value: AdminService()),
         Provider.value(value: ImageToolService(storage)),
       ],
       child: const MakoMemeApp(),

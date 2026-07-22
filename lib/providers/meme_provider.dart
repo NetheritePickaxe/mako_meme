@@ -37,6 +37,10 @@ class MemeProvider with ChangeNotifier {
   // 情绪筛选：null=全部，否则只显示该 mood 的 memes
   String? _moodFilter;
 
+  // 缓存
+  Map<String, List<Meme>>? _memesByMoodCache;
+  final Map<String, RegExp> _wildcardCache = {};
+
   Set<String> get folderFilter => _folderFilter;
   Set<String> get typeFilter => _typeFilter;
   String? get moodFilter => _moodFilter;
@@ -109,6 +113,7 @@ class MemeProvider with ChangeNotifier {
 
   /// 按情绪分组：moodName 映射到对应的 Meme 列表（按权重降序）
   Map<String, List<Meme>> get memesByMood {
+    if (_memesByMoodCache != null) return _memesByMoodCache!;
     final map = <String, List<Meme>>{};
     for (final m in _all) {
       for (final mood in m.moods) {
@@ -116,7 +121,6 @@ class MemeProvider with ChangeNotifier {
         map.putIfAbsent(name, () => []).add(m);
       }
     }
-    // 每个 mood 内按权重降序
     for (final entry in map.entries) {
       entry.value.sort((a, b) {
         final aw = a.moods.firstWhere((m) => m['name'] == entry.key,
@@ -126,6 +130,7 @@ class MemeProvider with ChangeNotifier {
         return bw.compareTo(aw);
       });
     }
+    _memesByMoodCache = map;
     return map;
   }
 
@@ -137,15 +142,10 @@ class MemeProvider with ChangeNotifier {
   Future<void> loadAll() async {
     _all = _storage.getAllMemes();
     _folders = _storage.getAllFolders();
-    debugPrint('[Mako] loadAll: _all.length=${_all.length}, _folders.length=${_folders.length}'
-        ', folderId=$_folderId, showFavorites=$_showFavorites, showFoldersView=$_showFoldersView'
-        ', typeFilter=$_typeFilter, tagFilter=$_tagFilter, folderFilter=$_folderFilter'
-        ', moodFilter=$_moodFilter, query="$_query"');
+    _memesByMoodCache = null;
     await _loadSystemGalleryMemes();
     _apply();
-    debugPrint('[Mako] loadAll done: _filtered.length=${_filtered.length}');
     notifyListeners();
-    // 同步 meme 索引到原生 ContentProvider（供 IME 进程读取）
     _exporter.exportAll(_all);
   }
 
@@ -196,44 +196,46 @@ class MemeProvider with ChangeNotifier {
       _query.trim().startsWith('/') &&
       SearchQuery.parse(_query, _folders) is CommandSearch;
 
-  /// 执行命令，返回结果消息（用于 snackbar 提示）
-  /// 仅支持 CommandSearch 类型，其他返回 null
-  Future<String?> executeCommand(String query) async {
+  /// 执行命令，返回结果消息（key + args，用于 snackbar 翻译）
+  ({String key, Map<String, String> args})? executeCommand(String query) {
     final result = SearchQuery.parse(query, _folders);
     if (result is! CommandSearch) return null;
 
     if (result.command == 'tag') {
       if (result.action.isEmpty) {
-        return '缺少操作（add 或 remove）';
+        return (key: 'cmd_missing_action', args: {});
       }
       if (result.args.isEmpty) {
-        return '缺少标签名';
+        return (key: 'cmd_missing_tag', args: {});
       }
       final matcher = result.asMatcher(_folders);
       final targets = _all.where(matcher).toList();
-      if (targets.isEmpty) return '没有匹配的表情包';
+      if (targets.isEmpty) return (key: 'cmd_no_match', args: {});
 
       final tags = result.args;
       if (result.action == 'add') {
         for (final meme in targets) {
           for (final tag in tags) {
-            await _storage.addTagToMeme(meme.id, tag);
+            _storage.addTagToMeme(meme.id, tag);
           }
         }
       } else if (result.action == 'remove') {
         for (final meme in targets) {
           for (final tag in tags) {
-            await _storage.removeTagFromMeme(meme.id, tag);
+            _storage.removeTagFromMeme(meme.id, tag);
           }
         }
       }
-      await loadAll();
-      final op = result.action == 'add' ? '添加' : '移除';
-      return '已对 ${targets.length} 个表情包$op标签: ${tags.join(", ")}';
+      loadAll();
+      final op = result.action == 'add' ? 'cmd_tag_added' : 'cmd_tag_removed';
+      return (
+        key: op,
+        args: {'count': targets.length.toString(), 'tags': tags.join(', ')},
+      );
     }
 
     if (result.command == 'help') return null;
-    return '未知命令: ${result.command}';
+    return (key: 'cmd_unknown', args: {'cmd': result.command});
   }
 
   void toggleTag(String tag) {
@@ -252,25 +254,25 @@ class MemeProvider with ChangeNotifier {
   /// 给单个 meme 添加 tag
   Future<void> addTag(String memeId, String tag) async {
     await _storage.addTagToMeme(memeId, tag);
-    await loadAll();
+    _refreshMeme(memeId);
   }
 
   /// 给单个 meme 移除 tag
   Future<void> removeTag(String memeId, String tag) async {
     await _storage.removeTagFromMeme(memeId, tag);
-    await loadAll();
+    _refreshMeme(memeId);
   }
 
   /// 给单个 meme 添加/更新情绪标签（权重 1-5）
   Future<void> addMood(String memeId, String mood, int weight) async {
     await _storage.addMoodToMeme(memeId, mood, weight);
-    await loadAll();
+    _refreshMeme(memeId);
   }
 
   /// 给单个 meme 移除情绪标签
   Future<void> removeMood(String memeId, String mood) async {
     await _storage.removeMoodFromMeme(memeId, mood);
-    await loadAll();
+    _refreshMeme(memeId);
   }
 
   void toggleFolderFilter(String folderId) {
@@ -394,40 +396,46 @@ class MemeProvider with ChangeNotifier {
 
   Future<void> toggleFavorite(String id) async {
     await _storage.toggleFavorite(id);
-    await loadAll();
+    _refreshMeme(id);
   }
 
   Future<void> deleteMeme(String id) async {
     await _storage.deleteMeme(id);
     _sel.remove(id);
-    await loadAll();
+    _all.removeWhere((m) => m.id == id);
+    _memesByMoodCache = null;
+    _apply();
+    notifyListeners();
   }
 
   Future<void> deleteSelected() async {
     await _storage.deleteMemes(_sel.toList());
+    _all.removeWhere((m) => _sel.contains(m.id));
     _sel.clear();
     _multi = false;
-    await loadAll();
+    _memesByMoodCache = null;
+    _apply();
+    notifyListeners();
   }
 
   Future<void> moveToFolder(String memeId, String? folderId) async {
     await _storage.moveToFolder(memeId, folderId);
-    await loadAll();
+    _refreshMeme(memeId);
   }
 
   Future<void> renameMeme(String id, String newName) async {
     await _storage.renameMeme(id, newName);
-    await loadAll();
+    _refreshMeme(id);
   }
 
   Future<void> updateMemeText(String id, String text, {String? name}) async {
     await _storage.updateMemeText(id, text, name: name);
-    await loadAll();
+    _refreshMeme(id);
   }
 
   Future<void> setMemeType(String id, String type) async {
     await _storage.setMemeType(id, type);
-    await loadAll();
+    _refreshMeme(id);
   }
 
   Future<void> setSelectedType(String type) async {
@@ -482,14 +490,24 @@ class MemeProvider with ChangeNotifier {
 
   Future<void> updateCharacterData(String id, Map<String, dynamic> data) async {
     await _storage.updateCharacterData(id, data);
-    await loadAll();
+    _refreshMeme(id);
   }
 
   Future<void> moveSelectedToFolder(String? folderId) async {
     await _storage.moveToFolderBatch(_sel.toList(), folderId);
+    final ids = _sel.toList();
     _sel.clear();
     _multi = false;
-    await loadAll();
+    _memesByMoodCache = null;
+    for (final id in ids) {
+      final meme = _storage.getMeme(id);
+      if (meme != null) {
+        final idx = _all.indexWhere((m) => m.id == id);
+        if (idx >= 0) _all[idx] = meme;
+      }
+    }
+    _apply();
+    notifyListeners();
   }
 
   Future<MemeFolder> createFolder(String name) async {
@@ -633,12 +651,43 @@ class MemeProvider with ChangeNotifier {
 
   List<Meme> get favorites => _all.where((m) => m.isFavorite).toList();
 
+  void _refreshMeme(String id) {
+    final meme = _storage.getMeme(id);
+    if (meme == null) return;
+    final idx = _all.indexWhere((m) => m.id == id);
+    if (idx >= 0) {
+      _all[idx] = meme;
+    } else {
+      _all.add(meme);
+    }
+    _memesByMoodCache = null;
+    _apply();
+    notifyListeners();
+  }
+
+  Future<void> forceRefresh() async {
+    await loadAll();
+  }
+
+  void _sortMemeList(List<Meme> list) {
+    list.sort((a, b) {
+      int cmp;
+      switch (_sortBy) {
+        case SortBy.date: cmp = a.createdAt.compareTo(b.createdAt); break;
+        case SortBy.name: cmp = a.name.compareTo(b.name); break;
+        case SortBy.size: cmp = a.fileSize.compareTo(b.fileSize); break;
+      }
+      return _order == SortOrder.asc ? cmp : -cmp;
+    });
+  }
+
   bool _matchWildcard(String text, String pattern) {
     final lowerText = text.toLowerCase();
     final lowerPattern = pattern.toLowerCase();
     if (lowerPattern.contains('*')) {
       final regexPattern = '^${lowerPattern.replaceAll('*', '.*')}\$';
-      return RegExp(regexPattern).hasMatch(lowerText);
+      final regex = _wildcardCache.putIfAbsent(regexPattern, () => RegExp(regexPattern));
+      return regex.hasMatch(lowerText);
     }
     return lowerText.contains(lowerPattern);
   }
@@ -651,15 +700,7 @@ class MemeProvider with ChangeNotifier {
         final q = _query.toLowerCase();
         list = list.where((m) => m.name.toLowerCase().contains(q)).toList();
       }
-      list.sort((a, b) {
-        int cmp;
-        switch (_sortBy) {
-          case SortBy.date: cmp = a.createdAt.compareTo(b.createdAt); break;
-          case SortBy.name: cmp = a.name.compareTo(b.name); break;
-          case SortBy.size: cmp = a.fileSize.compareTo(b.fileSize); break;
-        }
-        return _order == SortOrder.asc ? cmp : -cmp;
-      });
+      _sortMemeList(list);
       _filtered = list;
       return;
     }
@@ -710,15 +751,7 @@ class MemeProvider with ChangeNotifier {
       }
     }
 
-    list.sort((a, b) {
-      int cmp;
-      switch (_sortBy) {
-        case SortBy.date: cmp = a.createdAt.compareTo(b.createdAt); break;
-        case SortBy.name: cmp = a.name.compareTo(b.name); break;
-        case SortBy.size: cmp = a.fileSize.compareTo(b.fileSize); break;
-      }
-      return _order == SortOrder.asc ? cmp : -cmp;
-    });
+    _sortMemeList(list);
     _filtered = list;
     // 诊断日志：当筛选结果为空但全量数据非空时，记录筛选状态以便定位问题
     if (_filtered.isEmpty && _all.isNotEmpty) {

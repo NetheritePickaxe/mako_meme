@@ -130,6 +130,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: Text(l10n.tr('clean_invalid_memes_desc')),
             onTap: () => _cleanInvalidMemes(context, l10n),
           ),
+          ListTile(
+            leading: const Icon(Icons.refresh),
+            title: Text(l10n.tr('force_refresh')),
+            subtitle: Text(l10n.tr('force_refresh_desc')),
+            onTap: () async {
+              await context.read<MemeProvider>().forceRefresh();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(l10n.tr('force_refresh_done')),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              }
+            },
+          ),
           const SizedBox(height: 16),
 
           _sectionHeader(l10n.tr('cloud_sync'), cs),

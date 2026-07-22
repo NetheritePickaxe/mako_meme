@@ -482,28 +482,25 @@ class _HomeScreenState extends State<HomeScreen> {
           return validExts.contains(f.name.split('.').last.toLowerCase());
         }).toList();
         if (files.isNotEmpty) {
-          final storage = context.read<StorageService>();
-          final settingsProvider = context.read<SettingsProvider>();
+          final pfList = <PlatformFile>[];
           for (final f in files) {
-            // Web 端无文件路径，必须预读 bytes；原生端用 path 流式拷贝
             Uint8List? webBytes;
             if (kIsWeb) {
               try {
                 webBytes = await f.readAsBytes();
               } catch (_) {}
             }
-            await storage.importFile(
-              PlatformFile(
-                name: f.name,
-                size: await f.length(),
-                path: f.path,
-                bytes: webBytes,
-              ),
-              autoClassify: settingsProvider.autoClassify,
-              classifyRatio: settingsProvider.classifyRatio,
-            );
+            pfList.add(PlatformFile(
+              name: f.name,
+              size: await f.length(),
+              path: f.path,
+              bytes: webBytes,
+            ));
           }
-          await prov.loadAll();
+          await prov.importFiles(pfList,
+            autoClassify: context.read<SettingsProvider>().autoClassify,
+            classifyRatio: context.read<SettingsProvider>().classifyRatio,
+          );
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(l10n.tr('imported_images', args: {'count': files.length.toString()})), duration: const Duration(seconds: 2)),
@@ -1355,7 +1352,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  /// 立绘/CG 导入子菜单：多图合并 / krkr pjson
+  /// 立绘/CG 导入子菜单：多图合并 / krkr pjson 立绘 / krkr pjson CG
   void _showSpriteImportMenu(BuildContext ctx, MemeProvider prov) {
     final l10n = context.read<LocaleProvider>().l10n;
     showModalBottomSheet(
@@ -1371,10 +1368,16 @@ class _HomeScreenState extends State<HomeScreen> {
               onTap: () { Navigator.pop(bCtx); _importSpriteFromImages(ctx, prov); },
             ),
             ListTile(
-              leading: const Icon(Icons.description),
-              title: Text(l10n.tr('sprite_from_pjson')),
-              subtitle: Text(l10n.tr('sprite_from_pjson_desc')),
-              onTap: () { Navigator.pop(bCtx); _importSpriteFromPjson(ctx, prov); },
+              leading: const Icon(Icons.accessibility_new),
+              title: Text(l10n.tr('sprite_pjson_portrait')),
+              subtitle: Text(l10n.tr('sprite_pjson_portrait_desc')),
+              onTap: () { Navigator.pop(bCtx); _importSpriteFromPjson(ctx, prov, type: Meme.typePortrait); },
+            ),
+            ListTile(
+              leading: const Icon(Icons.wallpaper_outlined),
+              title: Text(l10n.tr('sprite_pjson_cg')),
+              subtitle: Text(l10n.tr('sprite_pjson_cg_desc')),
+              onTap: () { Navigator.pop(bCtx); _importSpriteFromPjson(ctx, prov, type: Meme.typeCg); },
             ),
           ],
         ),
@@ -1469,7 +1472,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// 从 krkr pjson + 图片导入立绘/CG
-  Future<void> _importSpriteFromPjson(BuildContext ctx, MemeProvider prov) async {
+  Future<void> _importSpriteFromPjson(BuildContext ctx, MemeProvider prov, {String? type}) async {
     final l10n = context.read<LocaleProvider>().l10n;
     // 1. 选择 pjson 文件
     final pjsonResult = await FilePicker.platform.pickFiles(
@@ -1488,8 +1491,8 @@ class _HomeScreenState extends State<HomeScreen> {
     if (imgResult == null || imgResult.files.isEmpty) return;
     if (!ctx.mounted) return;
 
-    // 3. 选择类型
-    final type = await showDialog<String>(
+    // 3. 未预设类型时弹窗让用户选择
+    type ??= await showDialog<String>(
       context: ctx,
       builder: (dCtx) => AlertDialog(
         title: Text(l10n.tr('select_category')),

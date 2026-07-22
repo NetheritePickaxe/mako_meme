@@ -417,7 +417,7 @@ class StorageService {
             meme = meme.copyWith(type: autoType);
           }
         }
-      } else if (meme.isImageType && meme.filePath.isNotEmpty) {
+      } else if (meme.filePath.isNotEmpty) {
         // 非自动归类场景也解析宽高并存储
         if (!kIsWeb) {
           final dims = await getImageDimensions(filePath);
@@ -448,6 +448,12 @@ class StorageService {
     // 超大 ICO/TIF 跳过转换（image 包 decodeImage 会一次性载入内存）
     if (const ['.ico', '.tif', '.tiff'].contains(ext) && !isHugeFile) {
       meme = await _processRasterConversion(meme, file, bytes, fileHash);
+    }
+
+    // 超大画幅图片（>50MB）：生成 512px 缩略图加速卡片加载
+    // 跳过已有 thumbPath（已由 PSD/ICO/上一步处理）和超大文件（>200MB 解码可能 OOM）
+    if (meme.thumbPath == null && meme.isImageType && fileSize > 50 * 1024 * 1024 && !isHugeFile) {
+      meme = await _generateLargeImageThumb(meme, file, bytes, fileHash);
     }
 
     // PDF 不再渲染封面（pdfx 在 Windows CI 上下载 pdfium 失败）
@@ -536,6 +542,37 @@ class StorageService {
         width: decoded.width,
         height: decoded.height,
       );
+      await _saveMeme(updated, fileHash);
+      return updated;
+    } catch (_) {
+      return meme;
+    }
+  }
+
+  /// 超大画幅图片生成 512px 缩略图
+  Future<Meme> _generateLargeImageThumb(
+    Meme meme,
+    PlatformFile file,
+    Uint8List? inMemoryBytes,
+    String? fileHash,
+  ) async {
+    try {
+      Uint8List? sourceBytes;
+      if (inMemoryBytes != null) {
+        sourceBytes = inMemoryBytes;
+      } else if (file.path != null && !kIsWeb) {
+        sourceBytes = await File(file.path!).readAsBytes();
+      }
+      if (sourceBytes == null) return meme;
+
+      final decoded = img.decodeImage(sourceBytes);
+      if (decoded == null) return meme;
+
+      final resized = img.copyResize(decoded, width: 512);
+      final png = Uint8List.fromList(img.encodePng(resized));
+      final thumbPath = await _saveThumbPng(meme.id, png);
+
+      final updated = meme.copyWith(thumbPath: thumbPath);
       await _saveMeme(updated, fileHash);
       return updated;
     } catch (_) {
@@ -763,6 +800,9 @@ class StorageService {
     if (map == null) return null;
     return Meme.fromMap(map);
   }
+
+  /// 公开读取单条 meme（供 provider 增量刷新使用）
+  Meme? getMeme(String id) => _getMeme(id);
 
   Future<void> reimportMeme(String memeId, PlatformFile file) async {
     if (_memeBox == null) return;

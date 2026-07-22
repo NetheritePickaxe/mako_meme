@@ -57,6 +57,11 @@ class MultiSelectBar extends StatelessWidget {
                         tooltip: l10n.tr('change_category'),
                         onPressed: () => _showTypeDialog(context, prov, l10n),
                       ),
+                      IconButton(
+                        icon: const Icon(Icons.local_offer_outlined, size: 20),
+                        tooltip: l10n.tr('batch_add_tag'),
+                        onPressed: () => _showBatchTagDialog(context, prov, l10n),
+                      ),
                     ],
                     IconButton(
                       icon: const Icon(Icons.ios_share, size: 20),
@@ -601,6 +606,57 @@ class MultiSelectBar extends StatelessWidget {
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dCtx), child: Text(l10n.tr('cancel'))),
+        ],
+      ),
+    );
+  }
+
+  void _showBatchTagDialog(BuildContext ctx, MemeProvider prov, L10n l10n) {
+    final tagCtrl = TextEditingController();
+    showDialog(
+      context: ctx,
+      builder: (dCtx) => AlertDialog(
+        title: Text(l10n.tr('batch_add_tag')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(l10n.tr('batch_add_tag_desc', args: {'count': prov.selected.length.toString()})),
+            const SizedBox(height: 12),
+            TextField(
+              controller: tagCtrl,
+              autofocus: true,
+              decoration: InputDecoration(
+                labelText: l10n.tr('add_tag'),
+                prefixIcon: const Icon(Icons.tag, size: 20),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onSubmitted: (_) {
+                final tag = tagCtrl.text.trim();
+                if (tag.isNotEmpty) {
+                  for (final id in prov.selected) {
+                    prov.addTag(id, tag);
+                  }
+                  Navigator.pop(dCtx);
+                }
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dCtx), child: Text(l10n.tr('cancel'))),
+          FilledButton(
+            onPressed: () {
+              final tag = tagCtrl.text.trim();
+              if (tag.isNotEmpty) {
+                for (final id in prov.selected) {
+                  prov.addTag(id, tag);
+                }
+                Navigator.pop(dCtx);
+              }
+            },
+            child: Text(l10n.tr('add')),
+          ),
         ],
       ),
     );

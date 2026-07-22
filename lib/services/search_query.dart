@@ -324,6 +324,15 @@ class SearchQuery {
     if (q.startsWith('[')) {
       return _getSelectorSuggestions(q, allTags, folders);
     }
+    // Plain text: #tag / @folder 补全（支持逗号多值）
+    final segments = q.split(',');
+    final last = segments.last.trim();
+    if (last.startsWith('#')) {
+      return _getHashTagSuggestions(last.substring(1), allTags);
+    }
+    if (last.startsWith('@')) {
+      return _getAtFolderSuggestions(last.substring(1), folders);
+    }
     return [];
   }
 
@@ -350,8 +359,9 @@ class SearchQuery {
 
     // /tag 后面补全 add/remove
     if (parts[0].toLowerCase() == 'tag' && parts.length == 2) {
-      final actions = ['add', 'remove'];
       final a = parts[1].toLowerCase();
+      if (a.isEmpty) return [];
+      final actions = ['add', 'remove'];
       return actions
           .where((act) => act.startsWith(a))
           .map((act) => SearchSuggestion(act, act, description: act == 'add' ? '添加标签' : '移除标签'))
@@ -363,6 +373,7 @@ class SearchQuery {
       final action = parts[parts.length - 2];
       if (action == 'add' || action == 'remove') {
         final last = parts.last.toLowerCase();
+        if (last.isEmpty) return [];
         return allTags
             .where((t) => t.toLowerCase().startsWith(last))
             .map((t) => SearchSuggestion(t, t))
@@ -451,6 +462,26 @@ class SearchQuery {
       default:
         return [];
     }
+  }
+
+  static List<SearchSuggestion> _getHashTagSuggestions(String input, List<String> allTags) {
+    if (input.isEmpty) return [];
+    final lower = input.toLowerCase();
+    return allTags
+        .where((t) => t.toLowerCase().contains(lower))
+        .take(10)
+        .map((t) => SearchSuggestion('#$t', '#$t,'))
+        .toList();
+  }
+
+  static List<SearchSuggestion> _getAtFolderSuggestions(String input, List<MemeFolder> folders) {
+    if (input.isEmpty) return [];
+    final lower = input.toLowerCase();
+    return folders
+        .where((f) => f.name.toLowerCase().contains(lower))
+        .take(10)
+        .map((f) => SearchSuggestion('@${f.name}', '@${f.name},'))
+        .toList();
   }
 
   /// 获取补全用的原始分割部分（公开方法）
