@@ -64,10 +64,20 @@ jobs:
             abi=$(echo "$f" | sed 's/app-\(.*\)-release\.apk/\1/')
             mv "$f" "mako_meme-${VERSION}-${abi}.apk"
           done
-      - uses: actions/upload-artifact@v7
+      - name: Upload arm64-v8a
+        uses: actions/upload-artifact@v7
         with:
-          name: android-apk
-          path: build/app/outputs/apk/release/mako_meme-*.apk
+          path: build/app/outputs/apk/release/mako_meme-*-arm64-v8a.apk
+          archive: false
+      - name: Upload armeabi-v7a
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/app/outputs/apk/release/mako_meme-*-armeabi-v7a.apk
+          archive: false
+      - name: Upload x86_64
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/app/outputs/apk/release/mako_meme-*-x86_64.apk
           archive: false
 
   # --- Web Build ---
@@ -119,7 +129,6 @@ jobs:
         with:
           name: windows-installer
           path: build/windows/x64/runner/Release/*-setup.exe
-          archive: false
 
   # --- Linux Build (commented out, uncomment to enable) ---
   # linux:
@@ -168,14 +177,19 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
       - name: Package artifacts
         shell: bash
         run: |
           mkdir release-artifacts
-          cp -r android-apk/* release-artifacts/ 2>/dev/null || true
-          cp -r windows-installer/*.exe release-artifacts/ 2>/dev/null || true
-          cd web-build && zip -r ../release-artifacts/web-build.zip . && cd ..
+          # 非 zip APK 以文件名作为目录名，从子目录取出
+          for dir in mako_meme-*.apk/; do
+            [ -d "$dir" ] && cp "$dir"*.apk release-artifacts/ || true
+          done
+          # Windows 安装包
+          [ -d windows-installer ] && cp windows-installer/*.exe release-artifacts/ || true
+          # Web 构建
+          [ -d web-build ] && cd web-build && zip -r ../release-artifacts/web-build.zip . && cd ..
       - uses: ncipollo/release-action@v1
         with:
           name: "Mako Meme ${{ github.ref_name }}"
