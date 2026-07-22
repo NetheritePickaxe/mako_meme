@@ -16,7 +16,7 @@ class SettingsProvider extends ChangeNotifier {
   bool _autoClassify = true; // 导入时按画幅自动归类
   double _classifyRatio = 1.1; // 宽高比阈值，<=此值视为正方形(表情)
   bool _landscapePreview = false; // 横屏模式：左侧大图预览
-  // 预测式返回 / 页面切换风格：'aosp' / 'zoom' / 'classic'
+  // 预测式返回：'none' / 'aosp' / 'zoom' / 'classic'
   String _predictiveBack = 'aosp';
 
   // 卡片显示选项

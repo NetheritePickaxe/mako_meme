@@ -506,6 +506,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   /// 预测式返回 / 页面切换风格：aosp / zoom / classic
   Widget _predictiveBackTile(SettingsProvider settings, L10n l10n) {
     final options = [
+      ('none', l10n.tr('pb_none')),
       ('aosp', l10n.tr('pb_aosp')),
       ('zoom', l10n.tr('pb_zoom')),
       ('classic', l10n.tr('pb_classic')),

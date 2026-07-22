@@ -79,7 +79,8 @@ class AppTheme {
       colorScheme: scheme,
       scaffoldBackgroundColor: pureBlack && isDark ? Colors.black : null,
       fontFamily: 'Noto Sans SC',
-      // 页面切换风格：aosp / zoom / classic，由设置选择
+      // 预测式返回：none / aosp / zoom / classic，由设置选择
+      // none = NoPageTransitionsBuilder（无过渡动画）
       // aosp = PredictiveBackPageTransitionsBuilder（Android 14+ 原生预测式返回）
       // zoom = ZoomPageTransitionsBuilder（Android 10 Material 缩放）
       // classic = FadeUpwardsPageTransitionsBuilder（Android 8 经典向上淡入）
@@ -187,6 +188,8 @@ class AppTheme {
   /// 根据风格字符串返回对应的 PageTransitionsBuilder
   static PageTransitionsBuilder _pageTransitionBuilder(String mode) {
     switch (mode) {
+      case 'none':
+        return const NoPageTransitionsBuilder();
       case 'zoom':
         return const ZoomPageTransitionsBuilder();
       case 'classic':
@@ -195,6 +198,22 @@ class AppTheme {
       default:
         return PredictiveBackPageTransitionsBuilder();
     }
+  }
+}
+
+/// 无过渡动画的页面切换
+class NoPageTransitionsBuilder extends PageTransitionsBuilder {
+  const NoPageTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    return child;
   }
 }
 
