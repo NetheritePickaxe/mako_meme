@@ -129,6 +129,7 @@ jobs:
         with:
           name: windows-installer
           path: build/windows/x64/runner/Release/*-setup.exe
+          archive: false
 
   # --- Linux Build (commented out, uncomment to enable) ---
   # linux:
@@ -186,8 +187,10 @@ jobs:
           for dir in mako_meme-*.apk/; do
             [ -d "$dir" ] && cp "$dir"*.apk release-artifacts/ || true
           done
-          # Windows 安装包
-          [ -d windows-installer ] && cp windows-installer/*.exe release-artifacts/ || true
+          # Windows 安装包（非 zip，以文件名作目录）
+          for dir in *-setup.exe/; do
+            [ -d "$dir" ] && cp "$dir"*.exe release-artifacts/ || true
+          done
           # Web 构建
           [ -d web-build ] && cd web-build && zip -r ../release-artifacts/web-build.zip . && cd ..
       - uses: ncipollo/release-action@v1
