@@ -79,6 +79,18 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
   // 角色卡预览展开/收起状态：默认收起，避免长内容撑爆详情面板
   bool _cardExpanded = false;
 
+  // 详情面板回顶按钮
+  bool _showScrollToTop = false;
+  ScrollController? _lastDetailController;
+
+  void _onDetailScroll() {
+    final offset = _lastDetailController?.offset ?? 0;
+    final show = _cardExpanded && offset > 600;
+    if (show != _showScrollToTop) {
+      setState(() => _showScrollToTop = show);
+    }
+  }
+
   // 漫画内部页面滑动
   int _mangaPageIndex = 0;
   final _LruCache<String, Uint8List?> _mangaBytesCache = _LruCache(3);
@@ -1165,20 +1177,27 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
     return DraggableScrollableSheet(
       initialChildSize: 0.45,
       minChildSize: 0.2,
-      maxChildSize: 0.9,
+      maxChildSize: 1.0,
       builder: (ctx, controller) {
-        return Container(
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: SingleChildScrollView(
-            controller: controller,
-            padding: const EdgeInsets.fromLTRB(16, 6, 16, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+        if (controller != _lastDetailController) {
+          _lastDetailController?.removeListener(_onDetailScroll);
+          _lastDetailController = controller;
+          controller.addListener(_onDetailScroll);
+        }
+        return Stack(
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: SingleChildScrollView(
+                controller: controller,
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                 // 手势指示条（可拖动）
                 Center(
                   child: Container(
@@ -1320,20 +1339,29 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.tonalIcon(
-                      onPressed: _editCharacterCard,
-                      icon: const Icon(Icons.edit_note),
-                      label: Text(l10n.tr('edit_character_card')),
-                    ),
-                  ),
                 ],
               ],
             ),
           ),
-        );
+          ),
+          if (_showScrollToTop)
+            Positioned(
+              right: 12,
+              bottom: 12,
+              child: FloatingActionButton.small(
+                heroTag: 'scroll_to_top',
+                onPressed: () {
+                  _lastDetailController?.animateTo(
+                    0,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                },
+                child: const Icon(Icons.arrow_upward, size: 20),
+              ),
+            ),
+        ],
+      );
       },
     );
   }
@@ -2137,7 +2165,10 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
               foregroundColor: theme.colorScheme.primary,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
-            onPressed: () => setState(() => _cardExpanded = !_cardExpanded),
+            onPressed: () => setState(() {
+              _cardExpanded = !_cardExpanded;
+              _onDetailScroll();
+            }),
           ),
         ],
       ),

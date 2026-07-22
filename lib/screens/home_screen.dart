@@ -174,7 +174,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildLeading(MemeProvider prov, L10n l10n) {
     // 表情包标签：进入文件夹时显示返回，否则显示菜单
-    if (_currentTab == 0 && prov.folderId != null) {
+    if ((_currentTab == 0 || _currentTab == 1) && prov.folderId != null) {
       return IconButton(
         icon: const Icon(Icons.arrow_back),
         tooltip: l10n.tr('back'),
@@ -201,7 +201,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// leading 是否被返回按钮占用（文件夹内 / 情绪筛选内）
   bool _leadingIsBack(MemeProvider prov) =>
-      (_currentTab == 0 && prov.folderId != null) ||
+      (_currentTab == 0 || _currentTab == 1) && prov.folderId != null ||
       (_currentTab == 3 && prov.moodFilter != null);
 
   /// AppBar 标题：在文件夹/情绪筛选内时点击可打开侧边栏
@@ -290,7 +290,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ? Icon(Icons.check, size: 20, color: theme.colorScheme.primary)
                 : const SizedBox.shrink(),
           ),
-          Expanded(child: Text(label, style: const TextStyle(fontSize: 16))),
+          Expanded(child: Text(label, style: const TextStyle(fontSize: 14))),
         ],
       ),
     );
@@ -456,6 +456,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildBody(MemeProvider prov, L10n l10n) {
     switch (_currentTab) {
       case 1:
+        if (prov.folderId != null) {
+          return _buildMemesListView(prov, l10n);
+        }
         return _buildFoldersGrid(prov);
       case 2:
         return _buildMemesListView(prov, l10n);
@@ -583,6 +586,9 @@ class _HomeScreenState extends State<HomeScreen> {
     if (prov.isMulti) return l10n.tr('selected_count', args: {'count': prov.selected.length.toString()});
     switch (_currentTab) {
       case 1:
+        if (prov.folderId != null) {
+          return prov.folders.where((f) => f.id == prov.folderId).firstOrNull?.name ?? l10n.tr('browse_folders');
+        }
         return l10n.tr('browse_folders');
       case 2:
         return l10n.tr('favorites');
@@ -651,7 +657,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 folder: f,
                 count: prov.countInFolder(f.id),
                 isActive: prov.folderId == f.id,
-                onSelected: () => setState(() => _currentTab = 0),
+                onSelected: null,
               );
             },
           ),
@@ -874,7 +880,9 @@ class _HomeScreenState extends State<HomeScreen> {
       onTap: () {
         prov.selectFolder(folder.id);
         Navigator.pop(context);
-        setState(() => _currentTab = 0);
+        if (_currentTab != 1) {
+          setState(() => _currentTab = 0);
+        }
       },
       onLongPress: () => _showFolderMenu(context, prov, folder),
       dense: true,
@@ -1063,13 +1071,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     dense: true,
                     contentPadding: EdgeInsets.zero,
                   )),
-                  PopupMenuItem(value: 'sprite_sheet', child: ListTile(
-                    leading: const Icon(Icons.view_carousel, size: 20),
-                    title: Text(l10n.tr('import_as_sprite_sheet'),
-                      style: const TextStyle(fontSize: 14)),
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                  )),
                   PopupMenuItem(value: 'manga', child: ListTile(
                     leading: const Icon(Icons.photo_library, size: 20),
                     title: Text(l10n.tr('import_as_manga'),
@@ -1080,6 +1081,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   PopupMenuItem(value: 'sprite', child: ListTile(
                     leading: const Icon(Icons.accessibility_new, size: 20),
                     title: Text(l10n.tr('import_as_sprite'),
+                      style: const TextStyle(fontSize: 14)),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                  )),
+                  PopupMenuItem(value: 'sprite_sheet', child: ListTile(
+                    leading: const Icon(Icons.view_carousel, size: 20),
+                    title: Text(l10n.tr('import_as_sprite_sheet'),
                       style: const TextStyle(fontSize: 14)),
                     dense: true,
                     contentPadding: EdgeInsets.zero,
