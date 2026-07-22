@@ -669,6 +669,11 @@ class MemeProvider with ChangeNotifier {
     await loadAll();
   }
 
+  Future<void> clearCache() async {
+    await _storage.clearThumbnailCache();
+    await loadAll();
+  }
+
   void _sortMemeList(List<Meme> list) {
     list.sort((a, b) {
       int cmp;

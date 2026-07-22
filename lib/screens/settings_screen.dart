@@ -146,6 +146,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
               }
             },
           ),
+          const Divider(indent: 16, endIndent: 16),
+          ListTile(
+            leading: const Icon(Icons.cached_outlined),
+            title: Text(l10n.tr('clear_cache')),
+            subtitle: Text(l10n.tr('clear_cache_desc')),
+            onTap: () async {
+              await context.read<MemeProvider>().clearCache();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(l10n.tr('clear_cache_done')),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              }
+            },
+          ),
           const SizedBox(height: 16),
 
           _sectionHeader(l10n.tr('cloud_sync'), cs),

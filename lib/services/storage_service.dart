@@ -591,6 +591,25 @@ class StorageService {
   /// 公共保存接口：供外部服务（如 ImageToolService）保存新生成的 meme
   Future<void> saveMeme(Meme meme) => _saveMeme(meme, null);
 
+  /// 清除所有缩略图缓存，重置 thumbPath
+  Future<void> clearThumbnailCache() async {
+    if (_memeBox == null) return;
+    final memes = _memeBox!.values
+        .map((e) => Meme.fromMap(Map<String, dynamic>.from(e as Map)))
+        .where((m) => m.thumbPath != null)
+        .toList();
+    for (final meme in memes) {
+      if (kIsWeb) {
+        await webStorageDelete(meme.thumbPath!);
+      } else {
+        final file = File(p.join(_basePath!, meme.thumbPath!));
+        if (await file.exists()) await file.delete();
+      }
+      final updated = meme.copyWith(thumbPath: null);
+      await _memeBox!.put(meme.id, updated.toMap());
+    }
+  }
+
   Future<Uint8List?> readMemeBytes(String filePath) async {
     if (kIsWeb) {
       return await webStorageGetBinary(filePath);
