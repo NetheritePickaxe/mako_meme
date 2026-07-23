@@ -137,7 +137,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ) : null,
       ),
       // 增大左边缘触发宽度，让 drawer 更容易被左滑打开
-      drawerEdgeDragWidth: 40,
+      drawerEdgeDragWidth: 80,
       drawer: _buildDrawer(context, prov),
       body: _buildBody(prov, l10n),
       bottomNavigationBar: NavigationBar(
@@ -676,6 +676,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final theme = Theme.of(context);
     final l10n = context.read<LocaleProvider>().l10n;
     return Drawer(
+      width: 280,
       child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
