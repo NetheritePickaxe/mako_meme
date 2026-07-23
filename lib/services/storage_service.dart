@@ -355,6 +355,14 @@ class StorageService {
         memeType = Meme.typeCharacterCard;
         final cardName = CharacterCardService.getName(characterData!);
         if (cardName.isNotEmpty && cardName != '未知角色') {
+          int ccWidth = 0, ccHeight = 0;
+          if (!kIsWeb) {
+            final dims = await getImageDimensions(filePath);
+            if (dims != null) { ccWidth = dims.width; ccHeight = dims.height; }
+          } else if (bytes != null) {
+            final dims = _parseImageDimensionsFromHeader(bytes);
+            if (dims != null) { ccWidth = dims.width; ccHeight = dims.height; }
+          }
           final meme = Meme(
             id: id,
             name: cardName,
@@ -366,6 +374,8 @@ class StorageService {
             fileSize: bytes?.length ?? file.size,
             type: memeType,
             characterData: CharacterCardService.sanitizeCard(characterData),
+            width: ccWidth,
+            height: ccHeight,
           );
           await _saveMeme(meme, fileHash);
           return meme;
@@ -387,55 +397,31 @@ class StorageService {
     );
     await _saveMeme(meme, fileHash);
 
-    // 自动按画幅归类：正方形→表情，长方形→图片
-    // 超大文件跳过尺寸解析（getImageDimensions 已是流式但仍有 IO 开销）
+    // 解析宽高（从头部读取，仅数 KB，不会 OOM）
     int imgWidth = 0;
     int imgHeight = 0;
-    if (!isHugeFile) {
-      if (autoClassify && type == null && memeType != Meme.typeCharacterCard && ext != '.gif') {
-        double? ratio;
-        if (!kIsWeb) {
-          final dims = await getImageDimensions(filePath);
-          if (dims != null) {
-            imgWidth = dims.width;
-            imgHeight = dims.height;
-            ratio = dims.ratio;
-          }
-        } else if (bytes != null) {
-          final dims = _parseImageDimensionsFromHeader(bytes);
-          if (dims != null) {
-            imgWidth = dims.width;
-            imgHeight = dims.height;
-            ratio = dims.ratio;
-          }
-        }
-        if (ratio != null && ratio > 0) {
-          // 宽高比 <= 阈值 → 正方形 → 表情；否则 → 图片
-          final autoType = (ratio <= classifyRatio) ? Meme.typeEmoji : Meme.typeImage;
-          if (autoType != memeType) {
-            await setMemeType(id, autoType);
-            meme = meme.copyWith(type: autoType);
-          }
-        }
-      } else if (meme.filePath.isNotEmpty) {
-        // 非自动归类场景也解析宽高并存储
-        if (!kIsWeb) {
-          final dims = await getImageDimensions(filePath);
-          if (dims != null) {
-            imgWidth = dims.width;
-            imgHeight = dims.height;
-          }
-        } else if (bytes != null) {
-          final dims = _parseImageDimensionsFromHeader(bytes);
-          if (dims != null) {
-            imgWidth = dims.width;
-            imgHeight = dims.height;
-          }
-        }
+    if (memeType != Meme.typeCharacterCard && meme.filePath.isNotEmpty) {
+      if (!kIsWeb) {
+        final dims = await getImageDimensions(filePath);
+        if (dims != null) { imgWidth = dims.width; imgHeight = dims.height; }
+      } else if (bytes != null) {
+        final dims = _parseImageDimensionsFromHeader(bytes);
+        if (dims != null) { imgWidth = dims.width; imgHeight = dims.height; }
       }
-      if (imgWidth > 0 && imgHeight > 0) {
-        meme = meme.copyWith(width: imgWidth, height: imgHeight);
-        await _saveMeme(meme, fileHash);
+    }
+    if (imgWidth > 0 && imgHeight > 0) {
+      meme = meme.copyWith(width: imgWidth, height: imgHeight);
+      await _saveMeme(meme, fileHash);
+    }
+    // 自动按画幅归类：正方形→表情，长方形→图片（仅非超大文件）
+    if (!isHugeFile && autoClassify && type == null && memeType != Meme.typeCharacterCard && ext != '.gif') {
+      final ratio = (imgWidth > 0 && imgHeight > 0) ? imgWidth / imgHeight : null;
+      if (ratio != null && ratio > 0) {
+        final autoType = (ratio <= classifyRatio) ? Meme.typeEmoji : Meme.typeImage;
+        if (autoType != memeType) {
+          await setMemeType(id, autoType);
+          meme = meme.copyWith(type: autoType);
+        }
       }
     }
 
@@ -1103,6 +1089,14 @@ class StorageService {
       pagePaths.add(relPath);
     }
 
+    int mWidth = 0, mHeight = 0;
+    if (!kIsWeb) {
+      final dims = await getImageDimensions(pagePaths.first);
+      if (dims != null) { mWidth = dims.width; mHeight = dims.height; }
+    } else if (files.first.bytes != null) {
+      final dims = parseImageDimensionsFromHeader(files.first.bytes!);
+      if (dims != null) { mWidth = dims.width; mHeight = dims.height; }
+    }
     final meme = Meme(
       id: id,
       name: name ?? p.basenameWithoutExtension(files.first.name),
@@ -1114,6 +1108,8 @@ class StorageService {
       fileSize: totalSize,
       type: Meme.typeManga,
       pages: pagePaths,
+      width: mWidth,
+      height: mHeight,
     );
     await _saveMeme(meme, null);
     return meme;
@@ -1170,6 +1166,17 @@ class StorageService {
       throw StateError('archive contains no images');
     }
 
+    int mWidth = 0, mHeight = 0;
+    if (!kIsWeb) {
+      final dims = await getImageDimensions(pagePaths.first);
+      if (dims != null) { mWidth = dims.width; mHeight = dims.height; }
+    } else {
+      final firstBytes = await webStorageGetBinary(pagePaths.first);
+      if (firstBytes != null) {
+        final dims = parseImageDimensionsFromHeader(firstBytes);
+        if (dims != null) { mWidth = dims.width; mHeight = dims.height; }
+      }
+    }
     final meme = Meme(
       id: id,
       name: name ?? p.basenameWithoutExtension(file.name),
@@ -1181,6 +1188,8 @@ class StorageService {
       fileSize: totalSize,
       type: Meme.typeManga,
       pages: pagePaths,
+      width: mWidth,
+      height: mHeight,
     );
     await _saveMeme(meme, null);
     return meme;

@@ -273,11 +273,22 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                       ),
                     ),
                   ),
-                  if (!_isFullscreen)
+                  if (!_isFullscreen) ...[
+                    Positioned.fill(
+                      bottom: panelHeight,
+                      child: IgnorePointer(
+                        child: AnimatedOpacity(
+                          opacity: ((_panelExtent - 0.2) / 0.8).clamp(0.0, 1.0),
+                          duration: const Duration(milliseconds: 150),
+                          child: Container(color: Colors.black54),
+                        ),
+                      ),
+                    ),
                     Align(
                       alignment: Alignment.bottomCenter,
                       child: _buildDraggableDetailPanel(theme, prov, m, l10n),
                     ),
+                  ],
                 ],
               ),
             );
