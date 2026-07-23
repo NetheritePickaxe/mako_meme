@@ -38,6 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // 文件夹/情绪页面的本地搜索关键字
   String _folderQuery = '';
   String _moodQuery = '';
+  bool _isEffectShowing = false;
 
   // 底部导航顺序与内部 tab 语义一致：0=表情 1=文件夹 2=收藏 3=情绪
   int _navToLogic(int nav) => nav;
@@ -77,11 +78,15 @@ class _HomeScreenState extends State<HomeScreen> {
   // barrierDismissible=false：避免用户点击操作时被透明 barrier 拦截并关闭特效
   // 特效仅由动画结束自动关闭，点击完全穿透到下层 UI
   void _showEmojiEffect(BuildContext ctx) {
+    if (_isEffectShowing) return;
+    _isEffectShowing = true;
     showDialog(
       context: ctx,
       barrierColor: Colors.transparent,
       barrierDismissible: false,
-      builder: (_) => const _EmojiRainOverlay(),
+      builder: (_) => _EmojiRainOverlay(
+        onDone: () { if (mounted) setState(() => _isEffectShowing = false); },
+      ),
     );
   }
 
@@ -1825,7 +1830,8 @@ class _HomeScreenState extends State<HomeScreen> {
 /// 满屏 emoji 下雨特效（🥰😍😘）
 /// 点击穿透，动画结束后自动关闭
 class _EmojiRainOverlay extends StatefulWidget {
-  const _EmojiRainOverlay();
+  final VoidCallback? onDone;
+  const _EmojiRainOverlay({this.onDone});
 
   @override
   State<_EmojiRainOverlay> createState() => _EmojiRainOverlayState();
@@ -1836,9 +1842,6 @@ class _EmojiRainOverlayState extends State<_EmojiRainOverlay>
   late AnimationController _controller;
   final List<_EmojiParticle> _particles = [];
   static const _emojis = ['🥰', '😍', '😘'];
-  // 最慢粒子的完成时间（controller value）= max_delay + 1/min_speed
-  // max_delay=0.4, min_speed=0.8 → 1/max=1.25 → 总 1.65
-  // controller duration 需让 value 达到 1.65 时所有粒子出屏
   static const _maxControllerValue = 1.65;
 
   @override
@@ -1846,18 +1849,19 @@ class _EmojiRainOverlayState extends State<_EmojiRainOverlay>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      // 以最慢粒子出屏所需时间为基准，每秒约 0.5 个 controller value
       duration: const Duration(milliseconds: 4000),
     );
     _spawnParticles();
     _controller.forward().then((_) {
-      if (mounted) Navigator.of(context).maybePop();
-    });
+      if (mounted) {
+        widget.onDone?.call();
+        Navigator.of(context).maybePop();
+      }
+    }).catchError((_) {});
   }
 
   void _spawnParticles() {
     final rng = Random();
-    // 下雨：从顶部下落
     for (int i = 0; i < 36; i++) {
       _particles.add(_EmojiParticle(
         emoji: _emojis[rng.nextInt(_emojis.length)],
@@ -1880,37 +1884,20 @@ class _EmojiRainOverlayState extends State<_EmojiRainOverlay>
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
-    // IgnorePointer 让点击穿透，粒子不影响下方操作
     return IgnorePointer(
       child: Material(
         type: MaterialType.transparency,
         child: AnimatedBuilder(
           animation: _controller,
           builder: (ctx, _) {
-            // 按 _maxControllerValue 归一化，让最慢粒子在动画结束时刚好 t=1
             final cv = _controller.value * _maxControllerValue;
-            // 检查是否所有粒子都已完全出屏
-            final allGone = _particles.every((p) {
-              final t = (cv - p.delay) * p.speed;
-              return t > 1.1;
-            });
-            if (allGone && _controller.value >= 1.0) {
-              // 全部出屏，触发关闭
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) Navigator.of(context).maybePop();
-              });
-            }
             return Stack(
               children: _particles.map((p) {
-                // t 表示粒子下落进度：0=顶部出发，1=刚出屏幕底部
                 double t = (cv - p.delay) * p.speed;
                 if (t <= 0) return const SizedBox.shrink();
-                // t > 1 后继续向下超出屏幕，不再夹紧到 1
-                // 当 t > 1.1 时粒子已远离屏幕，返回空避免无谓绘制
                 if (t > 1.15) return const SizedBox.shrink();
                 final y = -60.0 + t * (size.height + 120);
                 final x = p.x * size.width + p.drift * size.width * t;
-                // 淡入（前 8%）+ 淡出（最后 15%）
                 final opacity = t < 0.08
                     ? t / 0.08
                     : (t > 0.85 ? (1 - t) / 0.15 : 1.0);
