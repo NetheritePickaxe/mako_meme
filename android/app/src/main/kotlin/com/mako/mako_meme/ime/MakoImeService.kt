@@ -590,7 +590,6 @@ class MakoImeService : InputMethodService() {
                 performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                 shiftEnabled = !shiftEnabled
                 // 重建 QWERTY 键盘以刷新键帽
-                val wasQwerty = qwertyMode
                 contentContainer.removeAllViews()
                 contentContainer.addView(buildQwertyKeyboard())
                 qwertyMode = true

@@ -2,6 +2,7 @@ package com.mako.mako_meme.ime
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.drawable.BitmapDrawable
 import android.os.Handler
 import android.os.Looper
 import android.util.LruCache
@@ -47,7 +48,7 @@ object BitmapLoader {
         // 先查内存缓存
         memoryCache.get(path)?.let { bmp ->
             if (isSameRequest(imageView, path)) {
-                imageView.setImageBitmap(bmp)
+                setBitmap(imageView, bmp)
             }
             return
         }
@@ -60,9 +61,21 @@ object BitmapLoader {
             memoryCache.put(path, bitmap)
             mainHandler.post {
                 if (isSameRequest(imageView, path)) {
-                    imageView.setImageBitmap(bitmap)
+                    setBitmap(imageView, bitmap)
                 }
             }
+        }
+    }
+
+    /** 设置 bitmap 到 ImageView，像素图（≤64px）禁用双线性滤波。 */
+    private fun setBitmap(imageView: ImageView, bmp: Bitmap) {
+        val isPixelArt = bmp.width <= 64 && bmp.height <= 64
+        if (isPixelArt) {
+            val drawable = BitmapDrawable(imageView.context.resources, bmp)
+            drawable.isFilterBitmap = false
+            imageView.setImageDrawable(drawable)
+        } else {
+            imageView.setImageBitmap(bmp)
         }
     }
 
