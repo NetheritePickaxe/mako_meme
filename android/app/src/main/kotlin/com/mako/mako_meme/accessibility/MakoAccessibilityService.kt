@@ -153,7 +153,7 @@ class MakoAccessibilityService : AccessibilityService() {
         ) { _, _ -> onDone() }
     }
 
-    /** 识别当前前台 App 并执行对应适配器。 */
+    /** 识别当前前台 App 并执行对应适配器。失败时自动降级到系统分享。 */
     private fun executeAppAdapter(meme: MemeItem, imageFile: File) {
         val pkg = currentPackage() ?: ""
         Log.d(TAG, "当前前台包名: $pkg")
@@ -166,7 +166,13 @@ class MakoAccessibilityService : AccessibilityService() {
                 return
             }
         }
-        adapter.send(this, meme, imageFile)
+        val success = runCatching {
+            adapter.send(this, meme, imageFile)
+        }.getOrDefault(false)
+        if (!success) {
+            Log.w(TAG, "无障碍发送失败，回退到系统分享")
+            MemeSender.sendViaShare(this, meme)
+        }
     }
 
     /** 获取当前前台 App 包名。 */

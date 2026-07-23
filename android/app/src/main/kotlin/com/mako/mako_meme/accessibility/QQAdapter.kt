@@ -24,34 +24,34 @@ class QQAdapter : AppAdapter {
         private val SEND_KEYWORDS = listOf("发送", "确定", "完成")
     }
 
-    override fun send(service: MakoAccessibilityService, meme: MemeItem, imageFile: File) {
-        Thread {
-            try {
-                Log.i(TAG, "QQ 自动化开始: ${meme.name}")
-                // 步骤1：点击图片入口
-                if (!clickImageEntry(service)) {
-                    Log.e(TAG, "未找到图片入口")
-                    return@Thread
-                }
-                delay(1000)
-
-                // 步骤2：选择第一张图
-                if (!selectFirstImage(service)) {
-                    Log.e(TAG, "未找到可选图片")
-                    return@Thread
-                }
-                delay(600)
-
-                // 步骤3：点击发送
-                if (!clickSendButton(service)) {
-                    Log.e(TAG, "未找到发送按钮")
-                    return@Thread
-                }
-                Log.i(TAG, "QQ 自动化完成")
-            } catch (e: Exception) {
-                Log.e(TAG, "自动化异常", e)
+    override fun send(service: MakoAccessibilityService, meme: MemeItem, imageFile: File): Boolean {
+        return try {
+            Log.i(TAG, "QQ 自动化开始: ${meme.name}")
+            // 步骤1：点击图片入口
+            if (!clickImageEntry(service)) {
+                Log.e(TAG, "未找到图片入口")
+                return false
             }
-        }.start()
+            delay(1000)
+
+            // 步骤2：选择第一张图
+            if (!selectFirstImage(service)) {
+                Log.e(TAG, "未找到可选图片")
+                return false
+            }
+            delay(600)
+
+            // 步骤3：点击发送
+            if (!clickSendButton(service)) {
+                Log.e(TAG, "未找到发送按钮")
+                return false
+            }
+            Log.i(TAG, "QQ 自动化完成")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "自动化异常", e)
+            false
+        }
     }
 
     private fun clickImageEntry(service: MakoAccessibilityService): Boolean {

@@ -16,13 +16,13 @@ interface AppAdapter {
 
     /**
      * 在当前聊天界面执行发送 [meme]（图片已复制到 [imageFile]）的自动化流程。
-     * 实现应在异步线程或带延迟执行，避免阻塞无障碍主线程。
+     * 返回 true 表示发送成功，false 表示失败（将触发 fallback 到系统分享）。
      */
     fun send(
         service: MakoAccessibilityService,
         meme: MemeItem,
         imageFile: File
-    )
+    ): Boolean
 
     /** 获取 root 节点（封装空判断）。 */
     fun root(service: MakoAccessibilityService): AccessibilityNodeInfo? =

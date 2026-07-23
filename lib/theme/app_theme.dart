@@ -78,7 +78,7 @@ class AppTheme {
       useMaterial3: true,
       colorScheme: scheme,
       scaffoldBackgroundColor: pureBlack && isDark ? Colors.black : null,
-      fontFamily: 'Noto Sans SC',
+      // 不设置 fontFamily，依赖 index.html 的系统字体回退链
       // 预测式返回：none / aosp / zoom / classic，由设置选择
       // none = NoPageTransitionsBuilder（无过渡动画）
       // aosp = PredictiveBackPageTransitionsBuilder（Android 14+ 原生预测式返回）

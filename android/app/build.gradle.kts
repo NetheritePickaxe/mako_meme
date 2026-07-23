@@ -61,6 +61,8 @@ kotlin {
 dependencies {
     // IME 表情包输入法网格列表所需（不引入第三方图片库，仅用 Android 原生 API）
     implementation("androidx.recyclerview:recyclerview:1.3.2")
+    // 拼音搜索
+    implementation("com.belerweb:pinyin4j:2.5.1")
 }
 
 flutter {

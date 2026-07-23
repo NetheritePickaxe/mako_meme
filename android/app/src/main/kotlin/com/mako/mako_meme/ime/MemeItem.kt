@@ -22,7 +22,9 @@ data class MemeItem(
     val mimeType: String,
     val textContent: String?,
     val width: Int = 0,
-    val height: Int = 0
+    val height: Int = 0,
+    val pinyinName: String = "",
+    val pinyinTags: List<String> = emptyList(),
 ) {
     /** 是否为图片类（有绝对路径可加载）。文字类 absPath 为空。 */
     val isImage: Boolean get() = absPath.isNotEmpty()
@@ -45,6 +47,12 @@ data class MemeItem(
         obj.put("height", height)
         return obj.toString()
     }
+
+    /** 创建一份拷贝，附带上预计算的拼音字段。 */
+    fun withPinyin(pinyinName: String, pinyinTags: List<String>): MemeItem = copy(
+        pinyinName = pinyinName,
+        pinyinTags = pinyinTags,
+    )
 
     companion object {
         /** 类型常量，与 Flutter 侧 [Meme.typeXxx] 保持一致。 */

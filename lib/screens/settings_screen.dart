@@ -1,8 +1,8 @@
-import 'dart:math';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -1007,77 +1007,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Text(l10n.tr('custom_color_scheme'),
                 style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
-              // 色轮 + 预览
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 220,
-                    height: 220,
-                    child: _ColorWheel(
-                      initialColor: currentColor,
-                      onColorChanged: (c) {
-                        setModalState(() => setColor(c));
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  // 当前颜色预览块
-                  Column(
-                    children: [
-                      Text(l10n.tr('preview'), style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
-                      const SizedBox(height: 6),
-                      Container(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          color: currentColor,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: cs.outline.withValues(alpha: 0.4)),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      // 派生色板预览（圆角方形）
-                      Column(
-                        children: [
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              _swatch(ColorScheme.fromSeed(seedColor: currentColor, brightness: Brightness.light).primary, 18),
-                              const SizedBox(width: 3),
-                              _swatch(ColorScheme.fromSeed(seedColor: currentColor, brightness: Brightness.light).secondary, 18),
-                            ],
-                          ),
-                          const SizedBox(height: 3),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              _swatch(ColorScheme.fromSeed(seedColor: currentColor, brightness: Brightness.dark).primary, 18),
-                              const SizedBox(width: 3),
-                              _swatch(ColorScheme.fromSeed(seedColor: currentColor, brightness: Brightness.dark).secondary, 18),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Text(l10n.tr('lightness'), style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Slider(
-                      value: HSVColor.fromColor(currentColor).value,
-                      onChanged: (v) {
-                        final hsv = HSVColor.fromColor(currentColor);
-                        setModalState(() => setColor(hsv.withValue(v).toColor()));
-                      },
-                    ),
-                  ),
-                ],
+              ColorPicker(
+                pickerColor: currentColor,
+                onColorChanged: (c) => setModalState(() => setColor(c)),
+                enableAlpha: false,
+                pickerAreaHeightPercent: 0.8,
+                paletteType: PaletteType.hsv,
+                displayThumbColor: true,
+                labelTypes: const [],
+                hexInputBar: false,
               ),
               const SizedBox(height: 8),
               // HEX 输入 — 不使用 maxLength 以避免显示计数器
@@ -1809,136 +1747,4 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
-class _ColorWheel extends StatefulWidget {
-  final Color initialColor;
-  final ValueChanged<Color> onColorChanged;
-  const _ColorWheel({required this.initialColor, required this.onColorChanged});
 
-  @override
-  State<_ColorWheel> createState() => _ColorWheelState();
-}
-
-class _ColorWheelState extends State<_ColorWheel> {
-  late HSVColor _hsv;
-
-  @override
-  void initState() {
-    super.initState();
-    _hsv = HSVColor.fromColor(widget.initialColor);
-  }
-
-  /// 将本地坐标转换为 HSV（hue 0-360, saturation 0-1）
-  /// 仅在圆形范围内有效，超出半径则饱和度截断为 1
-  void _updateFromLocal(Offset localPos) {
-    final RenderBox box = context.findRenderObject() as RenderBox;
-    final size = box.size;
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2;
-    final dx = localPos.dx - center.dx;
-    final dy = localPos.dy - center.dy;
-    final dist = sqrt(dx * dx + dy * dy);
-    // 角度：0 度在顶部（12 点方向），顺时针递增
-    var angle = atan2(dx, -dy) * 180 / pi;
-    if (angle < 0) angle += 360;
-    final saturation = (dist / radius).clamp(0.0, 1.0);
-    setState(() {
-      _hsv = HSVColor.fromAHSV(1.0, angle, saturation, _hsv.value);
-      widget.onColorChanged(_hsv.toColor());
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (ctx, constraints) {
-        final size = constraints.biggest;
-        return GestureDetector(
-          onPanDown: (d) => _updateFromLocal(d.localPosition),
-          onPanUpdate: (d) => _updateFromLocal(d.localPosition),
-          child: CustomPaint(
-            size: size,
-            painter: _WheelPainter(
-              hsv: _hsv,
-              radius: size.width / 2,
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _WheelPainter extends CustomPainter {
-  final HSVColor hsv;
-  final double radius;
-  _WheelPainter({required this.hsv, required this.radius});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    // 用 SweepGradient 绘制色相环（圆盘），颜色从顶部（12 点钟）开始顺时针
-    // startAngle: -pi/2 让 hue=0 的红色从顶部开始，与交互坐标和指示器角度对齐
-    final sweepPaint = Paint()
-      ..shader = SweepGradient(
-        center: Alignment.center,
-        startAngle: -pi / 2,
-        colors: [
-          HSVColor.fromAHSV(1.0, 0, 1.0, 1.0).toColor(),
-          HSVColor.fromAHSV(1.0, 60, 1.0, 1.0).toColor(),
-          HSVColor.fromAHSV(1.0, 120, 1.0, 1.0).toColor(),
-          HSVColor.fromAHSV(1.0, 180, 1.0, 1.0).toColor(),
-          HSVColor.fromAHSV(1.0, 240, 1.0, 1.0).toColor(),
-          HSVColor.fromAHSV(1.0, 300, 1.0, 1.0).toColor(),
-          HSVColor.fromAHSV(1.0, 360, 1.0, 1.0).toColor(),
-        ],
-      ).createShader(Rect.fromCircle(center: center, radius: radius));
-    canvas.drawCircle(center, radius, sweepPaint);
-
-    // 叠加径向白色渐变实现饱和度（中心白→边缘饱和）
-    final satPaint = Paint()
-      ..shader = RadialGradient(
-        center: Alignment.center,
-        radius: 1.0,
-        colors: [Colors.white, Colors.white.withValues(alpha: 0)],
-      ).createShader(Rect.fromCircle(center: center, radius: radius));
-    canvas.drawCircle(center, radius, satPaint);
-
-    // 选中指示器：在色轮上的位置
-    final angleRad = hsv.hue * pi / 180;
-    final indicatorDist = hsv.saturation * radius;
-    final indicatorPos = Offset(
-      center.dx + indicatorDist * sin(angleRad),
-      center.dy - indicatorDist * cos(angleRad),
-    );
-    // 外圈白边
-    canvas.drawCircle(
-      indicatorPos,
-      12,
-      Paint()
-        ..color = Colors.white
-        ..style = PaintingStyle.fill,
-    );
-    // 内圈当前色
-    canvas.drawCircle(
-      indicatorPos,
-      9,
-      Paint()
-        ..color = hsv.toColor()
-        ..style = PaintingStyle.fill,
-    );
-    // 描边
-    canvas.drawCircle(
-      indicatorPos,
-      9,
-      Paint()
-        ..color = Colors.black54
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _WheelPainter oldDelegate) {
-    return oldDelegate.hsv != hsv;
-  }
-}

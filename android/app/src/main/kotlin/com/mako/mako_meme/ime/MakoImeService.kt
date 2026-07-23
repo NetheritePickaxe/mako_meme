@@ -40,10 +40,8 @@ import androidx.recyclerview.widget.RecyclerView
 class MakoImeService : InputMethodService() {
 
     companion object {
-        /** 键盘高度（dp）。整体加大以容纳更大的按键。 */
-        private const val KEYBOARD_HEIGHT_DP = 340
-        /** 网格列数。 */
-        private const val GRID_SPAN = 4
+        /** 网格列数。3 列以显示更大缩略图。 */
+        private const val GRID_SPAN = 3
         /** 按键圆角半径（dp）。 */
         private const val KEY_RADIUS_DP = 8
         /** Tab 圆角半径（dp）。 */
@@ -73,6 +71,9 @@ class MakoImeService : InputMethodService() {
     /** 当前选中的 meme（用于发送）。 */
     private var selectedMeme: MemeItem? = null
 
+    /** Shift 大写锁定状态。 */
+    private var shiftEnabled = false
+
     /** Tab 视图列表，用于高亮切换。 */
     private val tabViews = mutableListOf<TextView>()
 
@@ -81,21 +82,47 @@ class MakoImeService : InputMethodService() {
 
     private lateinit var btnShare: ImageButton
     private lateinit var btnAccessibility: ImageButton
+    private lateinit var btnFavorite: ImageButton
     private lateinit var btnKeyboard: ImageButton
     private lateinit var searchInput: TextView
     private lateinit var contentContainer: LinearLayout
 
-    /** 分类定义：显示名 → 类型（null = 全部）。 */
-    private val categories = listOf(
-        "全部" to null,
-        "表情" to MemeItem.TYPE_EMOJI,
-        "GIF" to MemeItem.TYPE_GIF,
-        "图片" to MemeItem.TYPE_IMAGE,
-        "文字" to MemeItem.TYPE_TEXT,
-        "角色卡" to MemeItem.TYPE_CHARACTER_CARD,
-        "立绘" to MemeItem.TYPE_PORTRAIT,
-        "CG" to MemeItem.TYPE_CG
+    /** 从 meme 数据动态构建的分类列表（"全部" + 存在的类型）。首次加载后重建。 */
+    private val dynamicCategories: MutableList<Pair<String, String?>> = mutableListOf("全部" to null)
+
+    /** 类型中文标签映射。 */
+    private val typeLabels = mapOf(
+        MemeItem.TYPE_EMOJI to "表情",
+        MemeItem.TYPE_GIF to "GIF",
+        MemeItem.TYPE_IMAGE to "图片",
+        MemeItem.TYPE_TEXT to "文字",
+        MemeItem.TYPE_CHARACTER_CARD to "角色卡",
+        MemeItem.TYPE_PORTRAIT to "立绘",
+        MemeItem.TYPE_CG to "CG",
     )
+
+    /** 根据已有 meme 数据刷新分类列表。 */
+    private fun rebuildCategories() {
+        val typesInData = allMemes.map { it.type }.distinct().sorted()
+        dynamicCategories.clear()
+        dynamicCategories.add("全部" to null)
+        for (t in typesInData) {
+            val label = typeLabels[t] ?: t
+            dynamicCategories.add(label to t)
+        }
+        // 重建 tab 视图
+        val tabRow = tabContainer.getChildAt(0) as? LinearLayout ?: return
+        tabRow.removeAllViews()
+        tabViews.clear()
+        buildCategoryTabsInto(tabRow)
+        // 重置到"全部"
+        currentType = null
+        if (tabViews.isNotEmpty()) {
+            updateTabHighlight(tabViews.first())
+        }
+    }
+
+    private lateinit var tabContainer: HorizontalScrollView
 
     /** QWERTY 键盘布局定义。 */
     private val qwertyRows = listOf(
@@ -114,11 +141,18 @@ class MakoImeService : InputMethodService() {
         theme = ImeTheme.load(this)
         adapter = MemeGridAdapter(this, theme) { meme -> onMemeClicked(meme) }
 
+        // 动态键盘高度：屏幕高度的 60%，最大 600dp
+        val displayMetrics = resources.displayMetrics
+        val keyboardHeightPx = minOf(
+            (displayMetrics.heightPixels * 0.6f).toInt(),
+            dp(600)
+        )
+
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(KEYBOARD_HEIGHT_DP)
+                keyboardHeightPx
             )
             setBackgroundColor(theme.bg)
         }
@@ -186,7 +220,16 @@ class MakoImeService : InputMethodService() {
                 layoutParams = LinearLayout.LayoutParams(0, dp(1), 1f)
             })
 
-            // 右侧：分享 + 无障碍发送
+            // 右侧：收藏 + 分享 + 无障碍发送
+            btnFavorite = iconButton(android.R.drawable.ic_menu_myplaces, "收藏") {
+                val meme = selectedMeme ?: return@iconButton
+                // 通过广播通知主应用切换收藏状态（仅显示提示）
+                Toast.makeText(this@MakoImeService,
+                    if (meme.isFavorite) "已取消收藏: ${meme.name}" else "已收藏: ${meme.name}",
+                    Toast.LENGTH_SHORT).show()
+            }.apply { alpha = 0.4f; isEnabled = false }
+            addView(btnFavorite)
+            addView(spacer(dp(4)))
             btnShare = iconButton(android.R.drawable.ic_menu_share, "分享发送") {
                 val meme = selectedMeme
                 if (meme != null) {
@@ -258,7 +301,23 @@ class MakoImeService : InputMethodService() {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(8), dp(6), dp(8), dp(6))
         }
-        categories.forEachIndexed { idx, (label, type) ->
+        buildCategoryTabsInto(row)
+        updateTabHighlight(tabViews.first())
+
+        return HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(row)
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(44)
+            )
+            setBackgroundColor(theme.bg)
+        }.also { tabContainer = it }
+    }
+
+    /** 将分类标签填充到已有 [row] 中（用于首次构建或重建）。 */
+    private fun buildCategoryTabsInto(row: LinearLayout) {
+        dynamicCategories.forEachIndexed { idx, (label, type) ->
             val tab = TextView(this).apply {
                 text = label
                 textSize = 13f
@@ -278,22 +337,9 @@ class MakoImeService : InputMethodService() {
             }
             tabViews.add(tab)
             row.addView(tab)
-            // Tab 间留 6dp 间隔
-            if (idx < categories.size - 1) {
+            if (idx < dynamicCategories.size - 1) {
                 row.addView(spacer(dp(6)))
             }
-        }
-        // 默认高亮"全部"
-        updateTabHighlight(tabViews.first())
-
-        return HorizontalScrollView(this).apply {
-            isHorizontalScrollBarEnabled = false
-            addView(row)
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(44)
-            )
-            setBackgroundColor(theme.bg)
         }
     }
 
@@ -376,9 +422,9 @@ class MakoImeService : InputMethodService() {
             gravity = Gravity.CENTER_HORIZONTAL
         }
         // 第 1 行：q w e r t y u i o p（10 键）
-        root.addView(buildQwertyRow(qwertyRows[0]))
+        root.addView(buildQwertyRow(qwertyRows[0], shiftEnabled))
         // 第 2 行：a s d f g h j k l（9 键，居中显示，左右留白）
-        root.addView(buildQwertyRow(qwertyRows[1], leftPadding = 0.5f, rightPadding = 0.5f))
+        root.addView(buildQwertyRow(qwertyRows[1], shiftEnabled, leftPadding = 0.5f, rightPadding = 0.5f))
         // 第 3 行：⇧ z x c v b n m ⌫（左侧 shift 占位 + 7 字母 + 右侧删除键）
         // 删除键位于右下角"完成"键的正上方
         val row3 = LinearLayout(this).apply {
@@ -390,11 +436,13 @@ class MakoImeService : InputMethodService() {
                 1f
             )
         }
-        // 左侧占位 shift 键（暂未实现大小写，仅占位让 z 行与 a 行错落对齐）
-        row3.addView(funcKey("⇧", 1.5f) { /* TODO: 大小写切换 */ })
+        // Shift 键：切换大小写模式
+        row3.addView(shiftKey(1.5f))
         qwertyRows[2].forEach { ch ->
-            row3.addView(qwertyKey(ch.toString(), 1f) {
-                currentQuery += ch.toString()
+            val display = if (shiftEnabled) ch.uppercaseChar() else ch
+            val typed = if (shiftEnabled) ch.uppercaseChar() else ch
+            row3.addView(qwertyKey(display.toString(), 1f) {
+                currentQuery += typed.toString()
                 searchInput.text = currentQuery
                 applyFilter()
             })
@@ -443,6 +491,7 @@ class MakoImeService : InputMethodService() {
      */
     private fun buildQwertyRow(
         chars: List<Char>,
+        shifted: Boolean = false,
         leftPadding: Float = 0f,
         rightPadding: Float = 0f
     ): View {
@@ -461,8 +510,10 @@ class MakoImeService : InputMethodService() {
             })
         }
         chars.forEach { ch ->
-            row.addView(qwertyKey(ch.toString(), 1f) {
-                currentQuery += ch.toString()
+            val display = if (shifted) ch.uppercaseChar() else ch
+            val typed = if (shifted) ch.uppercaseChar() else ch
+            row.addView(qwertyKey(display.toString(), 1f) {
+                currentQuery += typed.toString()
                 searchInput.text = currentQuery
                 applyFilter()
             })
@@ -520,6 +571,33 @@ class MakoImeService : InputMethodService() {
         }
     }
 
+    /** Shift 键：点击切换大小写，选中态用 accent 背景。 */
+    private fun shiftKey(weight: Float): View {
+        return TextView(this).apply {
+            text = "⇧"
+            textSize = FUNC_TEXT_SIZE
+            gravity = Gravity.CENTER
+            setTextColor(if (shiftEnabled) theme.onAccent else theme.subText)
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(if (shiftEnabled) theme.accent else theme.keyFuncBg)
+                cornerRadius = dp(KEY_RADIUS_DP).toFloat()
+            }
+            val lp = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, weight)
+            lp.setMargins(dp(QWERTY_GAP_DP), dp(QWERTY_GAP_DP), dp(QWERTY_GAP_DP), dp(QWERTY_GAP_DP))
+            layoutParams = lp
+            isClickable = true
+            setOnClickListener {
+                performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                shiftEnabled = !shiftEnabled
+                // 重建 QWERTY 键盘以刷新键帽
+                val wasQwerty = qwertyMode
+                contentContainer.removeAllViews()
+                contentContainer.addView(buildQwertyKeyboard())
+                qwertyMode = true
+            }
+        }
+    }
+
     /** QWERTY 强调键（如"完成"）：accent 背景。 */
     private fun accentKey(label: String, weight: Float, onClick: () -> Unit): View {
         return TextView(this).apply {
@@ -568,8 +646,13 @@ class MakoImeService : InputMethodService() {
         selectedMeme = meme
         btnShare.isEnabled = true
         btnAccessibility.isEnabled = true
+        btnFavorite.isEnabled = true
         btnShare.alpha = 1f
         btnAccessibility.alpha = 1f
+        btnFavorite.alpha = 1f
+        btnFavorite.setColorFilter(
+            if (meme.isFavorite) theme.accent else theme.subText
+        )
         adapter.setSelected(meme.id)
         Toast.makeText(this, "已选中: ${meme.name}", Toast.LENGTH_SHORT).show()
     }
@@ -601,6 +684,7 @@ class MakoImeService : InputMethodService() {
         repository.loadMemes { list ->
             allMemes.clear()
             allMemes.addAll(list)
+            rebuildCategories()
             applyFilter()
         }
     }

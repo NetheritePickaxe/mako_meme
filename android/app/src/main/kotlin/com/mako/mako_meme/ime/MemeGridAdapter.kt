@@ -32,7 +32,7 @@ class MemeGridAdapter(
     companion object {
         const val TYPE_IMAGE = 0
         const val TYPE_TEXT = 1
-        private const val CELL_SIZE_DP = 84
+        private const val CELL_SIZE_DP = 110
         private const val CARD_RADIUS_DP = 10
         private const val SELECT_STROKE_DP = 2
     }

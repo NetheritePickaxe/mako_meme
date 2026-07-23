@@ -34,41 +34,41 @@ class WeChatAdapter : AppAdapter {
         private val SEND_KEYWORDS = listOf("发送", "确定", "完成")
     }
 
-    override fun send(service: MakoAccessibilityService, meme: MemeItem, imageFile: File) {
-        Thread {
-            try {
-                Log.i(TAG, "微信自动化开始: ${meme.name}")
-                // 步骤1：点击"+"按钮
-                if (!clickPlusButton(service)) {
-                    Log.e(TAG, "未找到\"+\"按钮，请确保在聊天界面")
-                    return@Thread
-                }
-                delay(800)
-
-                // 步骤2：点击"相册"
-                if (!clickAlbumEntry(service)) {
-                    Log.e(TAG, "未找到相册入口")
-                    return@Thread
-                }
-                delay(1000)
-
-                // 步骤3：选择第一张图（最新）
-                if (!selectFirstImage(service)) {
-                    Log.e(TAG, "未找到可选图片")
-                    return@Thread
-                }
-                delay(600)
-
-                // 步骤4：点击发送
-                if (!clickSendButton(service)) {
-                    Log.e(TAG, "未找到发送按钮")
-                    return@Thread
-                }
-                Log.i(TAG, "微信自动化完成")
-            } catch (e: Exception) {
-                Log.e(TAG, "自动化异常", e)
+    override fun send(service: MakoAccessibilityService, meme: MemeItem, imageFile: File): Boolean {
+        return try {
+            Log.i(TAG, "微信自动化开始: ${meme.name}")
+            // 步骤1：点击"+"按钮
+            if (!clickPlusButton(service)) {
+                Log.e(TAG, "未找到\"+\"按钮，请确保在聊天界面")
+                return false
             }
-        }.start()
+            delay(800)
+
+            // 步骤2：点击"相册"
+            if (!clickAlbumEntry(service)) {
+                Log.e(TAG, "未找到相册入口")
+                return false
+            }
+            delay(1000)
+
+            // 步骤3：选择第一张图（最新）
+            if (!selectFirstImage(service)) {
+                Log.e(TAG, "未找到可选图片")
+                return false
+            }
+            delay(600)
+
+            // 步骤4：点击发送
+            if (!clickSendButton(service)) {
+                Log.e(TAG, "未找到发送按钮")
+                return false
+            }
+            Log.i(TAG, "微信自动化完成")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "自动化异常", e)
+            false
+        }
     }
 
     /** 点击聊天界面右下角的"+"按钮。 */
