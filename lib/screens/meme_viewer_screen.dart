@@ -1286,24 +1286,19 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                   children: [
                     if (!(isMobile && m.isImageType))
                       _actionButton(theme, l10n.tr('copy'), Icons.copy, _copy),
-                    // 系统图集虚拟 Meme 只读：仅支持复制/分享，不显示重命名/收藏/分类/编辑/删除
-                    if (!m.isSystemGallery) ...[
-                      _actionButton(theme, l10n.tr('rename'), Icons.edit, _rename),
-                      _actionButton(theme, l10n.tr('share'), Icons.ios_share, _share),
-                      _actionButton(
-                        theme,
-                        m.isFavorite ? l10n.tr('unfavorite') : l10n.tr('favorite'),
-                        m.isFavorite ? Icons.favorite : Icons.favorite_border,
-                        () => prov.toggleFavorite(m.id),
-                        color: m.isFavorite ? Colors.red : null,
-                      ),
-                      _actionButton(theme, l10n.tr('select_category'), Icons.label_outline, _showTypeDialog),
-                      if (m.isTextLike)
-                        _actionButton(theme, l10n.tr('edit'), Icons.edit_note, () => _editText(m)),
-                      _actionButton(theme, l10n.tr('delete'), Icons.delete_outline, _confirmDelete, color: Colors.red),
-                    ] else ...[
-                      _actionButton(theme, l10n.tr('share'), Icons.ios_share, _share),
-                    ],
+                    _actionButton(theme, l10n.tr('rename'), Icons.edit, _rename),
+                    _actionButton(theme, l10n.tr('share'), Icons.ios_share, _share),
+                    _actionButton(
+                      theme,
+                      m.isFavorite ? l10n.tr('unfavorite') : l10n.tr('favorite'),
+                      m.isFavorite ? Icons.favorite : Icons.favorite_border,
+                      () => prov.toggleFavorite(m.id),
+                      color: m.isFavorite ? Colors.red : null,
+                    ),
+                    _actionButton(theme, l10n.tr('select_category'), Icons.label_outline, _showTypeDialog),
+                    if (m.isTextLike)
+                      _actionButton(theme, l10n.tr('edit'), Icons.edit_note, () => _editText(m)),
+                    _actionButton(theme, l10n.tr('delete'), Icons.delete_outline, _confirmDelete, color: Colors.red),
                   ],
                 ),
                 if (m.type == Meme.typeCharacterCard) ...[

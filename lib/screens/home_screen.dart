@@ -1,3 +1,4 @@
+import 'dart:io' show Directory, File, Platform;
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
@@ -20,6 +21,7 @@ import '../widgets/mako_search_bar.dart' as custom;
 import '../widgets/multi_select_bar.dart';
 import '../widgets/meme_preview_panel.dart';
 import '../services/storage_service.dart';
+import '../utils/platform_paths.dart';
 import '../screens/settings_screen.dart';
 import '../screens/text_editor_screen.dart';
 import '../screens/markdown_editor_screen.dart';
@@ -303,10 +305,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget? _buildFab(MemeProvider prov) {
     final theme = Theme.of(context);
-    // 系统图集分类为只读，不显示导入按钮
-    if (_currentTab == 0 && prov.typeFilter.contains(Meme.typeSystemGallery)) {
-      return null;
-    }
     if (_currentTab == 0) {
       return FloatingActionButton(
         onPressed: () => _showImportMenu(context, prov),
@@ -316,7 +314,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     if (_currentTab == 1) {
       return FloatingActionButton(
-        onPressed: () => _showCreateFolderDialog(context, prov),
+        onPressed: () => _showFolderFabMenu(context, prov),
         backgroundColor: theme.colorScheme.primaryContainer,
         child: Icon(Icons.create_new_folder_outlined, color: theme.colorScheme.onPrimaryContainer),
       );
@@ -912,9 +910,6 @@ class _HomeScreenState extends State<HomeScreen> {
       {'type': Meme.typeManga, 'label': l10n.tr('cat_manga'), 'icon': Icons.menu_book_outlined},
       // 文件分类：包含 PDF 和其他文件类型
       {'type': Meme.typeFile, 'label': l10n.tr('cat_file'), 'icon': Icons.folder_outlined},
-      // 系统图集分类：仅在设置中启用后加入列表（仍受分类可见性控制）
-      if (settings.systemGalleryEnabled)
-        {'type': Meme.typeSystemGallery, 'label': l10n.tr('cat_system_gallery'), 'icon': Icons.photo_library_outlined},
       // md 归入文字分类，不单独显示
       // 用户自定义分类
       ...settings.customCategories.map((c) => {'type': c, 'label': c, 'icon': Icons.label_outline}),
@@ -1700,6 +1695,38 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _showFolderFabMenu(BuildContext ctx, MemeProvider prov) {
+    final l10n = context.read<LocaleProvider>().l10n;
+    showModalBottomSheet(
+      context: ctx,
+      builder: (bCtx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.create_new_folder_outlined),
+              title: Text(l10n.tr('new_folder')),
+              onTap: () {
+                Navigator.pop(bCtx);
+                _showCreateFolderDialog(context, prov);
+              },
+            ),
+            if (!kIsWeb)
+              ListTile(
+                leading: const Icon(Icons.folder_open),
+                title: Text(l10n.tr('bind_folder')),
+                subtitle: Text(l10n.tr('bind_folder_desc')),
+                onTap: () {
+                  Navigator.pop(bCtx);
+                  _showBindFolderDialog(context, prov);
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showCreateFolderDialog(BuildContext ctx, MemeProvider prov) {
     final l10n = context.read<LocaleProvider>().l10n;
     final ctrl = TextEditingController();
@@ -1723,6 +1750,49 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _showBindFolderDialog(BuildContext ctx, MemeProvider prov) async {
+    final l10n = context.read<LocaleProvider>().l10n;
+    final dirPath = await FilePicker.platform.getDirectoryPath(
+      initialDirectory: picturesDirectory,
+    );
+    if (dirPath == null || !ctx.mounted) return;
+    final dir = Directory(dirPath);
+    if (!dir.existsSync()) {
+      if (ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(content: Text(l10n.tr('bind_folder_not_found'))),
+        );
+      }
+      return;
+    }
+    final files = dir.listSync().whereType<File>().where((f) {
+      final ext = f.path.split('.').last.toLowerCase();
+      return Meme.supportedExtensions.contains(ext);
+    }).toList();
+    if (files.isEmpty) {
+      if (ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(content: Text(l10n.tr('bind_folder_no_images'))),
+        );
+      }
+      return;
+    }
+    final folderName = dirPath.split(Platform.pathSeparator).last;
+    final folder = await prov.createFolder(folderName);
+    final platformFiles = files.map((f) => PlatformFile(
+      name: f.path.split(Platform.pathSeparator).last,
+      path: f.path,
+      size: f.lengthSync(),
+      bytes: null,
+    )).toList();
+    final imported = await prov.importFiles(platformFiles, folderId: folder.id);
+    if (ctx.mounted) {
+      ScaffoldMessenger.of(ctx).showSnackBar(
+        SnackBar(content: Text(l10n.tr('bind_folder_success', args: {'count': '${imported.length}'}))),
+      );
+    }
   }
 
   void _showFolderMenu(BuildContext ctx, MemeProvider prov, MemeFolder folder) {

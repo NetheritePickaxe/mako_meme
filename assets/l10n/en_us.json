@@ -424,15 +424,6 @@
   "cmd_unknown": "Unknown command: {cmd}",
   "switch_to_ime": "Switch to this IME",
   "switch_to_ime_desc": "Switch the system default IME to Mako Meme",
-  "system_gallery_section": "System Gallery",
-  "system_gallery_enabled": "Enable system gallery category",
-  "system_gallery_enabled_desc": "After enabling, you can bind system directories to view their images (read-only)",
-  "cat_system_gallery": "System Gallery",
-  "no_system_gallery": "No system gallery bound",
-  "no_system_gallery_desc": "Click the button below to add a system gallery directory to view",
-  "add_system_gallery": "Add system gallery directory",
-  "system_gallery_read_only": "System gallery is a read-only category. You cannot edit, delete, or import images into it",
-  "pick_dir_failed": "Failed to pick directory. Please select a directory under internal storage (e.g. DCIM, Pictures)",
   "disabled": "Disabled",
   "test_input_title": "Test Input",
   "test_input_desc": "Tap the input box to bring up the current IME keyboard",
@@ -458,5 +449,10 @@
   "auto_folder_cover_desc": "Auto-set the first meme as folder cover when moving",
   "pick_cover_title": "Pick Cover Image",
   "cover_removed": "Cover removed",
-  "cover_set_success": "Cover set successfully"
+  "cover_set_success": "Cover set successfully",
+  "bind_folder": "Bind Folder",
+  "bind_folder_desc": "Import a system directory as a folder",
+  "bind_folder_not_found": "Directory not found",
+  "bind_folder_no_images": "No supported images in this directory",
+  "bind_folder_success": "Imported {count} images"
 }

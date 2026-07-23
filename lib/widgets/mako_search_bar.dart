@@ -295,6 +295,7 @@ class _MakoSearchBarState extends State<MakoSearchBar> {
             style: TextStyle(color: theme.colorScheme.onSurface),
             onChanged: _onChanged,
             onSubmitted: _onSubmitted,
+            onTapOutside: (_) => FocusScope.of(context).unfocus(),
           ),
         ),
         // 错误提示

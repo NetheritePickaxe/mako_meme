@@ -5,7 +5,6 @@ import '../models/folder.dart';
 import '../services/storage_service.dart';
 import '../services/meme_index_exporter.dart';
 import '../services/search_query.dart';
-import '../services/system_gallery_service.dart';
 import '../services/webdav_service.dart';
 import 'settings_provider.dart';
 import '../utils/lru_cache.dart';
@@ -19,9 +18,6 @@ class MemeProvider with ChangeNotifier {
   List<Meme> _all = [];
   List<Meme> _filtered = [];
   List<MemeFolder> _folders = [];
-  // 系统图集虚拟 Meme 列表（从绑定的系统目录扫描得到，不存数据库）
-  List<Meme> _systemGalleryMemes = [];
-
   String? _folderId;
   String _query = '';
   SortBy _sortBy = SortBy.date;
@@ -55,18 +51,8 @@ class MemeProvider with ChangeNotifier {
   }
 
   void _onSettingsChanged() {
-    // 系统图集配置变更时异步重新加载虚拟 Meme
-    if (_settings.systemGalleryEnabled && _settings.systemGalleryPaths.isNotEmpty) {
-      _loadSystemGalleryMemes().then((_) {
-        _apply();
-        notifyListeners();
-      });
-    } else {
-      _systemGalleryMemes = [];
-      _typeFilter.remove(Meme.typeSystemGallery);
-      _apply();
-      notifyListeners();
-    }
+    _apply();
+    notifyListeners();
   }
 
   @override
@@ -144,40 +130,10 @@ class MemeProvider with ChangeNotifier {
     _all = _storage.getAllMemes();
     _folders = _storage.getAllFolders();
     _memesByMoodCache = null;
-    await _loadSystemGalleryMemes();
     _apply();
     notifyListeners();
     _exporter.exportAll(_all);
   }
-
-  /// 扫描所有绑定的系统图集目录，构建虚拟 Meme 列表
-  Future<void> _loadSystemGalleryMemes() async {
-    if (!_settings.systemGalleryEnabled || _settings.systemGalleryPaths.isEmpty) {
-      _systemGalleryMemes = [];
-      return;
-    }
-    final all = <Meme>[];
-    for (final dirPath in _settings.systemGalleryPaths) {
-      final images = await SystemGalleryService.listImages(dirPath);
-      for (final img in images) {
-        try {
-          all.add(await SystemGalleryService.buildVirtualMeme(img));
-        } catch (_) {}
-      }
-    }
-    all.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    _systemGalleryMemes = all;
-  }
-
-  /// 手动刷新系统图集（设置页绑定/解绑目录后调用）
-  Future<void> refreshSystemGallery() async {
-    await _loadSystemGalleryMemes();
-    _apply();
-    notifyListeners();
-  }
-
-  /// 系统图集虚拟 Meme 列表（用于详情面板计数等）
-  List<Meme> get systemGalleryMemes => List.unmodifiable(_systemGalleryMemes);
 
   void selectFolder(String? id) {
     _folderId = id;
@@ -283,22 +239,10 @@ class MemeProvider with ChangeNotifier {
   }
 
   void toggleTypeFilter(String type) {
-    // 系统图集是特殊分类，与其他类型互斥：选中 system_gallery 时清空其他，
-    // 选中其他类型时移除 system_gallery
-    if (type == Meme.typeSystemGallery) {
-      if (_typeFilter.contains(type)) {
-        _typeFilter.remove(type);
-      } else {
-        _typeFilter.clear();
-        _typeFilter.add(type);
-      }
+    if (_typeFilter.contains(type)) {
+      _typeFilter.remove(type);
     } else {
-      _typeFilter.remove(Meme.typeSystemGallery);
-      if (_typeFilter.contains(type)) {
-        _typeFilter.remove(type);
-      } else {
-        _typeFilter.add(type);
-      }
+      _typeFilter.add(type);
     }
     _apply();
     notifyListeners();
@@ -737,18 +681,6 @@ class MemeProvider with ChangeNotifier {
   }
 
   void _apply() {
-    // 系统图集分类：特殊处理，只显示虚拟 Meme（不参与常规筛选）
-    if (_typeFilter.contains(Meme.typeSystemGallery)) {
-      var list = List<Meme>.from(_systemGalleryMemes);
-      if (_query.isNotEmpty) {
-        final q = _query.toLowerCase();
-        list = list.where((m) => m.name.toLowerCase().contains(q)).toList();
-      }
-      _sortMemeList(list);
-      _filtered = list;
-      return;
-    }
-
     var list = List<Meme>.from(_all);
     // 文件夹筛选仅在表情包 tab（非收藏视图）生效；
     // 切到收藏/文件夹 tab 时保留 _folderId 但不应用，以便切回时恢复

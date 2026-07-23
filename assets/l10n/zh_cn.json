@@ -424,15 +424,6 @@
   "cmd_unknown": "未知命令: {cmd}",
   "switch_to_ime": "切换到本输入法",
   "switch_to_ime_desc": "在系统中切换当前默认输入法为 Mako 表情包",
-  "system_gallery_section": "系统图集",
-  "system_gallery_enabled": "启用系统图集分类",
-  "system_gallery_enabled_desc": "启用后可绑定系统目录查看其中的图片（只读）",
-  "cat_system_gallery": "系统图集",
-  "no_system_gallery": "还没有绑定系统图集",
-  "no_system_gallery_desc": "点击下方按钮添加要查看的系统图集目录",
-  "add_system_gallery": "添加系统图集目录",
-  "system_gallery_read_only": "系统图集为只读分类，不能编辑、删除或导入图片到此处",
-  "pick_dir_failed": "选择目录失败，请选择内置存储下的目录（如 DCIM、Pictures）",
   "disabled": "已关闭",
   "test_input_title": "测试输入",
   "test_input_desc": "点击输入框可唤起当前输入法键盘",
@@ -458,5 +449,10 @@
   "auto_folder_cover_desc": "移动表情到文件夹时自动将第一张设为封面",
   "pick_cover_title": "选择封面图片",
   "cover_removed": "封面已移除",
-  "cover_set_success": "封面设置成功"
+  "cover_set_success": "封面设置成功",
+  "bind_folder": "绑定文件夹",
+  "bind_folder_desc": "将系统目录导入为文件夹",
+  "bind_folder_not_found": "目录不存在",
+  "bind_folder_no_images": "目录中没有支持的图片",
+  "bind_folder_success": "已导入 {count} 张图片"
 }

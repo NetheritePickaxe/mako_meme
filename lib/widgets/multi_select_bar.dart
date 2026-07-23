@@ -45,35 +45,31 @@ class MultiSelectBar extends StatelessWidget {
               child: Row(
                 children: [
                   if (prov.selected.isNotEmpty) ...[
-                    // 系统图集分类为只读：仅允许导出/分享，不显示移动/分类/删除
-                    if (!prov.typeFilter.contains(Meme.typeSystemGallery)) ...[
-                      IconButton(
-                        icon: const Icon(Icons.folder_open, size: 20),
-                        tooltip: l10n.tr('move_to_folder'),
-                        onPressed: () => _showMoveDialog(context, prov, l10n),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.label_outline, size: 20),
-                        tooltip: l10n.tr('change_category'),
-                        onPressed: () => _showTypeDialog(context, prov, l10n),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.local_offer_outlined, size: 20),
-                        tooltip: l10n.tr('batch_add_tag'),
-                        onPressed: () => _showBatchTagDialog(context, prov, l10n),
-                      ),
-                    ],
+                    IconButton(
+                      icon: const Icon(Icons.folder_open, size: 20),
+                      tooltip: l10n.tr('move_to_folder'),
+                      onPressed: () => _showMoveDialog(context, prov, l10n),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.label_outline, size: 20),
+                      tooltip: l10n.tr('change_category'),
+                      onPressed: () => _showTypeDialog(context, prov, l10n),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.local_offer_outlined, size: 20),
+                      tooltip: l10n.tr('batch_add_tag'),
+                      onPressed: () => _showBatchTagDialog(context, prov, l10n),
+                    ),
                     IconButton(
                       icon: const Icon(Icons.ios_share, size: 20),
                       tooltip: l10n.tr('export_selected'),
                       onPressed: () => _exportSelected(context, prov, l10n),
                     ),
-                    if (!prov.typeFilter.contains(Meme.typeSystemGallery))
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
-                        tooltip: l10n.tr('delete_selected'),
-                        onPressed: () => _confirmDelete(context, prov, l10n),
-                      ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                      tooltip: l10n.tr('delete_selected'),
+                      onPressed: () => _confirmDelete(context, prov, l10n),
+                    ),
                   ],
                 ],
               ),

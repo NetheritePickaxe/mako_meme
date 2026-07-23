@@ -177,9 +177,7 @@ class _MemeCardState extends State<MemeCard> {
     final canReorder = widget.onReorder != null;
 
     // 桌面端：长按拖拽（用于排序或拖入文件夹），左键复制，右键菜单
-    // 系统图集虚拟 Meme 只读，不允许拖拽到文件夹
     if (_isDesktop) {
-      final draggable = !widget.meme.isSystemGallery;
       final card = GestureDetector(
         onTap: isMulti
             ? () => prov.toggleSelect(widget.meme.id)
@@ -188,7 +186,6 @@ class _MemeCardState extends State<MemeCard> {
         onSecondaryTapUp: (details) => _showContextMenu(details.globalPosition),
         child: _buildInner(prov, isSelected, isMulti, theme),
       );
-      if (!draggable) return card;
       return LongPressDraggable<Meme>(
         data: widget.meme,
         feedback: _buildFeedback(),
@@ -202,8 +199,7 @@ class _MemeCardState extends State<MemeCard> {
     }
 
     // 移动端：多选模式下长按拖拽排序
-    // 系统图集虚拟 Meme 只读，不参与拖拽排序
-    if (isMulti && canReorder && !widget.meme.isSystemGallery) {
+    if (isMulti && canReorder) {
       final inner = _buildInner(prov, isSelected, isMulti, theme);
       return LongPressDraggable<Meme>(
         data: widget.meme,
@@ -778,8 +774,7 @@ class _MemeCardState extends State<MemeCard> {
 
   void _showContextMenu(Offset tapPosition) {
     final l10n = context.read<LocaleProvider>().l10n;
-    // 系统图集虚拟 Meme：只读，只支持预览/复制/分享，不支持编辑/分类/删除/收藏
-    final isReadOnly = widget.meme.isSystemGallery;
+    final isReadOnly = false;
     showMenu(
       context: context,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
