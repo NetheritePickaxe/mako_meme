@@ -481,8 +481,8 @@ class _MemeCardState extends State<MemeCard> {
     }
     // 普通位图：原生端用 Image.file，Web 端用 Image.memory，都加 cacheWidth
     // 当原始图片尺寸很小（≤64px）时视为像素图，用最近邻插值保持清晰
-    final isPixelArt = widget.meme.width > 0 && widget.meme.width <= 64 &&
-        widget.meme.height > 0 && widget.meme.height <= 64;
+    final isPixelArt = widget.meme.width > 0 && widget.meme.width <= 128 &&
+        widget.meme.height > 0 && widget.meme.height <= 128;
     final filterQuality = isPixelArt ? FilterQuality.none : FilterQuality.low;
     if (_file != null) {
       return Image.file(

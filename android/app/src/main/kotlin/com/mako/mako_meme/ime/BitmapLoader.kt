@@ -69,7 +69,7 @@ object BitmapLoader {
 
     /** 设置 bitmap 到 ImageView，像素图（≤64px）禁用双线性滤波。 */
     private fun setBitmap(imageView: ImageView, bmp: Bitmap) {
-        val isPixelArt = bmp.width <= 64 && bmp.height <= 64
+        val isPixelArt = bmp.width <= 128 && bmp.height <= 128
         if (isPixelArt) {
             val drawable = BitmapDrawable(imageView.context.resources, bmp)
             drawable.isFilterBitmap = false
