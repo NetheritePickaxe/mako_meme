@@ -11,7 +11,7 @@ val keystoreProperties = Properties().apply {
 
 android {
     namespace = "com.mako.mako_meme"
-    compileSdk = 36
+        compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -31,7 +31,7 @@ android {
     defaultConfig {
         applicationId = "com.mako.mako_meme"
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 37
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
@@ -48,7 +48,7 @@ android {
 
 afterEvaluate {
     android {
-        compileSdk = 36
+    compileSdk = 37
     }
 }
 

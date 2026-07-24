@@ -90,7 +90,7 @@ class MemeRepository(context: Context) {
         for (ch in input) {
             val pinyins = PinyinHelper.toHanyuPinyinStringArray(ch)
             if (pinyins != null && pinyins.isNotEmpty()) {
-                sb.append(pinyins[0].replace(Regex("[0-9]")))
+                sb.append(pinyins[0].replace(Regex("[0-9]"), ""))
             } else {
                 sb.append(ch)
             }
