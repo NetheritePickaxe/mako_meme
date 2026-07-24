@@ -180,13 +180,13 @@ class TopCommandDef {
   static const all = [
     TopCommandDef(
       name: 'tag',
-      description: '批量添加/移除标签。用选择器筛选目标 meme，未给选择器时作用于全部',
+      description: '批量添加/移除标签。用选择器筛选目标 meme，未给选择器时作用于全部（别名 t）',
       usage: '/tag [<选择器>] (add|remove) <标签名>',
-      examples: ['/tag [xy=1:2] add 竖图', '/tag [xy=2:1] remove 喜欢', '/tag [type=图片] add 图片'],
+      examples: ['/tag [xy=1:2] add 竖图', '/t [xy=2:1] remove 喜欢', '/tag [type=图片] add 图片'],
     ),
     TopCommandDef(
       name: 'help',
-      description: '显示帮助。/? 或 /help 看全部，/<命令> ? 看该命令帮助',
+      description: '显示帮助。/? 或 /help 看全部，/<命令> ? 看该命令帮助（别名 h）',
       usage: '(/?|/help) 或 /<命令> ?',
       examples: ['/?', '/help', '/tag ?'],
     ),
@@ -343,14 +343,21 @@ class SearchQuery {
   ) {
     final parts = afterSlash.split(RegExp(r'\s+'));
     if (parts.isEmpty || parts[0].isEmpty) {
-      return TopCommandDef.all
-          .map((c) => SearchSuggestion(c.name, '/${c.name} ', description: c.description))
-          .toList();
+      return [
+        ...TopCommandDef.all
+            .map((c) => SearchSuggestion(c.name, '/${c.name} ', description: c.description)),
+        const SearchSuggestion('t', '/t ', description: '批量添加/移除标签'),
+        const SearchSuggestion('h', '/h ', description: '显示帮助'),
+      ];
     }
 
-    // 只输入了命令名，补全命令
+    // 只输入了命令名，补全命令（含别名）
     if (parts.length == 1) {
       final cmd = parts[0].toLowerCase();
+      final resolved = _resolveCommandAlias(cmd);
+      if (resolved != cmd) {
+        return [SearchSuggestion(resolved, '/$resolved ', description: TopCommandDef.find(resolved)?.description)];
+      }
       return TopCommandDef.all
           .where((c) => c.name.startsWith(cmd))
           .map((c) => SearchSuggestion(c.name, '/${c.name} ', description: c.description))
@@ -358,7 +365,8 @@ class SearchQuery {
     }
 
     // /tag 后面补全 add/remove
-    if (parts[0].toLowerCase() == 'tag' && parts.length == 2) {
+    final resolvedCmd = _resolveCommandAlias(parts[0].toLowerCase());
+    if (resolvedCmd == 'tag' && parts.length == 2) {
       final a = parts[1].toLowerCase();
       if (a.isEmpty) return [];
       final actions = ['add', 'remove'];
@@ -369,7 +377,7 @@ class SearchQuery {
     }
 
     // /tag [selector] add|remove 后面补全标签
-    if (parts[0].toLowerCase() == 'tag' && parts.length >= 3) {
+    if (resolvedCmd == 'tag' && parts.length >= 3) {
       final action = parts[parts.length - 2];
       if (action == 'add' || action == 'remove') {
         final last = parts.last.toLowerCase();
@@ -436,6 +444,7 @@ class SearchQuery {
         const typeValues = [
           '表情', 'gif', '图片', '文字', '立绘', 'cg', '角色卡',
           '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.bmp',
+          'suki',
         ];
         return typeValues
             .where((t) => t.toLowerCase().startsWith(v))
@@ -515,7 +524,7 @@ class SearchQuery {
     final parts = afterSlash.split(RegExp(r'\s+'));
     if (parts.isEmpty || parts[0].isEmpty) return '命令为空';
 
-    final cmd = parts[0].toLowerCase();
+    final cmd = _resolveCommandAlias(parts[0].toLowerCase());
     final cmdDef = TopCommandDef.find(cmd);
     if (cmdDef == null) return '未知命令: "$cmd"';
 
@@ -662,7 +671,7 @@ class SearchQuery {
     final parts = afterSlash.split(RegExp(r'\s+'));
     if (parts.isEmpty || parts[0].isEmpty) return PlainSearch('');
 
-    final cmd = parts[0].toLowerCase();
+    final cmd = _resolveCommandAlias(parts[0].toLowerCase());
     if (cmd == 'help' || cmd == '?') {
       return const CommandSearch(command: 'help', selector: [], action: '', args: []);
     }
@@ -846,6 +855,18 @@ class SearchQuery {
     }
   }
 
+  /// 命令别名映射：短命令 → 真实命令名
+  static String _resolveCommandAlias(String cmd) {
+    switch (cmd) {
+      case 't':
+        return 'tag';
+      case 'h':
+        return 'help';
+      default:
+        return cmd;
+    }
+  }
+
   // ===== 普通模式匹配（公开给 PlainSearch） =====
 
   static bool Function(Meme) _matchPlain(String q, List<MemeFolder> folders) {
@@ -985,6 +1006,10 @@ class Condition {
 
   static bool _matchType(Meme m, String query) {
     final q = query.toLowerCase().trim();
+    // suki: 收藏 + 表情（type=suki 匹配 isFavorite && type=emoji）
+    if (q == 'suki') {
+      return m.isFavorite && m.type == Meme.typeEmoji;
+    }
     if (q.startsWith('.')) {
       if (m.filePath.isEmpty) return false;
       final ext = m.filePath.toLowerCase();
