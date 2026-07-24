@@ -185,6 +185,54 @@ class TopCommandDef {
       examples: ['/tag [xy=1:2] add 竖图', '/tag [xy=2:1] remove 喜欢', '/tag [type=图片] add 图片'],
     ),
     TopCommandDef(
+      name: 'move',
+      description: '批量移动到文件夹。用选择器筛选目标 meme',
+      usage: '/move [<选择器>] <文件夹名>',
+      examples: ['/move 表情包', '/move [type=gif] 动图', '/mv 收藏'],
+    ),
+    TopCommandDef(
+      name: 'type',
+      description: '批量修改分类。用选择器筛选目标 meme',
+      usage: '/type [<选择器>] <类型名>',
+      examples: ['/type 图片', '/type [x=100..] 表情', '/tp [xy=1:2] 立绘'],
+    ),
+    TopCommandDef(
+      name: 'delete',
+      description: '批量删除。用选择器筛选目标 meme',
+      usage: '/delete [<选择器>]',
+      examples: ['/delete [tag=垃圾]', '/del [type=vector]'],
+    ),
+    TopCommandDef(
+      name: 'convert',
+      description: '批量格式转换。用选择器筛选目标 meme，可选质量',
+      usage: '/convert [<选择器>] <格式> [质量]',
+      examples: ['/convert png', '/conv jpg 85', '/convert [type=图片] webp 90'],
+    ),
+    TopCommandDef(
+      name: 'resize',
+      description: '批量缩放。用选择器筛选目标 meme，百分比 10-200',
+      usage: '/resize [<选择器>] <百分比>',
+      examples: ['/resize 50', '/res [type=图片] 150', '/resize 75'],
+    ),
+    TopCommandDef(
+      name: 'animate',
+      description: '多图合成 GIF/APNG。用选择器筛选目标 meme',
+      usage: '/animate [<选择器>] <gif|apng> <帧时长ms>',
+      examples: ['/animate gif 200', '/anim apng 150', '/animate [type=表情] gif 300'],
+    ),
+    TopCommandDef(
+      name: 'phantom',
+      description: '多图合成幻影坦克（取前 2 张）。用选择器筛选目标 meme',
+      usage: '/phantom [<选择器>]',
+      examples: ['/phantom', '/pt [type=图片]'],
+    ),
+    TopCommandDef(
+      name: 'export',
+      description: '批量导出选中。用选择器筛选目标 meme',
+      usage: '/export [<选择器>]',
+      examples: ['/export [tag=分享]', '/exp [xy=16:9]'],
+    ),
+    TopCommandDef(
       name: 'help',
       description: '显示帮助。/? 或 /help 看全部，/<命令> ? 看该命令帮助',
       usage: '(/?|/help) 或 /<命令> ?',
@@ -381,6 +429,28 @@ class SearchQuery {
       }
     }
 
+    // /type 后面补全类型名
+    if (parts[0].toLowerCase() == 'type' && parts.length == 2) {
+      final v = parts[1].toLowerCase();
+      if (v.isEmpty) return [];
+      const typeValues = ['表情', 'gif', '图片', '文字', '立绘', 'cg', '角色卡', '矢量', 'psd', '漫画', '文件'];
+      return typeValues
+          .where((t) => t.toLowerCase().startsWith(v))
+          .map((t) => SearchSuggestion(t, t))
+          .toList();
+    }
+
+    // /animate 后面补全格式
+    if (parts[0].toLowerCase() == 'animate' && parts.length == 2) {
+      final v = parts[1].toLowerCase();
+      if (v.isEmpty) return [];
+      const fmts = ['gif', 'apng'];
+      return fmts
+          .where((f) => f.startsWith(v))
+          .map((f) => SearchSuggestion(f, f))
+          .toList();
+    }
+
     return [];
   }
 
@@ -436,6 +506,7 @@ class SearchQuery {
         const typeValues = [
           '表情', 'gif', '图片', '文字', '立绘', 'cg', '角色卡',
           '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.bmp',
+          'suki',
         ];
         return typeValues
             .where((t) => t.toLowerCase().startsWith(v))
@@ -525,7 +596,6 @@ class SearchQuery {
       if (parts.length < 4) {
         return 'tag 命令格式: /tag [选择器] add|remove <标签名>';
       }
-      // 校验选择器
       for (final p in parts) {
         if (p.startsWith('[')) {
           final end = _findMatchingBracket(p, 0);
@@ -542,6 +612,43 @@ class SearchQuery {
       final tagname = parts.last;
       if (tagname.isEmpty) return '标签名不能为空';
       return null;
+    }
+
+    // 通用命令校验
+    for (final p in parts) {
+      if (p.startsWith('[')) {
+        final end = _findMatchingBracket(p, 0);
+        if (end == -1) return '选择器方括号未闭合';
+        final inner = p.substring(1, end);
+        final err = _validateSelectorInner(inner, folders);
+        if (err != null) return err;
+      }
+    }
+
+    final known = ['move', 'type', 'delete', 'convert', 'resize', 'animate', 'phantom', 'export'];
+    if (!known.contains(cmd)) return '未知命令: "$cmd"';
+
+    if (cmd == 'move' && parts.length < 2) {
+      return 'move 命令格式: /move [选择器] <文件夹名>';
+    }
+    if (cmd == 'type' && parts.length < 2) {
+      return 'type 命令格式: /type [选择器] <类型名>';
+    }
+    if (cmd == 'convert' && parts.length < 2) {
+      return 'convert 命令格式: /convert [选择器] <格式> [质量]';
+    }
+    if (cmd == 'resize') {
+      if (parts.length < 2) return 'resize 命令格式: /resize [选择器] <百分比>';
+      final last = parts.last;
+      final pct = double.tryParse(last);
+      if (pct == null || pct < 10 || pct > 200) return '百分比无效（10-200）';
+    }
+    if (cmd == 'animate') {
+      if (parts.length < 3) return 'animate 命令格式: /animate [选择器] <gif|apng> <帧时长ms>';
+      final fmt = parts[parts.length - 2].toLowerCase();
+      if (fmt != 'gif' && fmt != 'apng') return '格式应为 gif 或 apng';
+      final dur = int.tryParse(parts.last);
+      if (dur == null || dur < 50 || dur > 1000) return '帧时长无效（50-1000ms）';
     }
 
     return null;
@@ -694,7 +801,28 @@ class SearchQuery {
       );
     }
 
-    return PlainSearch('');
+    // 通用命令：move, type, delete, convert, resize, animate, phantom, export
+    List<Condition> selector = [];
+    List<String> args = [];
+
+    for (final p in parts.sublist(1)) {
+      if (p.startsWith('[')) {
+        final end = _findMatchingBracket(p, 0);
+        if (end != -1) {
+          final inner = p.substring(1, end);
+          selector.addAll(_parseConditions(inner, folders));
+        }
+      } else {
+        args.add(p);
+      }
+    }
+
+    return CommandSearch(
+      command: cmd,
+      selector: selector,
+      action: args.isNotEmpty ? args.first : '',
+      args: args,
+    );
   }
 
   /// 从字符串中提取所有选择器条件
@@ -985,6 +1113,9 @@ class Condition {
 
   static bool _matchType(Meme m, String query) {
     final q = query.toLowerCase().trim();
+    if (q == 'suki') {
+      return m.isFavorite && m.type == Meme.typeEmoji;
+    }
     if (q.startsWith('.')) {
       if (m.filePath.isEmpty) return false;
       final ext = m.filePath.toLowerCase();

@@ -6,6 +6,7 @@ import '../services/storage_service.dart';
 import '../services/meme_index_exporter.dart';
 import '../services/search_query.dart';
 import '../services/webdav_service.dart';
+import '../services/image_tool_service.dart';
 import 'settings_provider.dart';
 import '../utils/lru_cache.dart';
 
@@ -45,10 +46,12 @@ class MemeProvider with ChangeNotifier {
   bool get showFavorites => _showFavorites;
   Meme? get previewMeme => _previewMeme;
 
-  MemeProvider(this._storage, this._settings) {
+  MemeProvider(this._storage, this._settings, this._imageTool) {
     // 监听设置变化（如 excludeFoldered 切换）后重新筛选
     _settings.addListener(_onSettingsChanged);
   }
+
+  final ImageToolService _imageTool;
 
   void _onSettingsChanged() {
     _apply();
@@ -154,45 +157,200 @@ class MemeProvider with ChangeNotifier {
       SearchQuery.parse(_query, _folders) is CommandSearch;
 
   /// 执行命令，返回结果消息（key + args，用于 snackbar 翻译）
-  ({String key, Map<String, String> args})? executeCommand(String query) {
+  Future<({String key, Map<String, String> args})?> executeCommand(String query) async {
     final result = SearchQuery.parse(query, _folders);
     if (result is! CommandSearch) return null;
 
-    if (result.command == 'tag') {
-      if (result.action.isEmpty) {
-        return (key: 'cmd_missing_action', args: {});
-      }
-      if (result.args.isEmpty) {
-        return (key: 'cmd_missing_tag', args: {});
-      }
-      final matcher = result.asMatcher(_folders);
-      final targets = _all.where(matcher).toList();
-      if (targets.isEmpty) return (key: 'cmd_no_match', args: {});
-
-      final tags = result.args;
-      if (result.action == 'add') {
-        for (final meme in targets) {
-          for (final tag in tags) {
-            _storage.addTagToMeme(meme.id, tag);
-          }
-        }
-      } else if (result.action == 'remove') {
-        for (final meme in targets) {
-          for (final tag in tags) {
-            _storage.removeTagFromMeme(meme.id, tag);
-          }
-        }
-      }
-      loadAll();
-      final op = result.action == 'add' ? 'cmd_tag_added' : 'cmd_tag_removed';
-      return (
-        key: op,
-        args: {'count': targets.length.toString(), 'tags': tags.join(', ')},
-      );
-    }
-
     if (result.command == 'help') return null;
-    return (key: 'cmd_unknown', args: {'cmd': result.command});
+
+    final matcher = result.asMatcher(_folders);
+    List<Meme> targets;
+    if (result.selector.isNotEmpty) {
+      targets = _all.where(matcher).toList();
+    } else {
+      targets = (_sel.isNotEmpty ? _all.where((m) => _sel.contains(m.id)) : _all)
+          .where((m) => _filtered.contains(m))
+          .toList();
+    }
+    if (targets.isEmpty) return (key: 'cmd_no_match', args: <String, String>{});
+
+    switch (result.command) {
+      case 'tag':
+        return _executeTagCommand(result, targets);
+      case 'move':
+        return await _executeMoveCommand(result, targets);
+      case 'type':
+        return await _executeTypeCommand(result, targets);
+      case 'delete':
+        return await _executeDeleteCommand(targets);
+      case 'convert':
+        return await _executeConvertCommand(result, targets);
+      case 'resize':
+        return await _executeResizeCommand(result, targets);
+      case 'animate':
+        return await _executeAnimateCommand(result, targets);
+      case 'phantom':
+        return await _executePhantomCommand(targets);
+      case 'export':
+        return _executeExportCommand(targets);
+      default:
+        return (key: 'cmd_unknown', args: <String, String>{'cmd': result.command});
+    }
+  }
+
+  ({String key, Map<String, String> args}) _executeTagCommand(
+      CommandSearch cmd, List<Meme> targets) {
+    if (cmd.action.isEmpty) return (key: 'cmd_missing_action', args: <String, String>{});
+    if (cmd.args.isEmpty) return (key: 'cmd_missing_tag', args: <String, String>{});
+    final tags = cmd.args;
+    if (cmd.action == 'add') {
+      for (final meme in targets) {
+        for (final tag in tags) {
+          _storage.addTagToMeme(meme.id, tag);
+        }
+      }
+    } else if (cmd.action == 'remove') {
+      for (final meme in targets) {
+        for (final tag in tags) {
+          _storage.removeTagFromMeme(meme.id, tag);
+        }
+      }
+    }
+    loadAll();
+    final op = cmd.action == 'add' ? 'cmd_tag_added' : 'cmd_tag_removed';
+    return (
+      key: op,
+      args: <String, String>{'count': targets.length.toString(), 'tags': tags.join(', ')},
+    );
+  }
+
+  Future<({String key, Map<String, String> args})> _executeMoveCommand(
+      CommandSearch cmd, List<Meme> targets) async {
+    final folderName = cmd.args.firstOrNull ?? '';
+    if (folderName.isEmpty) return (key: 'cmd_missing_arg', args: <String, String>{'arg': '文件夹名'});
+    final folder = _folders.where((f) => f.name == folderName).firstOrNull;
+    if (folder == null) return (key: 'cmd_folder_not_found', args: <String, String>{'name': folderName});
+    final ids = targets.map((m) => m.id).toList();
+    await _storage.moveToFolderBatch(ids, folder.id);
+    await loadAll();
+    return (key: 'cmd_moved', args: <String, String>{'count': ids.length.toString(), 'folder': folder.name});
+  }
+
+  Future<({String key, Map<String, String> args})> _executeTypeCommand(
+      CommandSearch cmd, List<Meme> targets) async {
+    final typeName = cmd.args.firstOrNull ?? '';
+    if (typeName.isEmpty) return (key: 'cmd_missing_arg', args: <String, String>{'arg': '类型'});
+    const cnMap = {
+      '表情': Meme.typeEmoji, '表情包': Meme.typeEmoji,
+      '动图': Meme.typeGif,
+      '图片': Meme.typeImage,
+      '文字': Meme.typeText,
+      '立绘': Meme.typePortrait,
+      'cg': Meme.typeCg,
+      '角色卡': Meme.typeCharacterCard,
+      '矢量': Meme.typeVector,
+      'psd': Meme.typePsd,
+      '漫画': Meme.typeManga,
+      '文件': Meme.typeFile,
+    };
+    final resolvedType = cnMap[typeName.toLowerCase()] ?? typeName;
+    for (final meme in targets) {
+      await _storage.setMemeType(meme.id, resolvedType);
+    }
+    await loadAll();
+    return (key: 'cmd_type_changed', args: <String, String>{'count': targets.length.toString(), 'type': resolvedType});
+  }
+
+  Future<({String key, Map<String, String> args})> _executeDeleteCommand(
+      List<Meme> targets) async {
+    final ids = targets.map((m) => m.id).toList();
+    await _storage.deleteMemes(ids);
+    _all.removeWhere((m) => ids.contains(m.id));
+    _sel.removeAll(ids);
+    _multi = _sel.isNotEmpty;
+    _memesByMoodCache = null;
+    await loadAll();
+    return (key: 'cmd_deleted', args: <String, String>{'count': ids.length.toString()});
+  }
+
+  Future<({String key, Map<String, String> args})> _executeConvertCommand(
+      CommandSearch cmd, List<Meme> targets) async {
+    final format = (cmd.args.firstOrNull ?? 'png').toLowerCase();
+    final quality = cmd.args.length >= 2 ? int.tryParse(cmd.args[1]) ?? 90 : 90;
+    final imageTargets = targets.where((m) => m.isImageType && !m.isVector && !m.isPsd && !m.isPdf).toList();
+    if (imageTargets.isEmpty) return (key: 'cmd_no_image', args: <String, String>{});
+    int ok = 0;
+    for (final m in imageTargets) {
+      try {
+        await _imageTool.convertFormat(m.filePath, format, quality: quality, name: m.name);
+        ok++;
+      } catch (_) {}
+    }
+    await loadAll();
+    return (key: 'cmd_converted', args: <String, String>{'ok': ok.toString(), 'total': imageTargets.length.toString()});
+  }
+
+  Future<({String key, Map<String, String> args})> _executeResizeCommand(
+      CommandSearch cmd, List<Meme> targets) async {
+    final pctStr = cmd.args.firstOrNull ?? '50';
+    final percent = (double.tryParse(pctStr) ?? 50) / 100.0;
+    final imageTargets = targets.where((m) => m.isImageType && !m.isVector && !m.isPsd && !m.isPdf).toList();
+    if (imageTargets.isEmpty) return (key: 'cmd_no_image', args: <String, String>{});
+    int ok = 0;
+    for (final m in imageTargets) {
+      try {
+        await _imageTool.resize(m.filePath, percent: percent, name: m.name);
+        ok++;
+      } catch (_) {}
+    }
+    await loadAll();
+    return (key: 'cmd_resized', args: <String, String>{'ok': ok.toString(), 'total': imageTargets.length.toString()});
+  }
+
+  Future<({String key, Map<String, String> args})> _executeAnimateCommand(
+      CommandSearch cmd, List<Meme> targets) async {
+    final format = (cmd.args.length >= 1 ? cmd.args[0] : 'gif').toLowerCase();
+    final frameDuration = cmd.args.length >= 2 ? int.tryParse(cmd.args[1]) ?? 200 : 200;
+    final imageTargets = targets
+        .where((m) => m.isImageType && !m.isVector && !m.isPsd && !m.isPdf)
+        .take(50)
+        .toList();
+    if (imageTargets.length < 2) return (key: 'cmd_need_two', args: <String, String>{});
+    final paths = imageTargets.map((m) => m.filePath).toList();
+    try {
+      if (format == 'gif') {
+        await _imageTool.imagesToGif(paths, frameDurationMs: frameDuration);
+      } else {
+        await _imageTool.imagesToApng(paths, frameDurationMs: frameDuration);
+      }
+      await loadAll();
+      return (key: 'cmd_animated', args: <String, String>{'count': paths.length.toString()});
+    } catch (e) {
+      return (key: 'cmd_failed', args: <String, String>{'error': e.toString()});
+    }
+  }
+
+  Future<({String key, Map<String, String> args})> _executePhantomCommand(
+      List<Meme> targets) async {
+    final imageTargets = targets
+        .where((m) => m.isImageType && !m.isAnimated)
+        .take(2)
+        .toList();
+    if (imageTargets.length < 2) return (key: 'cmd_need_two', args: <String, String>{});
+    final fg = imageTargets[0];
+    final bg = imageTargets[1];
+    try {
+      await _imageTool.makePhantomTank(fg.filePath, bg.filePath, name: '${fg.name}_phantom');
+      await loadAll();
+      return (key: 'cmd_phantom_done', args: <String, String>{'fg': fg.name, 'bg': bg.name});
+    } catch (e) {
+      return (key: 'cmd_failed', args: <String, String>{'error': e.toString()});
+    }
+  }
+
+  ({String key, Map<String, String> args}) _executeExportCommand(
+      List<Meme> targets) {
+    return (key: 'cmd_export_hint', args: <String, String>{'count': targets.length.toString()});
   }
 
   void toggleTag(String tag) {

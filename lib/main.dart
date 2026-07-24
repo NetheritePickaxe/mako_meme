@@ -25,6 +25,7 @@ Future<void> main() async {
 
   // 单例 SettingsProvider：MemeProvider 内部依赖与 UI 共用同一份
   final settings = SettingsProvider(storage);
+  final imageTool = ImageToolService(storage);
 
   runApp(
     MultiProvider(
@@ -32,7 +33,7 @@ Future<void> main() async {
         ChangeNotifierProvider.value(value: localeProvider),
         ChangeNotifierProvider.value(value: settings),
         ChangeNotifierProvider(create: (_) {
-          final prov = MemeProvider(storage, settings);
+          final prov = MemeProvider(storage, settings, imageTool);
           // 分享回调：直接走导入流程
           shareReceiver.onShared = (files) {
             prov.importFiles(

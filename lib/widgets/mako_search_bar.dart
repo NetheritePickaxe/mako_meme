@@ -196,7 +196,7 @@ class _MakoSearchBarState extends State<MakoSearchBar> {
     if (_isCommandMode(q)) {
       final prov = context.read<MemeProvider>();
       final l10n = context.read<LocaleProvider>().l10n;
-      final msg = prov.executeCommand(q);
+      final msg = await prov.executeCommand(q);
       // 清空搜索框
       _controller.clear();
       _suggestions = [];
