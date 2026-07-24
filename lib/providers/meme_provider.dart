@@ -185,7 +185,7 @@ class MemeProvider with ChangeNotifier {
         return await _executeDeleteCommand(targets);
       case 'convert':
         return await _executeConvertCommand(result, targets);
-      case 'resize':
+      case 'scale':
         return await _executeResizeCommand(result, targets);
       case 'animate':
         return await _executeAnimateCommand(result, targets);

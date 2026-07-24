@@ -194,37 +194,37 @@ class TopCommandDef {
       name: 'type',
       description: '批量修改分类。用选择器筛选目标 meme',
       usage: '/type [<选择器>] <类型名>',
-      examples: ['/type 图片', '/type [x=100..] 表情', '/tp [xy=1:2] 立绘'],
+      examples: ['/type 图片', '/type [x=100..] 表情', '/type [xy=1:2] 立绘'],
     ),
     TopCommandDef(
       name: 'delete',
       description: '批量删除。用选择器筛选目标 meme',
       usage: '/delete [<选择器>]',
-      examples: ['/delete [tag=垃圾]', '/del [type=vector]'],
+      examples: ['/delete [tag=垃圾]', '/delete [type=vector]'],
     ),
     TopCommandDef(
       name: 'convert',
       description: '批量格式转换。用选择器筛选目标 meme，可选质量',
       usage: '/convert [<选择器>] <格式> [质量]',
-      examples: ['/convert png', '/conv jpg 85', '/convert [type=图片] webp 90'],
+      examples: ['/convert png', '/convert jpg 85', '/convert [type=图片] webp 90'],
     ),
     TopCommandDef(
-      name: 'resize',
+      name: 'scale',
       description: '批量缩放。用选择器筛选目标 meme，百分比 10-200',
-      usage: '/resize [<选择器>] <百分比>',
-      examples: ['/resize 50', '/res [type=图片] 150', '/resize 75'],
+      usage: '/scale [<选择器>] <百分比>',
+      examples: ['/scale 50', '/scale [type=图片] 150'],
     ),
     TopCommandDef(
       name: 'animate',
       description: '多图合成 GIF/APNG。用选择器筛选目标 meme',
       usage: '/animate [<选择器>] <gif|apng> <帧时长ms>',
-      examples: ['/animate gif 200', '/anim apng 150', '/animate [type=表情] gif 300'],
+      examples: ['/animate gif 200', '/animate apng 150', '/animate [type=表情] gif 300'],
     ),
     TopCommandDef(
       name: 'phantom',
       description: '多图合成幻影坦克（取前 2 张）。用选择器筛选目标 meme',
       usage: '/phantom [<选择器>]',
-      examples: ['/phantom', '/pt [type=图片]'],
+      examples: ['/phantom', '/phantom [type=图片]'],
     ),
     TopCommandDef(
       name: 'export',
@@ -625,7 +625,7 @@ class SearchQuery {
       }
     }
 
-    final known = ['move', 'type', 'delete', 'convert', 'resize', 'animate', 'phantom', 'export'];
+    final known = ['move', 'type', 'delete', 'convert', 'scale', 'animate', 'phantom', 'export'];
     if (!known.contains(cmd)) return '未知命令: "$cmd"';
 
     if (cmd == 'move' && parts.length < 2) {
@@ -637,8 +637,8 @@ class SearchQuery {
     if (cmd == 'convert' && parts.length < 2) {
       return 'convert 命令格式: /convert [选择器] <格式> [质量]';
     }
-    if (cmd == 'resize') {
-      if (parts.length < 2) return 'resize 命令格式: /resize [选择器] <百分比>';
+    if (cmd == 'scale') {
+      if (parts.length < 2) return 'scale 命令格式: /scale [选择器] <百分比>';
       final last = parts.last;
       final pct = double.tryParse(last);
       if (pct == null || pct < 10 || pct > 200) return '百分比无效（10-200）';
