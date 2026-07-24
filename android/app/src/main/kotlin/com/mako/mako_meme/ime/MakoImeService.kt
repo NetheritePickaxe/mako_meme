@@ -1,5 +1,7 @@
 package com.mako.mako_meme.ime
 
+import android.content.res.Configuration
+import android.graphics.Rect
 import android.inputmethodservice.InputMethodService
 import android.graphics.Typeface
 import android.util.TypedValue
@@ -7,6 +9,9 @@ import android.view.Gravity
 import android.view.HapticFeedbackConstants
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowInsets
+import android.view.inputmethod.InputMethodManager
+import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.ImageButton
 import android.widget.LinearLayout
@@ -68,8 +73,8 @@ class MakoImeService : InputMethodService() {
     /** 当前搜索关键字。 */
     private var currentQuery: String = ""
 
-    /** 当前选中的 meme（用于发送）。 */
-    private var selectedMeme: MemeItem? = null
+    /** 最近一次点击的 meme（供无障碍按钮使用）。 */
+    private var lastClickedMeme: MemeItem? = null
 
     /** Shift 大写锁定状态。 */
     private var shiftEnabled = false
@@ -82,10 +87,10 @@ class MakoImeService : InputMethodService() {
 
     private lateinit var btnShare: ImageButton
     private lateinit var btnAccessibility: ImageButton
-    private lateinit var btnFavorite: ImageButton
     private lateinit var btnKeyboard: ImageButton
     private lateinit var searchInput: TextView
     private lateinit var contentContainer: LinearLayout
+    private lateinit var outerContainer: ViewGroup
 
     /** 从 meme 数据动态构建的分类列表（"全部" + 存在的类型）。首次加载后重建。 */
     private val dynamicCategories: MutableList<Pair<String, String?>> = mutableListOf("全部" to null)
@@ -141,14 +146,14 @@ class MakoImeService : InputMethodService() {
         theme = ImeTheme.load(this)
         adapter = MemeGridAdapter(this, theme) { meme -> onMemeClicked(meme) }
 
-        // 动态键盘高度：屏幕高度的 60%，最大 600dp
+        // 动态键盘高度：屏幕高度的 80%，最大 700dp
         val displayMetrics = resources.displayMetrics
         val keyboardHeightPx = minOf(
-            (displayMetrics.heightPixels * 0.6f).toInt(),
-            dp(600)
+            (displayMetrics.heightPixels * 0.8f).toInt(),
+            dp(700)
         )
 
-        val root = LinearLayout(this).apply {
+        val keyboard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -157,11 +162,11 @@ class MakoImeService : InputMethodService() {
             setBackgroundColor(theme.bg)
         }
 
-        root.addView(buildActionBar())
-        root.addView(buildDivider())
-        root.addView(buildCategoryTabs())
-        root.addView(buildSearchBar())
-        root.addView(buildDivider())
+        keyboard.addView(buildActionBar())
+        keyboard.addView(buildDivider())
+        keyboard.addView(buildCategoryTabs())
+        keyboard.addView(buildSearchBar())
+        keyboard.addView(buildDivider())
 
         // 内容容器：meme 网格 / QWERTY 键盘切换
         contentContainer = LinearLayout(this).apply {
@@ -173,15 +178,85 @@ class MakoImeService : InputMethodService() {
             )
         }
         contentContainer.addView(buildGrid())
-        root.addView(contentContainer)
+        keyboard.addView(contentContainer)
 
         // 首次加载 meme 数据
         loadMemes()
 
-        return root
+        // 外层容器：横屏做浮窗，竖屏填满
+        outerContainer = buildOuterContainer(keyboard)
+        return outerContainer
     }
 
-    /** 第一行：图标化操作栏（切换 / 键盘 / 退格 / 分享 / 无障碍）。 */
+    /** 横屏浮窗 / 竖屏全宽 + 导航栏内边距。 */
+    private fun buildOuterContainer(inner: View): ViewGroup {
+        val isLand = isLandscape()
+        val navBarHeight = getNavigationBarHeight()
+        if (isLand) {
+            // 横屏浮窗：70% 宽度，居中，圆角，底部留呼吸空间
+            val marginHoriz = dp(48)
+            val marginBottom = dp(24)
+            val wrapper = FrameLayout(this).apply {
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+                setBackgroundColor(0x80000000.toInt()) // 半透明遮罩
+                setOnClickListener { switchToPreviousInputMethod() }
+            }
+            inner.layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM
+                leftMargin = marginHoriz
+                rightMargin = marginHoriz
+                bottomMargin = marginBottom
+            }
+            // 浮窗圆角
+            inner.setClipToOutline(true)
+            inner.outlineProvider = object : android.view.ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: android.graphics.Outline) {
+                    outline.setRoundRect(0, 0, view.width, view.height, dp(16).toFloat())
+                }
+            }
+            wrapper.addView(inner)
+            return wrapper
+        } else {
+            // 竖屏全宽，底部加导航栏内边距
+            inner.setPadding(0, 0, 0, navBarHeight)
+            return inner as ViewGroup
+        }
+    }
+
+    /** 获取导航栏高度（像素）。 */
+    private fun getNavigationBarHeight(): Int {
+        val res = resources
+        val id = res.getIdentifier("navigation_bar_height", "dimen", "android")
+        return if (id > 0) res.getDimensionPixelSize(id) else 0
+    }
+
+    /** 判断当前是否为横屏。 */
+    private fun isLandscape(): Boolean {
+        return resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    }
+
+    /** 屏幕方向变化时重建输入视图。 */
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // 重建整个输入视图以切换竖屏/横屏布局
+        setInputView(onCreateInputView())
+    }
+
+    /** 向系统报告 IME 可见区域，确保应用内容正确抬升。 */
+    override fun onComputeInsets(outInsets: Insets) {
+        super.onComputeInsets(outInsets)
+        // 触摸区域 = 可见区域（导航栏外不响应触摸）
+        outInsets.touchableInsets = Insets.TOUCHABLE_INSETS_VISIBLE
+        // visibleTopInsets 保持默认（全可见），让系统正确计算内容偏移
+    }
+
+    /** 第一行：图标化操作栏（切换 / 键盘 / 退格 / 无障碍）。点击表情直接分享，无需手动按分享按钮。 */
     private fun buildActionBar(): View {
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -220,32 +295,13 @@ class MakoImeService : InputMethodService() {
                 layoutParams = LinearLayout.LayoutParams(0, dp(1), 1f)
             })
 
-            // 右侧：收藏 + 分享 + 无障碍发送
-            btnFavorite = iconButton(android.R.drawable.ic_menu_myplaces, "收藏") {
-                val meme = selectedMeme ?: return@iconButton
-                // 通过广播通知主应用切换收藏状态（仅显示提示）
-                Toast.makeText(this@MakoImeService,
-                    if (meme.isFavorite) "已取消收藏: ${meme.name}" else "已收藏: ${meme.name}",
-                    Toast.LENGTH_SHORT).show()
-            }.apply { alpha = 0.4f; isEnabled = false }
-            addView(btnFavorite)
-            addView(spacer(dp(4)))
-            btnShare = iconButton(android.R.drawable.ic_menu_share, "分享发送") {
-                val meme = selectedMeme
-                if (meme != null) {
-                    MemeSender.sendViaShare(this@MakoImeService, meme)
-                } else {
-                    Toast.makeText(this@MakoImeService, "请先选择一个表情", Toast.LENGTH_SHORT).show()
-                }
-            }.apply { alpha = 0.4f; isEnabled = false }
-            addView(btnShare)
-            addView(spacer(dp(4)))
+            // 右侧：无障碍发送（点击表情直接系统分享，无障碍按钮用于第三方 App 自动发送）
             btnAccessibility = iconButton(android.R.drawable.ic_menu_help, "无障碍发送") {
-                val meme = selectedMeme
+                val meme = lastClickedMeme
                 if (meme != null) {
                     MemeSender.sendViaAccessibility(this@MakoImeService, meme)
                 } else {
-                    Toast.makeText(this@MakoImeService, "请先选择一个表情", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MakoImeService, "请先点击一个表情", Toast.LENGTH_SHORT).show()
                 }
             }.apply { alpha = 0.4f; isEnabled = false }
             addView(btnAccessibility)
@@ -640,20 +696,12 @@ class MakoImeService : InputMethodService() {
         }
     }
 
-    /** 点击 meme 条目：选中并提示。 */
+    /** 点击 meme 条目：直接分享发送，并记录为无障碍按钮的可用目标。 */
     private fun onMemeClicked(meme: MemeItem) {
-        selectedMeme = meme
-        btnShare.isEnabled = true
+        lastClickedMeme = meme
         btnAccessibility.isEnabled = true
-        btnFavorite.isEnabled = true
-        btnShare.alpha = 1f
         btnAccessibility.alpha = 1f
-        btnFavorite.alpha = 1f
-        btnFavorite.setColorFilter(
-            if (meme.isFavorite) theme.accent else theme.subText
-        )
-        adapter.setSelected(meme.id)
-        Toast.makeText(this, "已选中: ${meme.name}", Toast.LENGTH_SHORT).show()
+        MemeSender.sendViaShare(this, meme)
     }
 
     /** 高亮当前选中的 Tab：选中态用 pill 背景。 */

@@ -305,7 +305,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget? _buildFab(MemeProvider prov) {
     final theme = Theme.of(context);
-    if (_currentTab == 0) {
+    if (_currentTab == 0 || (_currentTab == 1 && prov.folderId != null)) {
       return FloatingActionButton(
         onPressed: () => _showImportMenu(context, prov),
         backgroundColor: theme.colorScheme.primaryContainer,
@@ -457,20 +457,32 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildBody(MemeProvider prov, L10n l10n) {
+    Widget body;
     switch (_currentTab) {
       case 1:
         if (prov.folderId != null) {
-          return _buildMemesListView(prov, l10n);
+          body = _buildMemesListView(prov, l10n);
+        } else {
+          body = _buildFoldersGrid(prov);
         }
-        return _buildFoldersGrid(prov);
+        break;
       case 2:
-        return _buildMemesListView(prov, l10n);
+        body = _buildMemesListView(prov, l10n);
+        break;
       case 3:
-        return _buildMoodsView(prov, l10n);
+        body = _buildMoodsView(prov, l10n);
+        break;
       case 0:
       default:
-        return _buildMemesListView(prov, l10n);
+        body = _buildMemesListView(prov, l10n);
+        break;
     }
+    // 点击空白区域取消搜索框聚焦
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: body,
+    );
   }
 
   /// 表情包/收藏的通用列表视图：搜索栏 + 分类筛选 + 网格
@@ -884,9 +896,7 @@ class _HomeScreenState extends State<HomeScreen> {
       onTap: () {
         prov.selectFolder(folder.id);
         Navigator.pop(context);
-        if (_currentTab != 1) {
-          setState(() => _currentTab = 0);
-        }
+        setState(() => _currentTab = 1);
       },
       onLongPress: () => _showFolderMenu(context, prov, folder),
       dense: true,

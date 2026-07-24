@@ -467,5 +467,8 @@
   "bind_folder_desc": "将系统目录导入为文件夹",
   "bind_folder_not_found": "目录不存在",
   "bind_folder_no_images": "目录中没有支持的图片",
-  "bind_folder_success": "已导入 {count} 张图片"
+  "bind_folder_success": "已导入 {count} 张图片",
+  "no_tags": "暂无标签",
+  "view_tags": "查看标签",
+  "add": "添加"
 }

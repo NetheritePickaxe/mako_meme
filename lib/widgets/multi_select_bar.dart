@@ -46,6 +46,11 @@ class MultiSelectBar extends StatelessWidget {
                 children: [
                   if (prov.selected.isNotEmpty) ...[
                     IconButton(
+                      icon: const Icon(Icons.visibility, size: 20),
+                      tooltip: l10n.tr('view_tags'),
+                      onPressed: () => _showTagViewerDialog(context, prov, l10n),
+                    ),
+                    IconButton(
                       icon: const Icon(Icons.folder_open, size: 20),
                       tooltip: l10n.tr('move_to_folder'),
                       onPressed: () => _showMoveDialog(context, prov, l10n),
@@ -57,7 +62,7 @@ class MultiSelectBar extends StatelessWidget {
                     ),
                     IconButton(
                       icon: const Icon(Icons.local_offer_outlined, size: 20),
-                      tooltip: l10n.tr('batch_add_tag'),
+                      tooltip: l10n.tr('add_tag'),
                       onPressed: () => _showBatchTagDialog(context, prov, l10n),
                     ),
                     IconButton(
@@ -607,12 +612,61 @@ class MultiSelectBar extends StatelessWidget {
     );
   }
 
+  void _showTagViewerDialog(BuildContext ctx, MemeProvider prov, L10n l10n) {
+    final selectedMemes = prov.selectedMemes;
+    final tagMap = <String, Set<String>>{};
+    for (final m in selectedMemes) {
+      for (final t in m.tags) {
+        tagMap.putIfAbsent(t, () => {}).add(m.id);
+      }
+    }
+    final sortedTags = tagMap.keys.toList()..sort();
+    showDialog(
+      context: ctx,
+      builder: (dCtx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.label, size: 20),
+            const SizedBox(width: 8),
+            Text('${l10n.tr('add_tag')} (${selectedMemes.length})'),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: sortedTags.isEmpty
+              ? Text(l10n.tr('no_tags'))
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: sortedTags.map((tag) => ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.tag, size: 18),
+                    title: Text(tag, style: const TextStyle(fontSize: 14)),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.remove_circle_outline, size: 18, color: Colors.red),
+                      tooltip: l10n.tr('delete'),
+                      onPressed: () {
+                        for (final id in prov.selected) {
+                          prov.removeTag(id, tag);
+                        }
+                        Navigator.pop(dCtx);
+                      },
+                    ),
+                  )).toList(),
+                ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dCtx), child: Text(l10n.tr('close'))),
+        ],
+      ),
+    );
+  }
+
   void _showBatchTagDialog(BuildContext ctx, MemeProvider prov, L10n l10n) {
     final tagCtrl = TextEditingController();
     showDialog(
       context: ctx,
       builder: (dCtx) => AlertDialog(
-        title: Text(l10n.tr('batch_add_tag')),
+        title: Text(l10n.tr('add_tag')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,

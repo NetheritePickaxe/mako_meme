@@ -467,5 +467,8 @@
   "bind_folder_desc": "Import a system directory as a folder",
   "bind_folder_not_found": "Directory not found",
   "bind_folder_no_images": "No supported images in this directory",
-  "bind_folder_success": "Imported {count} images"
+  "bind_folder_success": "Imported {count} images",
+  "no_tags": "No tags",
+  "view_tags": "View Tags",
+  "add": "Add"
 }
