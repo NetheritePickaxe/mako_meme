@@ -209,13 +209,13 @@ class MemeIndexPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                 }
             }
             "saveToDownloads" -> {
-                if (ctx == null) { result.success(false); return }
+                if (ctx == null) { result.success(null); return }
                 val srcPath = call.argument<String>("path") ?: ""
                 val destName = call.argument<String>("name") ?: "backup.zip"
-                if (srcPath.isEmpty()) { result.success(false); return }
+                if (srcPath.isEmpty()) { result.success(null); return }
                 runCatching {
                     val srcFile = File(srcPath)
-                    if (!srcFile.exists()) { result.success(false); return }
+                    if (!srcFile.exists()) { result.success(null); return }
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                         val values = ContentValues().apply {
                             put(MediaStore.Downloads.DISPLAY_NAME, destName)
@@ -225,14 +225,15 @@ class MemeIndexPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                         }
                         val resolver = ctx.contentResolver
                         val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                        if (uri == null) { result.success(false); return }
+                        if (uri == null) { result.success(null); return }
                         resolver.openOutputStream(uri).use { output ->
-                            if (output == null) { result.success(false); return }
+                            if (output == null) { result.success(null); return }
                             FileInputStream(srcFile).use { input -> input.copyTo(output) }
                         }
                         values.clear()
                         values.put(MediaStore.Downloads.IS_PENDING, 0)
                         resolver.update(uri, values, null, null)
+                        result.success(uri.toString())
                     } else {
                         val destDir = File(
                             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
@@ -252,11 +253,11 @@ class MemeIndexPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                         val intent = Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE)
                         intent.data = android.net.Uri.fromFile(target)
                         ctx.sendBroadcast(intent)
+                        result.success(target.absolutePath)
                     }
-                    result.success(true)
                 }.getOrElse {
                     Log.e(TAG, "saveToDownloads failed", it)
-                    result.success(false)
+                    result.success(null)
                 }
             }
             else -> result.notImplemented()

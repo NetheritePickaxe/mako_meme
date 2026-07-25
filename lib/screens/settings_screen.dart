@@ -1445,18 +1445,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return;
     }
 
-    // Android：通过 MediaStore 保存到 Downloads/Mako Meme/
+    // Android：保存到 Downloads/Mako Meme/ 并唤起分享
     if (Platform.isAndroid) {
       const channel = MethodChannel('mako_meme/native');
       try {
-        final ok = await channel.invokeMethod<bool>('saveToDownloads', {
+        final saved = await channel.invokeMethod<String>('saveToDownloads', {
           'path': zipPath,
           'name': 'mako_meme_backup.zip',
         });
+        if (saved != null) {
+          await Share.shareXFiles([
+            XFile(saved, mimeType: 'application/zip', name: 'mako_meme_backup.zip'),
+          ]);
+        }
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(
-              ok == true ? l10n.tr('export_success_msg') : l10n.tr('export_failed_msg'),
+              saved != null ? l10n.tr('export_success_msg') : l10n.tr('export_failed_msg'),
             )),
           );
         }
