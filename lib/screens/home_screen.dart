@@ -308,6 +308,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget? _buildFab(MemeProvider prov) {
     final theme = Theme.of(context);
+    if (prov.selected.isNotEmpty) {
+      return FloatingActionButton(
+        onPressed: () => _confirmDeleteSelected(context, prov),
+        backgroundColor: theme.colorScheme.errorContainer,
+        child: Icon(Icons.delete_outline, size: 28, color: theme.colorScheme.onErrorContainer),
+      );
+    }
     if (_currentTab == 0 || (_currentTab == 1 && prov.folderId != null)) {
       return FloatingActionButton(
         onPressed: () => _showImportMenu(context, prov),
@@ -323,6 +330,29 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
     return null;
+  }
+
+  Future<void> _confirmDeleteSelected(BuildContext ctx, MemeProvider prov) async {
+    final l10n = context.read<LocaleProvider>().l10n;
+    final count = prov.selected.length;
+    final confirmed = await showDialog<bool>(
+      context: ctx,
+      builder: (dCtx) => AlertDialog(
+        title: Text(l10n.tr('delete_selected')),
+        content: Text(l10n.tr('delete_selected_confirm', args: {'count': count.toString()})),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dCtx, false), child: Text(l10n.tr('cancel'))),
+          FilledButton(
+            onPressed: () => Navigator.pop(dCtx, true),
+            style: FilledButton.styleFrom(backgroundColor: Theme.of(dCtx).colorScheme.error),
+            child: Text(l10n.tr('delete')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && ctx.mounted) {
+      await prov.deleteSelected();
+    }
   }
 
   /// 情绪页：按情绪分类展示表情包
