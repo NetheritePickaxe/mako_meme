@@ -1953,6 +1953,19 @@ class StorageService {
         }
       }
     } catch (_) {}
+    if (!kIsWeb) {
+      try {
+        final memesDir = Directory(p.join(_basePath!, 'memes'));
+        if (await memesDir.exists()) {
+          final files = memesDir.listSync().whereType<File>();
+          for (final f in files) {
+            if (p.basename(f.path).contains('_thumb')) {
+              total += await f.length();
+            }
+          }
+        }
+      } catch (_) {}
+    }
     return total;
   }
 
