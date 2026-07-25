@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
@@ -11,6 +12,7 @@ import 'package:hive/hive.dart';
 import 'package:image/image.dart' as img;
 import '../models/meme.dart';
 import '../models/folder.dart';
+import '../utils/lru_cache.dart';
 import 'character_card_service.dart';
 import 'storage_platform.dart';
 import 'webdav_service.dart';
@@ -1552,6 +1554,21 @@ class StorageService {
     final meme = _getMeme(id);
     if (meme == null) return;
 
+    // 先清理内存缓存
+    if (meme.displayPath.isNotEmpty) {
+      thumbCache.remove(meme.displayPath);
+    }
+    PaintingBinding.instance.imageCache.clear();
+
+    // 在删除文件之前计算哈希并清理 hashBox
+    if (_hashBox != null && meme.filePath.isNotEmpty && !kIsWeb) {
+      final fullPath = p.join(_basePath!, meme.filePath);
+      final hash = await _computeFileHash(fullPath);
+      if (hash != null) {
+        await _hashBox!.delete(hash);
+      }
+    }
+
     // 删除主文件
     if (!kIsWeb && meme.filePath.isNotEmpty) {
       final file = File(p.join(_basePath!, meme.filePath));
@@ -1561,7 +1578,7 @@ class StorageService {
       await webStorageDelete(meme.filePath);
     }
 
-    // 漫画：删除所有页面（filePath 已包含在 pages 中，但遍历以保险）
+    // 漫画：删除所有页面
     if (meme.isManga) {
       for (final page in meme.pages) {
         if (page == meme.filePath) continue;
@@ -1599,13 +1616,6 @@ class StorageService {
     }
 
     await _memeBox!.delete(id);
-    if (_hashBox != null && meme.filePath.isNotEmpty && !kIsWeb) {
-      final fullPath = p.join(_basePath!, meme.filePath);
-      final hash = await _computeFileHash(fullPath);
-      if (hash != null) {
-        await _hashBox!.delete(hash);
-      }
-    }
   }
 
   Future<void> deleteMemes(List<String> ids) async {
@@ -1928,6 +1938,35 @@ class StorageService {
     } catch (e) {
       return null;
     }
+  }
+
+  /// 获取缓存目录总大小（字节）。
+  /// 统计临时目录下 mako_meme 相关的文件（如导出失败的备份 zip）。
+  Future<int> getCacheSize() async {
+    int total = 0;
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final tempFiles = tempDir.listSync().whereType<File>();
+      for (final f in tempFiles) {
+        if (p.basename(f.path).startsWith('mako_meme_')) {
+          total += await f.length();
+        }
+      }
+    } catch (_) {}
+    return total;
+  }
+
+  /// 清理临时目录中的 mako_meme 遗留文件（如导出备份 zip）。
+  Future<void> clearTempCache() async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final tempFiles = tempDir.listSync().whereType<File>();
+      for (final f in tempFiles) {
+        if (p.basename(f.path).startsWith('mako_meme_')) {
+          try { await f.delete(); } catch (_) {}
+        }
+      }
+    } catch (_) {}
   }
 
   /// 导出数据为 zip 字节数组（用于 Web 端下载）

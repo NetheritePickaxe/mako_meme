@@ -809,10 +809,15 @@ class MemeProvider with ChangeNotifier {
     await loadAll();
   }
 
-  Future<void> clearCache() async {
+  /// 清理缓存，返回释放的字节数。
+  Future<int> clearCache() async {
+    int freed = 0;
+    freed += await _storage.getCacheSize();
     thumbCache.clear();
     await _storage.clearThumbnailCache();
+    await _storage.clearTempCache();
     await loadAll();
+    return freed;
   }
 
   void _sortMemeList(List<Meme> list) {

@@ -143,22 +143,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             },
           ),
           const Divider(indent: 16, endIndent: 16),
-          ListTile(
-            leading: const Icon(Icons.cached_outlined),
-            title: Text(l10n.tr('clear_cache')),
-            subtitle: Text(l10n.tr('clear_cache_desc')),
-            onTap: () async {
-              await context.read<MemeProvider>().clearCache();
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(l10n.tr('clear_cache_done')),
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
-              }
-            },
-          ),
+          _ClearCacheTile(l10n: l10n),
           const SizedBox(height: 16),
 
           _sectionHeader(l10n.tr('cloud_sync'), cs),
@@ -1447,9 +1432,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         await Share.shareXFiles([
           XFile(tempFile.path, mimeType: 'application/zip', name: 'mako_meme_backup.zip'),
         ]);
-        Future.delayed(const Duration(minutes: 1), () {
-          try { tempFile.delete(); } catch (_) {}
-        });
+        try { await tempFile.delete(); } catch (_) {}
       } else {
         // 普通文件路径：直接写入
         await File(savedPath).writeAsBytes(bytes);
@@ -1747,4 +1730,63 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
+class _ClearCacheTile extends StatefulWidget {
+  final L10n l10n;
+  const _ClearCacheTile({required this.l10n});
+
+  @override
+  State<_ClearCacheTile> createState() => _ClearCacheTileState();
+}
+
+class _ClearCacheTileState extends State<_ClearCacheTile> {
+  int _cacheSize = -1;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSize();
+  }
+
+  Future<void> _loadSize() async {
+    final size = await context.read<StorageService>().getCacheSize();
+    if (mounted) setState(() => _cacheSize = size);
+  }
+
+  String _formatSize(int bytes) {
+    if (bytes < 0) return '';
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final desc = _cacheSize >= 0
+        ? '${widget.l10n.tr('clear_cache_desc')} (${_formatSize(_cacheSize)})'
+        : widget.l10n.tr('clear_cache_desc');
+    return ListTile(
+      leading: const Icon(Icons.cached_outlined),
+      title: Text(widget.l10n.tr('clear_cache')),
+      subtitle: Text(desc),
+      onTap: () async {
+        final prov = context.read<MemeProvider>();
+        final freed = await prov.clearCache();
+        if (context.mounted) {
+          setState(() => _cacheSize = 0);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                freed > 0
+                    ? '${widget.l10n.tr('clear_cache_done')} (${_formatSize(freed)})'
+                    : widget.l10n.tr('clear_cache_done'),
+              ),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      },
+    );
+  }
+}
 

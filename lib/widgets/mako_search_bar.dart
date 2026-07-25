@@ -14,6 +14,7 @@ class MakoSearchBar extends StatefulWidget {
 
 class _MakoSearchBarState extends State<MakoSearchBar> {
   final _controller = TextEditingController();
+  final _focusNode = FocusNode();
   List<SearchSuggestion> _suggestions = [];
   String _lastHelpShown = '';
   String? _error;
@@ -23,6 +24,7 @@ class _MakoSearchBarState extends State<MakoSearchBar> {
   @override
   void dispose() {
     _controller.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -173,6 +175,7 @@ class _MakoSearchBarState extends State<MakoSearchBar> {
 
     _controller.text = newText;
     _controller.selection = TextSelection.collapsed(offset: newText.length);
+    _focusNode.requestFocus();
     _onChanged(_controller.text);
   }
 
@@ -205,6 +208,7 @@ class _MakoSearchBarState extends State<MakoSearchBar> {
       _showError = false;
       widget.onSearch('');
       setState(() {});
+      _focusNode.requestFocus();
       if (mounted && msg != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -232,10 +236,11 @@ class _MakoSearchBarState extends State<MakoSearchBar> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Padding(
+          Padding(
           padding: const EdgeInsets.all(12),
           child: TextField(
             controller: _controller,
+            focusNode: _focusNode,
             decoration: InputDecoration(
               hintText: l10n.tr('search_hint'),
               hintStyle: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
@@ -248,18 +253,19 @@ class _MakoSearchBarState extends State<MakoSearchBar> {
                     : (isCmd ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant),
               ),
               suffixIcon: _controller.text.isNotEmpty
-                  ? IconButton(
-                      icon: Icon(Icons.clear, color: theme.colorScheme.onSurfaceVariant),
-                      onPressed: () {
-                        _controller.clear();
-                        _suggestions = [];
-                        _lastHelpShown = '';
-                        _error = null;
-                        _showError = false;
-                        widget.onSearch('');
-                        setState(() {});
-                      },
-                    )
+                    ? IconButton(
+                        icon: Icon(Icons.clear, color: theme.colorScheme.onSurfaceVariant),
+                        onPressed: () {
+                          _controller.clear();
+                          _suggestions = [];
+                          _lastHelpShown = '';
+                          _error = null;
+                          _showError = false;
+                          widget.onSearch('');
+                          _focusNode.requestFocus();
+                          setState(() {});
+                        },
+                      )
                   : null,
               filled: true,
               fillColor: hasError

@@ -77,19 +77,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// 点击侧边栏 Logo：弹出满屏 emoji 特效（不关闭抽屉）
-  // barrierDismissible=false：避免用户点击操作时被透明 barrier 拦截并关闭特效
-  // 特效仅由动画结束自动关闭，点击完全穿透到下层 UI
+  /// 用 OverlayEntry 而非 showDialog，避免 barrier 拦截下层交互
   void _showEmojiEffect(BuildContext ctx) {
     if (_isEffectShowing) return;
     _isEffectShowing = true;
-    showDialog(
-      context: ctx,
-      barrierColor: Colors.transparent,
-      barrierDismissible: false,
+    final overlay = Overlay.of(ctx, rootOverlay: true);
+    OverlayEntry? entry;
+    entry = OverlayEntry(
       builder: (_) => _EmojiRainOverlay(
-        onDone: () { if (mounted) setState(() => _isEffectShowing = false); },
+        onDone: () {
+          if (mounted) setState(() => _isEffectShowing = false);
+          entry?.remove();
+        },
       ),
     );
+    overlay.insert(entry);
   }
 
   @override
@@ -1932,12 +1934,12 @@ class _EmojiRainOverlayState extends State<_EmojiRainOverlay>
       duration: const Duration(milliseconds: 4000),
     );
     _spawnParticles();
-    _controller.forward().then((_) {
-      if (mounted) {
+    _controller.addStatusListener((status) {
+      if (status == AnimationStatus.completed && mounted) {
         widget.onDone?.call();
-        Navigator.of(context).maybePop();
       }
-    }).catchError((_) {});
+    });
+    _controller.forward();
   }
 
   void _spawnParticles() {
@@ -1958,6 +1960,7 @@ class _EmojiRainOverlayState extends State<_EmojiRainOverlay>
   @override
   void dispose() {
     _controller.dispose();
+    widget.onDone?.call();
     super.dispose();
   }
 

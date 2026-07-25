@@ -24,6 +24,8 @@ class LruCache<K, V> {
   bool containsKey(K key) => _map.containsKey(key);
 
   void clear() => _map.clear();
+
+  void remove(K key) => _map.remove(key);
 }
 
 final LruCache<String, Uint8List?> thumbCache = LruCache(50);
