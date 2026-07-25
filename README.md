@@ -10,13 +10,13 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/anomalyco/mako_meme/actions">
-    <img src="https://img.shields.io/github/actions/workflow/status/anomalyco/mako_meme/build.yml?style=flat-square" alt="Build">
+  <a href="https://github.com/NetheritePickaxe/mako_meme/actions">
+    <img src="https://img.shields.io/github/actions/workflow/status/NetheritePickaxe/mako_meme/build.yml?style=flat-square" alt="Build">
   </a>
-  <a href="https://github.com/anomalyco/mako_meme/releases">
-    <img src="https://img.shields.io/github/v/release/anomalyco/mako_meme?style=flat-square" alt="Release">
+  <a href="https://github.com/NetheritePickaxe/mako_meme/releases">
+    <img src="https://img.shields.io/github/v/release/NetheritePickaxe/mako_meme?style=flat-square" alt="Release">
   </a>
-  <a href="https://github.com/anomalyco/mako_meme/blob/main/LICENSE">
+  <a href="https://github.com/NetheritePickaxe/mako_meme/blob/main/LICENSE">
     <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License">
   </a>
 </p>
