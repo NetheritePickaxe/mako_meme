@@ -2,6 +2,8 @@
 
 跨平台表情包管理器 (Android / Windows / Web)，Flutter + Provider + JSON 存储。
 
+## Version: v1.0.1
+
 ## Stack
 
 - **Flutter** 3.29+ (CI: 3.44.2), SDK `>=3.10.3 <4.0.0`
@@ -63,6 +65,7 @@ lib/
 
 ## Conventions
 
+- **Versioning**: Bump `## Version:` by +1 patch on every change (e.g., `v1.0.0` → `v1.0.1`).
 - **Imports**: Use relative imports (`../models/...`), never `package:mako_meme/...`.
 - **Models**: Immutable data classes with `copyWith()` and `toMap()`/`fromMap()`.
 - **Platform branching**: Use `kIsWeb` from `flutter/foundation.dart` for web vs native; `Theme.of(context).platform` for desktop/mobile interaction.

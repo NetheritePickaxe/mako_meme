@@ -52,6 +52,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _currentTab = i;
       if (i == 0) {
+        prov.selectFolder(null);
         prov.setShowFavorites(false);
         prov.setShowFoldersView(false);
         prov.setMoodFilter(null);

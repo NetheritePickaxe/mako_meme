@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:file_picker/file_picker.dart';
@@ -1202,44 +1203,67 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     int done = 0;
     int failed = 0;
-    // 构建 folderId → folderName 映射，按文件夹建子目录
-    final folders = storage.getAllFolders();
-    final folderNameById = <String, String>{};
-    for (final f in folders) {
-      folderNameById[f.id] = f.name;
-    }
-    for (final meme in memes) {
-      try {
-        final abs = storage.getMemeAbsolutePath(meme.filePath);
-        if (abs == null) { failed++; continue; }
-        final srcFile = File(abs);
-        if (!await srcFile.exists()) { failed++; continue; }
-        // 用唯一文件名避免覆盖
-        final ext = p.extension(meme.filePath);
-        final destName = '${meme.name}$ext';
-        // 有 folderId 的 meme 放到子目录，无 folderId 的放根目录
-        // targetDir 在循环外已确认非空（早期 return 处理 null 情况）
-        Directory destDir = targetDir;
-        if (meme.folderId != null && folderNameById.containsKey(meme.folderId)) {
-          // 去掉路径分隔符，避免破坏目录结构
-          final folderName = folderNameById[meme.folderId]!
-              .replaceAll(RegExp(r'[/\\]'), '_');
-          destDir = Directory(p.join(targetDir.path, folderName));
-          if (!await destDir.exists()) await destDir.create(recursive: true);
-        }
-        var finalPath = p.join(destDir.path, destName);
-        // 若重名，加序号
-        var counter = 1;
-        while (await File(finalPath).exists()) {
-          finalPath = p.join(destDir.path, '${meme.name} ($counter)$ext');
-          counter++;
-        }
-        await srcFile.copy(finalPath);
-        done++;
-      } catch (_) {
-        failed++;
+    // Android 使用原生 MediaStore 注册到系统图集
+    if (Platform.isAndroid) {
+      const channel = MethodChannel('mako_meme/native');
+      final folders = storage.getAllFolders();
+      final folderNameById = <String, String>{};
+      for (final f in folders) {
+        folderNameById[f.id] = f.name;
       }
-      progressNotifier.value = done + failed;
+      for (final meme in memes) {
+        try {
+          final abs = storage.getMemeAbsolutePath(meme.filePath);
+          if (abs == null) { failed++; continue; }
+          if (!await File(abs).exists()) { failed++; continue; }
+          final subDir = meme.folderId != null && folderNameById.containsKey(meme.folderId)
+              ? folderNameById[meme.folderId]!.replaceAll(RegExp(r'[/\\]'), '_')
+              : '';
+          final ok = await channel.invokeMethod<bool>('saveToGallery', {
+            'path': abs,
+            'name': meme.name,
+            'subDir': subDir,
+          });
+          if (ok == true) done++; else failed++;
+        } catch (_) {
+          failed++;
+        }
+        progressNotifier.value = done + failed;
+      }
+    } else {
+      final folders = storage.getAllFolders();
+      final folderNameById = <String, String>{};
+      for (final f in folders) {
+        folderNameById[f.id] = f.name;
+      }
+      for (final meme in memes) {
+        try {
+          final abs = storage.getMemeAbsolutePath(meme.filePath);
+          if (abs == null) { failed++; continue; }
+          final srcFile = File(abs);
+          if (!await srcFile.exists()) { failed++; continue; }
+          final ext = p.extension(meme.filePath);
+          final destName = '${meme.name}$ext';
+          Directory destDir = targetDir;
+          if (meme.folderId != null && folderNameById.containsKey(meme.folderId)) {
+            final folderName = folderNameById[meme.folderId]!
+                .replaceAll(RegExp(r'[/\\]'), '_');
+            destDir = Directory(p.join(targetDir.path, folderName));
+            if (!await destDir.exists()) await destDir.create(recursive: true);
+          }
+          var finalPath = p.join(destDir.path, destName);
+          var counter = 1;
+          while (await File(finalPath).exists()) {
+            finalPath = p.join(destDir.path, '${meme.name} ($counter)$ext');
+            counter++;
+          }
+          await srcFile.copy(finalPath);
+          done++;
+        } catch (_) {
+          failed++;
+        }
+        progressNotifier.value = done + failed;
+      }
     }
 
     progressNotifier.dispose();

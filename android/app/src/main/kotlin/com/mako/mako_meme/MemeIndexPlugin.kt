@@ -1,9 +1,13 @@
 package com.mako.mako_meme
 
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.os.Build
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
+import android.provider.MediaStore
 import android.provider.Settings
 import android.text.TextUtils
 import android.util.Log
@@ -12,6 +16,7 @@ import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
+import java.io.FileInputStream
 
 /**
  * 接收 Flutter 侧导出的 meme 索引，写入 filesDir/meme_index.json
@@ -136,6 +141,70 @@ class MemeIndexPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                     result.success(true)
                 }.getOrElse {
                     Log.e(TAG, "Failed to write IME theme", it)
+                    result.success(false)
+                }
+            }
+            "saveToGallery" -> {
+                if (ctx == null) { result.success(false); return }
+                val srcPath = call.argument<String>("path") ?: ""
+                val displayName = call.argument<String>("name") ?: ""
+                val subDir = call.argument<String>("subDir") ?: ""
+                if (srcPath.isEmpty()) { result.success(false); return }
+                runCatching {
+                    val srcFile = File(srcPath)
+                    if (!srcFile.exists()) { result.success(false); return }
+                    val ext = srcFile.extension
+                    val bareName = if (displayName.isNotEmpty()) displayName else srcFile.nameWithoutExtension
+                    val destName = "$bareName.$ext"
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        val relativePath = if (subDir.isNotEmpty()) "Pictures/Mako Meme/$subDir" else "Pictures/Mako Meme"
+                        val mime = when {
+                            ext.equals("png", true) -> "image/png"
+                            ext.equals("webp", true) -> "image/webp"
+                            ext.equals("gif", true) -> "image/gif"
+                            ext.equals("bmp", true) -> "image/bmp"
+                            ext.equals("heic", true) -> "image/heic"
+                            ext.equals("heif", true) -> "image/heif"
+                            ext.equals("avif", true) -> "image/avif"
+                            else -> "image/jpeg"
+                        }
+                        val values = ContentValues().apply {
+                            put(MediaStore.Images.Media.DISPLAY_NAME, destName)
+                            put(MediaStore.Images.Media.MIME_TYPE, mime)
+                            put(MediaStore.Images.Media.RELATIVE_PATH, relativePath)
+                            put(MediaStore.Images.Media.IS_PENDING, 1)
+                        }
+                        val resolver = ctx.contentResolver
+                        val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                        if (uri == null) { result.success(false); return }
+                        resolver.openOutputStream(uri).use { output ->
+                            if (output == null) { result.success(false); return }
+                            FileInputStream(srcFile).use { input -> input.copyTo(output) }
+                        }
+                        values.clear()
+                        values.put(MediaStore.Images.Media.IS_PENDING, 0)
+                        resolver.update(uri, values, null, null)
+                    } else {
+                        val destDir = File(
+                            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
+                            if (subDir.isNotEmpty()) "Mako Meme/$subDir" else "Mako Meme"
+                        )
+                        if (!destDir.exists()) destDir.mkdirs()
+                        val destFile = File(destDir, destName)
+                        var target = destFile
+                        var counter = 1
+                        while (target.exists()) {
+                            target = File(destDir, "$bareName ($counter).$ext")
+                            counter++
+                        }
+                        srcFile.copyTo(target, overwrite = false)
+                        val intent = Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE)
+                        intent.data = android.net.Uri.fromFile(target)
+                        ctx.sendBroadcast(intent)
+                    }
+                    result.success(true)
+                }.getOrElse {
+                    Log.e(TAG, "saveToGallery failed", it)
                     result.success(false)
                 }
             }

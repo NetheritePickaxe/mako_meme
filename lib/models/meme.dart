@@ -31,6 +31,7 @@ class Meme {
   static const List<String> supportedExtensions = [
     'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp',
     'svg', 'apng', 'psd', 'ico', 'tif', 'tiff', 'pdf',
+    'heic', 'heif', 'avif',
   ];
 
   bool get isImageType => type == typeImage || type == typeGif ||
