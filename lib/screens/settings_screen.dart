@@ -1382,18 +1382,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _exportData(BuildContext context, L10n l10n) async {
     final storage = context.read<StorageService>();
-    final bytes = await storage.exportDataBytes();
-    if (bytes == null) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.tr('export_failed_msg'))),
-        );
-      }
-      return;
-    }
 
-    // Web 端：saveFile(bytes:) 触发浏览器下载
+    // Web 端：用内存字节数组
     if (kIsWeb) {
+      final bytes = await storage.exportDataBytes();
+      if (bytes == null) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.tr('export_failed_msg'))),
+          );
+        }
+        return;
+      }
       final saved = await FilePicker.platform.saveFile(
         dialogTitle: l10n.tr('save_backup'),
         fileName: 'mako_meme_backup.zip',
@@ -1407,7 +1407,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return;
     }
 
-    // 桌面（Windows/Linux/macOS）：saveFile 返回路径，自己写入
+    // 原生端：导出到临时文件再走分享/保存
+    final zipPath = await storage.exportData();
+    if (zipPath == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.tr('export_failed_msg'))),
+        );
+      }
+      return;
+    }
+
+    // 桌面（Windows/Linux/macOS）：复制到用户选择的位置
     if (defaultTargetPlatform == TargetPlatform.windows ||
         defaultTargetPlatform == TargetPlatform.linux ||
         defaultTargetPlatform == TargetPlatform.macOS) {
@@ -1418,7 +1429,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
       if (path == null) return;
       try {
-        await File(path).writeAsBytes(bytes);
+        await File(zipPath).copy(path);
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(l10n.tr('export_success_msg'))),
@@ -1434,33 +1445,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return;
     }
 
-    // Android/iOS：用 SAF 让用户选择保存位置（系统文件管理器选目录）
-    // FilePicker.saveFile 在 Android 上会弹出系统的「另存为」对话框
-    // 返回的 content URI 可以通过 file_picker 插件内部机制写入
+    // Android/iOS：分享临时文件
     try {
-      // file_picker 在 Android 上 saveFile 不支持 bytes，需要先写临时文件再让 SAF 复制
-      // 但更可靠的方式：用 saveFile + type any + 让用户选择文件名
-      final savedPath = await FilePicker.platform.saveFile(
-        dialogTitle: l10n.tr('save_backup'),
-        fileName: 'mako_meme_backup.zip',
-        type: FileType.any,
-      );
-      if (savedPath == null) return;
-      // file_picker 在 Android 上返回 content URI，需通过插件 API 写入
-      // 检查返回值类型：如果是 content:// 开头的 URI，用 XFile 写入；否则直接 File.writeAsBytes
-      if (savedPath.startsWith('content://')) {
-        // content URI：file_picker 不直接支持写入，回退到临时文件 + Share
-        final tempDir = await getTemporaryDirectory();
-        final tempFile = File(p.join(tempDir.path, 'mako_meme_backup.zip'));
-        await tempFile.writeAsBytes(bytes);
-        await Share.shareXFiles([
-          XFile(tempFile.path, mimeType: 'application/zip', name: 'mako_meme_backup.zip'),
-        ]);
-        try { await tempFile.delete(); } catch (_) {}
-      } else {
-        // 普通文件路径：直接写入
-        await File(savedPath).writeAsBytes(bytes);
-      }
+      await Share.shareXFiles([
+        XFile(zipPath, mimeType: 'application/zip', name: 'mako_meme_backup.zip'),
+      ]);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n.tr('export_success_msg'))),
