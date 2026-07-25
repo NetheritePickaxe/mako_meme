@@ -1445,7 +1445,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return;
     }
 
-    // Android/iOS：分享临时文件
+    // Android：通过 MediaStore 保存到 Downloads/Mako Meme/
+    if (Platform.isAndroid) {
+      const channel = MethodChannel('mako_meme/native');
+      try {
+        final ok = await channel.invokeMethod<bool>('saveToDownloads', {
+          'path': zipPath,
+          'name': 'mako_meme_backup.zip',
+        });
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(
+              ok == true ? l10n.tr('export_success_msg') : l10n.tr('export_failed_msg'),
+            )),
+          );
+        }
+      } catch (_) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.tr('export_failed_msg'))),
+          );
+        }
+      }
+      return;
+    }
+
+    // iOS：分享临时文件
     try {
       await Share.shareXFiles([
         XFile(zipPath, mimeType: 'application/zip', name: 'mako_meme_backup.zip'),
@@ -1752,19 +1777,6 @@ class _ClearCacheTile extends StatefulWidget {
 }
 
 class _ClearCacheTileState extends State<_ClearCacheTile> {
-  int _cacheSize = -1;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadSize();
-  }
-
-  Future<void> _loadSize() async {
-    final size = await context.read<StorageService>().getCacheSize();
-    if (mounted) setState(() => _cacheSize = size);
-  }
-
   String _formatSize(int bytes) {
     if (bytes < 0) return '';
     if (bytes < 1024) return '$bytes B';
@@ -1775,18 +1787,14 @@ class _ClearCacheTileState extends State<_ClearCacheTile> {
 
   @override
   Widget build(BuildContext context) {
-    final desc = _cacheSize >= 0
-        ? '${widget.l10n.tr('clear_cache_desc')} (${_formatSize(_cacheSize)})'
-        : widget.l10n.tr('clear_cache_desc');
     return ListTile(
       leading: const Icon(Icons.cached_outlined),
       title: Text(widget.l10n.tr('clear_cache')),
-      subtitle: Text(desc),
+      subtitle: Text(widget.l10n.tr('clear_cache_desc')),
       onTap: () async {
         final prov = context.read<MemeProvider>();
         final freed = await prov.clearCache();
         if (context.mounted) {
-          setState(() => _cacheSize = 0);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
