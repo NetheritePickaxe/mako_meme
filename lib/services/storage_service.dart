@@ -1973,10 +1973,12 @@ class StorageService {
   Future<void> clearTempCache() async {
     try {
       final tempDir = await getTemporaryDirectory();
-      final tempFiles = tempDir.listSync().whereType<File>();
-      for (final f in tempFiles) {
-        if (p.basename(f.path).startsWith('mako_meme_')) {
-          try { await f.delete(); } catch (_) {}
+      for (final entity in tempDir.listSync()) {
+        if (p.basename(entity.path).startsWith('mako_meme_')) {
+          try {
+            if (entity is File) await entity.delete();
+            if (entity is Directory) await entity.delete(recursive: true);
+          } catch (_) {}
         }
       }
     } catch (_) {}

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart';
 import 'package:file_picker/file_picker.dart';
 import '../models/meme.dart';
 import '../models/folder.dart';
@@ -814,6 +815,7 @@ class MemeProvider with ChangeNotifier {
     int freed = 0;
     freed += await _storage.getCacheSize();
     thumbCache.clear();
+    PaintingBinding.instance.imageCache.clear();
     await _storage.clearThumbnailCache();
     await _storage.clearTempCache();
     await loadAll();
