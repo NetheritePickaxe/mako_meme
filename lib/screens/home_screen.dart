@@ -146,8 +146,8 @@ class _HomeScreenState extends State<HomeScreen> {
           child: MultiSelectBar(),
         ) : null,
       ),
-      // 增大左边缘触发宽度，让 drawer 更容易被右滑打开
-      drawerEdgeDragWidth: 200,
+      // 全屏右滑即可打开侧边栏
+      drawerEdgeDragWidth: MediaQuery.of(context).size.width,
       drawer: _buildDrawer(context, prov),
       body: _buildBody(prov, l10n),
       bottomNavigationBar: NavigationBar(
