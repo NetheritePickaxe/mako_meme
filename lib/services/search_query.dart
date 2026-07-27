@@ -408,7 +408,6 @@ class SearchQuery {
     // /tag 后面补全 add/remove
     if (parts[0].toLowerCase() == 'tag' && parts.length == 2) {
       final a = parts[1].toLowerCase();
-      if (a.isEmpty) return [];
       final actions = ['add', 'remove'];
       return actions
           .where((act) => act.startsWith(a))
@@ -421,7 +420,6 @@ class SearchQuery {
       final action = parts[parts.length - 2];
       if (action == 'add' || action == 'remove') {
         final last = parts.last.toLowerCase();
-        if (last.isEmpty) return [];
         return allTags
             .where((t) => t.toLowerCase().startsWith(last))
             .map((t) => SearchSuggestion(t, t))
@@ -432,7 +430,6 @@ class SearchQuery {
     // /type 后面补全类型名
     if (parts[0].toLowerCase() == 'type' && parts.length == 2) {
       final v = parts[1].toLowerCase();
-      if (v.isEmpty) return [];
       const typeValues = ['表情', 'gif', '图片', '文字', '立绘', 'cg', '角色卡', '矢量', 'psd', '漫画', '文件'];
       return typeValues
           .where((t) => t.toLowerCase().startsWith(v))
@@ -443,7 +440,6 @@ class SearchQuery {
     // /animate 后面补全格式
     if (parts[0].toLowerCase() == 'animate' && parts.length == 2) {
       final v = parts[1].toLowerCase();
-      if (v.isEmpty) return [];
       const fmts = ['gif', 'apng'];
       return fmts
           .where((f) => f.startsWith(v))

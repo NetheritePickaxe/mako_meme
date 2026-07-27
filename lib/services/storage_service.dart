@@ -440,7 +440,7 @@ class StorageService {
 
     // 超大画幅图片（>50MB）：生成 512px 缩略图加速卡片加载
     // 跳过已有 thumbPath（已由 PSD/ICO/上一步处理）和超大文件（>200MB 解码可能 OOM）
-    if (meme.thumbPath == null && meme.isImageType && fileSize > 50 * 1024 * 1024 && !isHugeFile) {
+    if (meme.thumbPath == null && meme.isImageType && fileSize > 5 * 1024 * 1024 && !isHugeFile) {
       meme = await _generateLargeImageThumb(meme, file, bytes, fileHash);
     }
 
@@ -486,7 +486,14 @@ class StorageService {
 
       String? thumbPath;
       if (result.compositePng != null) {
-        thumbPath = await _saveThumbPng(meme.id, result.compositePng!);
+        final decoded = img.decodeImage(result.compositePng!);
+        if (decoded != null && (decoded.width > 512 || decoded.height > 512)) {
+          final resized = img.copyResize(decoded, width: 512);
+          final resizedPng = Uint8List.fromList(img.encodePng(resized));
+          thumbPath = await _saveThumbPng(meme.id, resizedPng);
+        } else {
+          thumbPath = await _saveThumbPng(meme.id, result.compositePng!);
+        }
       }
 
       final updated = meme.copyWith(
@@ -522,7 +529,10 @@ class StorageService {
       final decoded = img.decodeImage(sourceBytes);
       if (decoded == null) return meme;
 
-      final png = Uint8List.fromList(img.encodePng(decoded));
+      final resized = decoded.width > 512 || decoded.height > 512
+          ? img.copyResize(decoded, width: 512)
+          : decoded;
+      final png = Uint8List.fromList(img.encodePng(resized));
       final thumbPath = await _saveThumbPng(meme.id, png);
 
       final updated = meme.copyWith(
