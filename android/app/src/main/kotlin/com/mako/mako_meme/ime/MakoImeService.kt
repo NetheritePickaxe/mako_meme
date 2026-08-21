@@ -14,6 +14,7 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -57,6 +58,8 @@ class MakoImeService : InputMethodService() {
         private const val FUNC_TEXT_SIZE = 15f
         /** QWERTY 行间距/键间距（dp）。 */
         private const val QWERTY_GAP_DP = 4
+        /** 实时结果条最大展示条数。 */
+        const val MAX_PREVIEW = 12
     }
 
     private lateinit var repository: MemeRepository
@@ -89,6 +92,10 @@ class MakoImeService : InputMethodService() {
     private lateinit var btnAccessibility: ImageButton
     private lateinit var btnKeyboard: ImageButton
     private lateinit var searchInput: TextView
+    private lateinit var searchRow: LinearLayout
+    private lateinit var clearButton: ImageButton
+    private lateinit var resultsStrip: HorizontalScrollView
+    private lateinit var resultsRow: LinearLayout
     private lateinit var contentContainer: LinearLayout
     private lateinit var outerContainer: ViewGroup
 
@@ -144,7 +151,7 @@ class MakoImeService : InputMethodService() {
     override fun onCreateInputView(): View {
         // 加载主应用同步的主题配色
         theme = ImeTheme.load(this)
-        adapter = MemeGridAdapter(this, theme) { meme -> onMemeClicked(meme) }
+        adapter = MemeGridAdapter(this, theme) { meme -> sendMeme(meme) }
 
         // 动态键盘高度：屏幕高度的 80%，最大 700dp
         val displayMetrics = resources.displayMetrics
@@ -286,6 +293,7 @@ class MakoImeService : InputMethodService() {
                 if (currentQuery.isNotEmpty()) {
                     currentQuery = currentQuery.dropLast(1)
                     searchInput.text = currentQuery
+                    updateClearButton()
                     applyFilter()
                 }
             })
@@ -399,7 +407,7 @@ class MakoImeService : InputMethodService() {
         }
     }
 
-    /** 第三行：搜索框（胶囊形，点击切换到 QWERTY）。 */
+    /** 第三行：搜索框（胶囊形，点击切换到 QWERTY；有输入时尾部显示清空按钮）。 */
     private fun buildSearchBar(): View {
         searchInput = TextView(this).apply {
             text = currentQuery
@@ -408,7 +416,7 @@ class MakoImeService : InputMethodService() {
             setSingleLine(true)
             setTextColor(theme.text)
             setHintTextColor(theme.subText)
-            setPadding(dp(14), dp(8), dp(14), dp(8))
+            setPadding(dp(14), dp(8), dp(44), dp(8))
             background = android.graphics.drawable.GradientDrawable().apply {
                 setColor(theme.surface)
                 cornerRadius = dp(16).toFloat()
@@ -416,9 +424,7 @@ class MakoImeService : InputMethodService() {
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 dp(36)
-            ).apply {
-                setMargins(dp(8), dp(2), dp(8), dp(4))
-            }
+            )
             isClickable = true
             setOnClickListener {
                 if (!qwertyMode) toggleQwerty()
@@ -429,7 +435,41 @@ class MakoImeService : InputMethodService() {
             )
             compoundDrawablePadding = dp(8)
         }
-        return searchInput
+        clearButton = ImageButton(this).apply {
+            setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(theme.keyFuncBg)
+                cornerRadius = dp(KEY_RADIUS_DP).toFloat()
+            }
+            imageTintList = android.content.res.ColorStateList.valueOf(theme.subText)
+            setPadding(dp(6), dp(4), dp(6), dp(4))
+            scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
+            layoutParams = LinearLayout.LayoutParams(dp(28), dp(28))
+            isClickable = true
+            visibility = View.GONE
+            setOnClickListener {
+                currentQuery = ""
+                searchInput.text = currentQuery
+                updateClearButton()
+                applyFilter()
+            }
+        }
+        searchRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(36)
+            ).apply { setMargins(dp(8), dp(2), dp(8), dp(4)) }
+            addView(searchInput)
+            addView(clearButton)
+        }
+        return searchRow
+    }
+
+    /** 刷新清空按钮可见性。 */
+    private fun updateClearButton() {
+        clearButton.visibility = if (currentQuery.isEmpty()) View.GONE else View.VISIBLE
     }
 
     /** 网格区域。 */
@@ -449,22 +489,98 @@ class MakoImeService : InputMethodService() {
         return recyclerView
     }
 
+    /** 横向实时结果条：QWERTY 模式下键盘上方展示最多 12 个匹配项，点击直接发送。 */
+    private fun buildResultsStrip(): View {
+        resultsRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(8), dp(2), dp(8), dp(2))
+        }
+        resultsStrip = HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(72)
+            ).apply { topMargin = dp(4) }
+            visibility = View.GONE
+            addView(resultsRow)
+        }
+        return resultsStrip
+    }
+
+    /** 刷新实时结果条（最多展示 [MAX_PREVIEW] 条）。 */
+    private fun updateResultsStrip(items: List<MemeItem>) {
+        if (!qwertyMode) return
+        val preview = items.take(MAX_PREVIEW)
+        if (preview.isEmpty()) {
+            resultsStrip.visibility = View.GONE
+            return
+        }
+        resultsStrip.visibility = View.VISIBLE
+        resultsRow.removeAllViews()
+        preview.forEach { meme ->
+            resultsRow.addView(buildResultCard(meme))
+            resultsRow.addView(spacer(dp(6)))
+        }
+    }
+
+    /** 构建结果条中的单个卡片。 */
+    private fun buildResultCard(meme: MemeItem): View {
+        val card = FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(56), dp(56))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(theme.cardBg)
+                cornerRadius = dp(8).toFloat()
+            }
+        }
+        val content: View = if (meme.isImage) {
+            ImageView(this).apply {
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                clipToOutline = true
+                outlineProvider = object : android.view.ViewOutlineProvider() {
+                    override fun getOutline(view: View, outline: android.graphics.Outline) {
+                        outline.setRoundRect(0, 0, view.width, view.height, dp(8).toFloat())
+                    }
+                }
+                if (meme.absPath.isNotEmpty()) {
+                    BitmapLoader.load(meme.absPath, this, dp(56))
+                }
+            }
+        } else {
+            TextView(this).apply {
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
+                gravity = Gravity.CENTER
+                setTextColor(theme.text)
+                textSize = 10f
+                setPadding(dp(4), dp(4), dp(4), dp(4))
+                maxLines = 2
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                text = meme.textContent?.takeIf { it.isNotBlank() } ?: meme.name
+            }
+        }
+        card.addView(content)
+        card.setOnClickListener { sendMeme(meme) }
+        return card
+    }
+
     /**
      * QWERTY 键盘视图：圆角按键，参考系统输入法 / Rime 布局。
      *
-     * 布局：
+     * 布局（自上而下）：
      * ```
+     * [实时结果条：最多 12 个匹配缩略图]
      *  q w e r t y u i o p
      *   a s d f g h j k l
-     *  ⇧ z x c v b n m  ⌫     ← 删除键在右下角"完成"上方
-     *  [表情]   空格    [完成]  ← 完成键在右下角
+     *  ⇧ z x c v b n m  ⌫
+     *  [😀]   空格    [完成]
      * ```
-     *
-     * 设计要点：
-     * - 字母键 1f 等宽，行 2/3 通过左右留白居中，视觉对齐
-     * - 删除键固定在第三行右侧，紧贴"完成"键上方
-     * - 字母键 textSize 20f，比之前 16f 大幅增加，便于点击
-     * - 键间距 4dp，按键整体变大
      */
     private fun buildQwertyKeyboard(): View {
         val root = LinearLayout(this).apply {
@@ -477,6 +593,8 @@ class MakoImeService : InputMethodService() {
             setBackgroundColor(theme.bg)
             gravity = Gravity.CENTER_HORIZONTAL
         }
+        // 顶部实时结果条
+        root.addView(buildResultsStrip())
         // 第 1 行：q w e r t y u i o p（10 键）
         root.addView(buildQwertyRow(qwertyRows[0], shiftEnabled))
         // 第 2 行：a s d f g h j k l（9 键，居中显示，左右留白）
@@ -500,6 +618,7 @@ class MakoImeService : InputMethodService() {
             row3.addView(qwertyKey(display.toString(), 1f) {
                 currentQuery += typed.toString()
                 searchInput.text = currentQuery
+                updateClearButton()
                 applyFilter()
             })
         }
@@ -508,6 +627,7 @@ class MakoImeService : InputMethodService() {
             if (currentQuery.isNotEmpty()) {
                 currentQuery = currentQuery.dropLast(1)
                 searchInput.text = currentQuery
+                updateClearButton()
                 applyFilter()
             }
         })
@@ -530,6 +650,7 @@ class MakoImeService : InputMethodService() {
         lastRow.addView(funcKey("空格", 5f) {
             currentQuery += " "
             searchInput.text = currentQuery
+            updateClearButton()
             applyFilter()
         })
         // 完成键：右下角，与上方删除键垂直对齐
@@ -571,6 +692,7 @@ class MakoImeService : InputMethodService() {
             row.addView(qwertyKey(display.toString(), 1f) {
                 currentQuery += typed.toString()
                 searchInput.text = currentQuery
+                updateClearButton()
                 applyFilter()
             })
         }
@@ -696,11 +818,16 @@ class MakoImeService : InputMethodService() {
         }
     }
 
-    /** 点击 meme 条目：直接分享发送，并记录为无障碍按钮的可用目标。 */
-    private fun onMemeClicked(meme: MemeItem) {
+    /** 点击 meme 条目：优先直插聊天框（微信路径上屏 / commitContent），失败则回退系统分享。 */
+    private fun sendMeme(meme: MemeItem) {
         lastClickedMeme = meme
         btnAccessibility.isEnabled = true
         btnAccessibility.alpha = 1f
+        val ic = currentInputConnection
+        val ei = currentInputEditorInfo
+        if (ic != null && ei != null) {
+            if (MemeInserter.tryInsert(this, meme, ic, ei)) return
+        }
         MemeSender.sendViaShare(this, meme)
     }
 
@@ -746,7 +873,11 @@ class MakoImeService : InputMethodService() {
         // 按搜索关键字过滤
         filtered = repository.search(currentQuery, filtered)
         adapter.submit(filtered)
+        updateResultsStrip(filtered)
     }
+
+    /** 横屏时禁止系统把 IME 切到全屏 extract 模式，保证浮窗布局始终生效。 */
+    override fun onEvaluateFullscreenMode(): Boolean = false
 
     override fun onDestroy() {
         super.onDestroy()

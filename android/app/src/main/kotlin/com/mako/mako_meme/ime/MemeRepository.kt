@@ -36,7 +36,12 @@ class MemeRepository(context: Context) {
     fun loadMemes(callback: (List<MemeItem>) -> Unit) {
         workHandler.post {
             val list = queryMemes().map { item ->
-                item.withPinyin(toPinyin(item.name), item.tags.map { toPinyin(it) })
+                item.withPinyin(
+                    pinyinName = toPinyin(item.name),
+                    pinyinTags = item.tags.map { toPinyin(it) },
+                    pinyinInitials = toPinyinInitials(item.name),
+                    pinyinTagInitials = item.tags.map { toPinyinInitials(it) },
+                )
             }
             Handler(appContext.mainLooper).post { callback(list) }
         }
@@ -66,20 +71,29 @@ class MemeRepository(context: Context) {
     }
 
     /**
-     * 本地过滤：按 [query] 在 [list] 中匹配 name / pinyin / tags / textContent（大小写不敏感）。
-     * 支持拼音搜索：查询词自动转拼音后匹配 pinyinName / pinyinTags。
+     * 本地过滤：按 [query] 在 [list] 中匹配 name / pinyin / 拼音首字母 / tags / textContent（大小写不敏感）。
+     *
+     * 匹配规则：
+     * - name / tags / textContent：原文 contains 查询词
+     * - 全拼：查询词去空格后，pinyinName / pinyinTags 子串匹配
+     * - 首字母：查询词去空格后，pinyinInitials / pinyinTagInitials 前缀或包含匹配
+     *   （如 "bq" 匹配 "表情"）
+     *
      * query 为空白时原样返回。
      */
     fun search(query: String, list: List<MemeItem>): List<MemeItem> {
         if (query.isBlank()) return list
         val q = query.trim().lowercase(Locale.ROOT)
-        val qPinyin = toPinyin(q)
+        val qNoSpace = q.replace(" ", "")
+        val qPinyin = toPinyin(qNoSpace)
         return list.filter { item ->
             item.name.lowercase(Locale.ROOT).contains(q) ||
-                    item.pinyinName.contains(q) ||
                     item.pinyinName.contains(qPinyin) ||
-                    item.tags.any { it.lowercase(Locale.ROOT).contains(q) } ||
-                    item.pinyinTags.any { it.contains(q) || it.contains(qPinyin) } ||
+                    (item.pinyinInitials.isNotEmpty() && (item.pinyinInitials.contains(qNoSpace) || item.pinyinInitials.startsWith(qNoSpace))) ||
+                    item.pinyinTags.any { it.contains(qPinyin) } ||
+                    item.pinyinTagInitials.any { initials ->
+                        initials.isNotEmpty() && (initials.contains(qNoSpace) || initials.startsWith(qNoSpace))
+                    } ||
                     (item.textContent?.lowercase(Locale.ROOT)?.contains(q) == true)
         }
     }
@@ -93,6 +107,18 @@ class MemeRepository(context: Context) {
                 sb.append(pinyins[0].replace(Regex("[0-9]"), ""))
             } else {
                 sb.append(ch)
+            }
+        }
+        return sb.toString().lowercase(Locale.ROOT)
+    }
+
+    /** 仅提取每个中文字符的拼音首字母（非中文字符忽略），用于首字母缩写匹配（如 bq → 表情）。 */
+    private fun toPinyinInitials(input: String): String {
+        val sb = StringBuilder()
+        for (ch in input) {
+            val pinyins = PinyinHelper.toHanyuPinyinStringArray(ch)
+            if (pinyins != null && pinyins.isNotEmpty()) {
+                sb.append(pinyins[0].first())
             }
         }
         return sb.toString().lowercase(Locale.ROOT)

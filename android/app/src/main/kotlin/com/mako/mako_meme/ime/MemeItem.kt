@@ -25,6 +25,8 @@ data class MemeItem(
     val height: Int = 0,
     val pinyinName: String = "",
     val pinyinTags: List<String> = emptyList(),
+    val pinyinInitials: String = "",
+    val pinyinTagInitials: List<String> = emptyList(),
 ) {
     /** 是否为图片类（有绝对路径可加载）。文字类 absPath 为空。 */
     val isImage: Boolean get() = absPath.isNotEmpty()
@@ -49,9 +51,16 @@ data class MemeItem(
     }
 
     /** 创建一份拷贝，附带上预计算的拼音字段。 */
-    fun withPinyin(pinyinName: String, pinyinTags: List<String>): MemeItem = copy(
+    fun withPinyin(
+        pinyinName: String,
+        pinyinTags: List<String>,
+        pinyinInitials: String = "",
+        pinyinTagInitials: List<String> = emptyList(),
+    ): MemeItem = copy(
         pinyinName = pinyinName,
         pinyinTags = pinyinTags,
+        pinyinInitials = pinyinInitials,
+        pinyinTagInitials = pinyinTagInitials,
     )
 
     companion object {

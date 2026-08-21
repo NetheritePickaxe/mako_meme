@@ -2,7 +2,7 @@
 
 跨平台表情包管理器 (Android / Windows / Web)，Flutter + Provider + JSON 存储。
 
-## Version: v1.0.1-dev
+## Version: v1.0.2-dev
 
 ## Stack
 
