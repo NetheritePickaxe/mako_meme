@@ -46,6 +46,7 @@ app.*.map.json
 
 # Agent
 .opencode/
+.openchamber/
 
 # Local config
 config.json

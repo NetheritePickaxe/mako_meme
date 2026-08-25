@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.util.Log
+import android.widget.Toast
 import androidx.core.content.FileProvider
 import java.io.File
 
@@ -39,6 +40,7 @@ object MemeSender {
         } else {
             shareText(context, meme)
         }
+        Toast.makeText(context, "正在分享...", Toast.LENGTH_SHORT).show()
     }
 
     /** 通过系统分享发送图片。 */
@@ -46,12 +48,14 @@ object MemeSender {
         val file = File(meme.absPath)
         if (!file.exists() || !file.isFile) {
             Log.w(TAG, "图片文件不存在: ${meme.absPath}")
+            Toast.makeText(context, "图片文件不存在", Toast.LENGTH_SHORT).show()
             return
         }
         val uri: Uri = runCatching {
             FileProvider.getUriForFile(context, FILE_PROVIDER_AUTHORITY, file)
         }.getOrElse {
             Log.e(TAG, "FileProvider 获取 URI 失败，请检查 manifest 配置", it)
+            Toast.makeText(context, "分享失败: 文件访问错误", Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -69,6 +73,7 @@ object MemeSender {
             context.startActivity(chooser)
         }.onFailure {
             Log.e(TAG, "启动分享面板失败", it)
+            Toast.makeText(context, "启动分享面板失败", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -87,6 +92,7 @@ object MemeSender {
             context.startActivity(chooser)
         }.onFailure {
             Log.e(TAG, "启动分享面板失败", it)
+            Toast.makeText(context, "启动分享面板失败", Toast.LENGTH_SHORT).show()
         }
     }
 

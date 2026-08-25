@@ -259,10 +259,8 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                 }
                 return false;
               },
-              child: ColoredBox(
-                color: theme.colorScheme.surfaceContainerHighest,
-                child: Stack(
-                  children: [
+              child: Stack(
+                children: [
                   // ClipRect 强制裁剪，防止超大画幅图片在 PhotoView 缩放时
                   // 溢出到 PageView 相邻页面（左右两侧看到本页内容）
                   Positioned.fill(
@@ -277,7 +275,7 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                   ),
                   if (!_isFullscreen) ...[
                     Positioned.fill(
-                      bottom: panelHeight,
+                      bottom: 0,
                       child: IgnorePointer(
                         child: AnimatedOpacity(
                           opacity: ((_panelExtent - 0.2) / 0.8).clamp(0.0, 1.0),
@@ -291,8 +289,7 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                       child: _buildDraggableDetailPanel(theme, prov, m, l10n),
                     ),
                   ],
-                  ],
-                ),
+                ],
               ),
             );
           },

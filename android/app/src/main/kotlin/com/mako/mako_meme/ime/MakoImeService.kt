@@ -1,5 +1,6 @@
 package com.mako.mako_meme.ime
 
+import android.content.SharedPreferences
 import android.content.res.Configuration
 import android.graphics.Rect
 import android.inputmethodservice.InputMethodService
@@ -27,11 +28,11 @@ import androidx.recyclerview.widget.RecyclerView
  * 键盘布局（代码构建，参考 Gboard / Rime 风格）：
  * ```
  * ┌──────────────────────────────────────────────┐
- * │ [🌐] [⌨] [⌫]                  [📤] [♿]      │ ← 图标化操作栏（紧凑、圆角）
- * │ [全部][表情][GIF][图片][文字]...（横向滚动） │ ← pill Tab（圆角胶囊选中态）
- * │ 🔍 搜索表情包...                             │ ← 胶囊搜索框
+ * │ 🔍 搜索表情包...                    [✕]      │ ← 胶囊搜索框（最顶部）
+ * │ [🌐] [⌨] [⌫] [⏱]               [♿]         │ ← 图标化操作栏（紧凑、圆角）
+ * │ [全部][最近][表情][GIF][图片]...（横向滚动） │ ← pill Tab（圆角胶囊选中态）
  * │ ┌──┐ ┌──┐ ┌──┐ ┌──┐                         │
- * │ │  │ │  │ │  │ │  │  ...（4 列圆角卡片）    │
+ * │ │  │ │  │ │  │ │  │  ...（3 列圆角卡片）    │
  * │ └──┘ └──┘ └──┘ └──┘                         │
  * └──────────────────────────────────────────────┘
  * ```
@@ -91,6 +92,7 @@ class MakoImeService : InputMethodService() {
     private lateinit var btnShare: ImageButton
     private lateinit var btnAccessibility: ImageButton
     private lateinit var btnKeyboard: ImageButton
+    private lateinit var btnRecent: ImageButton
     private lateinit var searchInput: TextView
     private lateinit var searchRow: LinearLayout
     private lateinit var clearButton: ImageButton
@@ -99,8 +101,15 @@ class MakoImeService : InputMethodService() {
     private lateinit var contentContainer: LinearLayout
     private lateinit var outerContainer: ViewGroup
 
-    /** 从 meme 数据动态构建的分类列表（"全部" + 存在的类型）。首次加载后重建。 */
-    private val dynamicCategories: MutableList<Pair<String, String?>> = mutableListOf("全部" to null)
+    /** 最近使用模式。 */
+    private var recentMode = false
+
+    private val prefs: SharedPreferences by lazy {
+        getSharedPreferences("mako_ime", MODE_PRIVATE)
+    }
+
+    /** 从 meme 数据动态构建的分类列表（"全部" + "最近" + 存在的类型）。首次加载后重建。 */
+    private val dynamicCategories: MutableList<Pair<String, String?>> = mutableListOf("全部" to null, "最近" to "__recent__")
 
     /** 类型中文标签映射。 */
     private val typeLabels = mapOf(
@@ -113,11 +122,31 @@ class MakoImeService : InputMethodService() {
         MemeItem.TYPE_CG to "CG",
     )
 
+    /** 最近使用 meme ID 列表。 */
+    private val recentIds: MutableList<String>
+        get() {
+            val raw = prefs.getString("recent_ids", "") ?: ""
+            return if (raw.isEmpty()) mutableListOf()
+            else raw.split(",").toMutableList()
+        }
+        set(value) {
+            prefs.edit().putString("recent_ids", value.take(20).joinToString(",")).apply()
+        }
+
+    /** 添加 meme 到最近使用列表头部。 */
+    private fun addRecent(memeId: String) {
+        val ids = recentIds
+        ids.remove(memeId)
+        ids.add(0, memeId)
+        recentIds = ids
+    }
+
     /** 根据已有 meme 数据刷新分类列表。 */
     private fun rebuildCategories() {
         val typesInData = allMemes.map { it.type }.distinct().sorted()
         dynamicCategories.clear()
         dynamicCategories.add("全部" to null)
+        dynamicCategories.add("最近" to "__recent__")
         for (t in typesInData) {
             val label = typeLabels[t] ?: t
             dynamicCategories.add(label to t)
@@ -129,6 +158,7 @@ class MakoImeService : InputMethodService() {
         buildCategoryTabsInto(tabRow)
         // 重置到"全部"
         currentType = null
+        recentMode = false
         if (tabViews.isNotEmpty()) {
             updateTabHighlight(tabViews.first())
         }
@@ -169,10 +199,9 @@ class MakoImeService : InputMethodService() {
             setBackgroundColor(theme.bg)
         }
 
-        keyboard.addView(buildActionBar())
-        keyboard.addView(buildDivider())
-        keyboard.addView(buildCategoryTabs())
         keyboard.addView(buildSearchBar())
+        keyboard.addView(buildActionBar())
+        keyboard.addView(buildCategoryTabs())
         keyboard.addView(buildDivider())
 
         // 内容容器：meme 网格 / QWERTY 键盘切换
@@ -263,15 +292,15 @@ class MakoImeService : InputMethodService() {
         // visibleTopInsets 保持默认（全可见），让系统正确计算内容偏移
     }
 
-    /** 第一行：图标化操作栏（切换 / 键盘 / 退格 / 无障碍）。点击表情直接分享，无需手动按分享按钮。 */
+    /** 第一行：图标化操作栏（切换 / 键盘 / 退格 / 最近使用 / 无障碍）。点击表情直接分享，无需手动按分享按钮。 */
     private fun buildActionBar(): View {
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(40)
+                dp(36)
             )
-            setPadding(dp(8), dp(4), dp(8), dp(4))
+            setPadding(dp(8), dp(2), dp(8), dp(2))
             gravity = Gravity.CENTER_VERTICAL
             setBackgroundColor(theme.surface)
 
@@ -297,6 +326,26 @@ class MakoImeService : InputMethodService() {
                     applyFilter()
                 }
             })
+            addView(spacer(dp(4)))
+            // 最近使用
+            btnRecent = iconButton(android.R.drawable.ic_menu_myplaces, "最近使用") {
+                recentMode = !recentMode
+                if (recentMode) {
+                    btnRecent.background = android.graphics.drawable.GradientDrawable().apply {
+                        setColor(theme.accent)
+                        cornerRadius = dp(KEY_RADIUS_DP).toFloat()
+                    }
+                    btnRecent.imageTintList = android.content.res.ColorStateList.valueOf(theme.onAccent)
+                } else {
+                    btnRecent.background = android.graphics.drawable.GradientDrawable().apply {
+                        setColor(theme.keyFuncBg)
+                        cornerRadius = dp(KEY_RADIUS_DP).toFloat()
+                    }
+                    btnRecent.imageTintList = android.content.res.ColorStateList.valueOf(theme.text)
+                }
+                applyFilter()
+            }
+            addView(btnRecent)
 
             // 中间撑开
             addView(View(this@MakoImeService).apply {
@@ -394,7 +443,13 @@ class MakoImeService : InputMethodService() {
                     cornerRadius = dp(TAB_RADIUS_DP).toFloat()
                 }
                 setOnClickListener {
-                    currentType = type
+                    if (type == "__recent__") {
+                        recentMode = true
+                        currentType = null
+                    } else {
+                        currentType = type
+                        recentMode = false
+                    }
                     updateTabHighlight(this)
                     applyFilter()
                 }
@@ -823,6 +878,7 @@ class MakoImeService : InputMethodService() {
         lastClickedMeme = meme
         btnAccessibility.isEnabled = true
         btnAccessibility.alpha = 1f
+        addRecent(meme.id)
         val ic = currentInputConnection
         val ei = currentInputEditorInfo
         if (ic != null && ei != null) {
@@ -866,6 +922,15 @@ class MakoImeService : InputMethodService() {
     /** 按当前分类 + 搜索关键字过滤并刷新网格。 */
     private fun applyFilter() {
         var filtered: List<MemeItem> = allMemes
+        // 最近使用模式
+        if (recentMode) {
+            val ids = recentIds
+            val idSet = ids.toSet()
+            filtered = filtered.filter { it.id in idSet }
+            // 按最近使用顺序排列
+            val order = ids.withIndex().associate { (i, id) -> id to i }
+            filtered = filtered.sortedBy { order[it.id] ?: Int.MAX_VALUE }
+        }
         // 按分类过滤
         if (currentType != null) {
             filtered = filtered.filter { it.type == currentType }
