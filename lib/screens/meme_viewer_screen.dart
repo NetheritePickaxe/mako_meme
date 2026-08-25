@@ -259,8 +259,10 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                 }
                 return false;
               },
-              child: Stack(
-                children: [
+              child: ColoredBox(
+                color: theme.colorScheme.surfaceContainerHighest,
+                child: Stack(
+                  children: [
                   // ClipRect 强制裁剪，防止超大画幅图片在 PhotoView 缩放时
                   // 溢出到 PageView 相邻页面（左右两侧看到本页内容）
                   Positioned.fill(
@@ -289,7 +291,8 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                       child: _buildDraggableDetailPanel(theme, prov, m, l10n),
                     ),
                   ],
-                ],
+                  ],
+                ),
               ),
             );
           },

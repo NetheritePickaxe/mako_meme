@@ -1,0 +1,23 @@
+# Normalize all text files to LF in the repository
+* text=auto eol=lf
+
+# Explicitly mark binary formats as binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.bmp binary
+*.psd binary
+
+# Windows build files that should keep CRLF
+*.sln text eol=crlf
+*.csproj text eol=crlf
+
+# Shell scripts must stay LF
+*.sh text eol=lf
+
+# Batch/cmd must stay CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
