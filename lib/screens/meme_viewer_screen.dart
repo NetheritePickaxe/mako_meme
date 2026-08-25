@@ -59,12 +59,33 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
   bool _showScrollToTop = false;
   ScrollController? _lastDetailController;
 
+  // 面板高度同步：防止同一帧重复排入测量回调
+  bool _syncExtentPending = false;
+
   void _onDetailScroll() {
     final offset = _lastDetailController?.offset ?? 0;
     final show = _cardExpanded && offset > 600;
     if (show != _showScrollToTop) {
       setState(() => _showScrollToTop = show);
     }
+  }
+
+  // 同步 _panelExtent 到面板真实高度（下一帧测量回调）
+  // DraggableScrollableNotification 只在拖动中触发，吸附/动画结束后不再通知，
+  // 这里靠逐帧量取面板约束高度保持图片区域与面板位置同步，
+  // 避免面板下方露出 Scaffold 背景色
+  void _syncExtentTo(double measuredHeight, double bodyHeight) {
+    if (_syncExtentPending || !mounted) return;
+    _syncExtentPending = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _syncExtentPending = false;
+      if (!mounted) return;
+      if (bodyHeight <= 0) return;
+      final desired = (measuredHeight / bodyHeight).clamp(0.0, 1.0);
+      if ((desired - _panelExtent).abs() > 0.001) {
+        setState(() => _panelExtent = desired);
+      }
+    });
   }
 
   // 漫画内部页面滑动
@@ -246,15 +267,20 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
           }),
           itemBuilder: (ctx, i) {
             final m = prov.memes[i];
-            final screenHeight = MediaQuery.sizeOf(context).height;
+            // 用 LayoutBuilder 量取 Scaffold body 的真实高度（面板可用高度）。
+            // 不能用 MediaQuery 全屏高度：body 位于 AppBar 之下，两者存在像素差，
+            // 会导致面板高度与图片区域留白不一致、面板下方露出 Scaffold 背景色
+            return LayoutBuilder(
+                builder: (ctx, constraints) {
+                  final bodyHeight = constraints.maxHeight;
             // 全屏模式下面板高度为 0，图片占满；否则留出面板高度
-            final panelHeight = _isFullscreen ? 0.0 : _panelExtent * screenHeight;
+            final panelHeight = _isFullscreen ? 0.0 : _panelExtent * bodyHeight;
             // 使用 Stack 让面板覆盖在图片上方，避免 Column 无界高度导致 DraggableScrollableSheet 失效
             // Align(bottomCenter) 让面板固定在底部并可正确计算高度
             return NotificationListener<DraggableScrollableNotification>(
               onNotification: (notification) {
                 final newExtent = notification.extent;
-                if ((newExtent - _panelExtent).abs() > 0.005) {
+                if ((newExtent - _panelExtent).abs() > 0.001) {
                   setState(() => _panelExtent = newExtent);
                 }
                 return false;
@@ -274,8 +300,12 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                     ),
                   ),
                   if (!_isFullscreen) ...[
-                    Positioned.fill(
-                      bottom: 0,
+                    // 暗色遮罩只覆盖图片区域（面板上方），随面板展开程度加深
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: panelHeight,
                       child: IgnorePointer(
                         child: AnimatedOpacity(
                           opacity: ((_panelExtent - 0.2) / 0.8).clamp(0.0, 1.0),
@@ -284,13 +314,23 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                         ),
                       ),
                     ),
+                    // 面板底层不透明色块：无论面板如何移动/动画，下方不会透出 Scaffold 背景
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      height: panelHeight,
+                      child: ColoredBox(color: theme.colorScheme.surfaceContainerHighest),
+                    ),
                     Align(
                       alignment: Alignment.bottomCenter,
-                      child: _buildDraggableDetailPanel(theme, prov, m, l10n),
+                      child: _buildDraggableDetailPanel(theme, prov, m, l10n, bodyHeight),
                     ),
                   ],
                 ],
               ),
+            );
+              },
             );
           },
         ),
@@ -1158,7 +1198,7 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
   String _tr(String key) => context.read<LocaleProvider>().l10n.tr(key);
 
   /// 底部详情面板：可拖动展开/收起
-  Widget _buildDraggableDetailPanel(ThemeData theme, MemeProvider prov, Meme m, L10n l10n) {
+  Widget _buildDraggableDetailPanel(ThemeData theme, MemeProvider prov, Meme m, L10n l10n, double bodyHeight) {
     final isMobile = _isMobilePlatform();
     final settings = context.watch<SettingsProvider>();
     return DraggableScrollableSheet(
@@ -1171,9 +1211,15 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
           _lastDetailController = controller;
           controller.addListener(_onDetailScroll);
         }
-        return Stack(
-          children: [
-            Container(
+        // 面板吸附到目标位置后 DraggableScrollableNotification 不再触发，
+        // 用 LayoutBuilder 逐帧量取面板真实约束高度同步 _panelExtent，
+        // 保证图片区域与面板位置精确贴合，面板下方不露背景色
+        return LayoutBuilder(
+          builder: (ctx, constraints) {
+            _syncExtentTo(constraints.maxHeight, bodyHeight);
+            return Stack(
+              children: [
+                Container(
               decoration: BoxDecoration(
                 color: theme.colorScheme.surfaceContainerHighest,
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
@@ -1343,6 +1389,8 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
               ),
             ),
         ],
+      );
+        },
       );
       },
     );
