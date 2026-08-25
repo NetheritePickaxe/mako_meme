@@ -123,7 +123,7 @@ class MakoImeService : InputMethodService() {
     )
 
     /** 最近使用 meme ID 列表。 */
-    private val recentIds: MutableList<String>
+    private var recentIds: MutableList<String>
         get() {
             val raw = prefs.getString("recent_ids", "") ?: ""
             return if (raw.isEmpty()) mutableListOf()
