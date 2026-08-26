@@ -264,6 +264,8 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
           onPageChanged: (i) => setState(() {
             _currentIndex = i;
             _mangaPageIndex = 0;
+            // 翻页时重置面板到初始高度，防止返回旧页时面板与图片区域高度不匹配导致图片从面板下露出
+            _panelExtent = 0.45;
           }),
           itemBuilder: (ctx, i) {
             final m = prov.memes[i];
