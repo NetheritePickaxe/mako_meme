@@ -732,6 +732,14 @@ class StorageService {
       }
       return null;
     }
+    // PSD: 38 42 50 53 ('8BPS')，文件头大端：height@14..17, width@18..21
+    if (bytes.length >= 26 &&
+        bytes[0] == 0x38 && bytes[1] == 0x42 && bytes[2] == 0x50 && bytes[3] == 0x53) {
+      final h = (bytes[14] << 24) | (bytes[15] << 16) | (bytes[16] << 8) | bytes[17];
+      final w = (bytes[18] << 24) | (bytes[19] << 16) | (bytes[20] << 8) | bytes[21];
+      if (w > 0 && h > 0) return ImageDimensions(w, h);
+      return null;
+    }
     return null;
   }
 
@@ -864,6 +872,56 @@ class StorageService {
     if (newHash != null && _hashBox != null) {
       await _hashBox!.put(newHash, memeId);
     }
+  }
+
+  /// 用新内容覆盖已有 meme 的文件（图片工具"覆盖原图"输出）：
+  /// 写入同 UUID + 新扩展名的文件并删除旧文件，同步更新路径/大小/宽高等元数据与哈希索引。
+  /// [type] 用于源类型随内容变化的情况（如 GIF 转静态图后不再是动图类型）
+  Future<void> replaceMemeFile(String memeId, Uint8List bytes, {required String ext, String? type}) async {
+    if (_memeBox == null) return;
+    final old = _getMeme(memeId);
+    if (old == null) return;
+    final newRelPath = 'memes/$memeId$ext';
+    final newAbs = kIsWeb ? null : p.join(_basePath!, newRelPath);
+    final oldAbs = (kIsWeb || old.filePath.isEmpty) ? null : getMemeAbsolutePath(old.filePath);
+
+    // 先取旧文件哈希并清除索引，再写新内容，避免新旧哈希错配
+    String? oldHash;
+    if (oldAbs != null && _hashBox != null) {
+      oldHash = await _computeFileHash(oldAbs);
+    }
+    if (kIsWeb) {
+      await webStorageSetBinary(newRelPath, bytes);
+      if (old.filePath.isNotEmpty && old.filePath != newRelPath) {
+        await webStorageDelete(old.filePath);
+      }
+    } else {
+      final dest = File(newAbs!);
+      await dest.create(recursive: true);
+      await dest.writeAsBytes(bytes);
+      if (oldHash != null) await _hashBox!.delete(oldHash);
+      if (oldAbs != null && oldAbs != newAbs) {
+        final oldF = File(oldAbs);
+        if (await oldF.exists()) await oldF.delete();
+      }
+    }
+    final newHash = _computeHash(bytes);
+    if (_hashBox != null) {
+      await _hashBox!.put(newHash, memeId);
+    }
+
+    final dims = parseImageDimensionsFromHeader(bytes);
+    // 直接改 map：copyWith 的 ?? 合并无法把 thumbPath 置空，
+    // 而旧缩略图（如 ICO/TIF 转换产物）已不代表新内容，必须清掉让 displayPath 回落到新文件
+    final map = old.toMap()
+      ..['filePath'] = newRelPath
+      ..['mimeType'] = _guessMime(ext)
+      ..['fileSize'] = bytes.length
+      ..['thumbPath'] = null
+      ..['width'] = dims?.width ?? old.width
+      ..['height'] = dims?.height ?? old.height;
+    if (type != null) map['type'] = type;
+    await _memeBox!.put(memeId, map);
   }
 
   Future<Meme> importText(String text, {String? name, String? folderId, List<String> tags = const [], String type = Meme.typeText}) async {

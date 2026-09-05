@@ -52,12 +52,19 @@ class ImageToolService {
 
   /// 转换格式并保存为新的 meme
   /// [srcPath] 源文件相对路径；[format] 目标格式（如 'png'）
-  /// 返回新生成的 Meme
-  Future<Meme> convertFormat(String srcPath, String format, {int quality = 90, String? name, String? folderId}) async {
+  /// [overwriteMeme] 不为 null 时覆盖该 meme 的原文件而非新增（保留名称/标签/文件夹等元数据）
+  /// 返回新生成或覆盖后的 Meme
+  Future<Meme> convertFormat(String srcPath, String format, {int quality = 90, String? name, String? folderId, Meme? overwriteMeme}) async {
     final image = await _decode(srcPath);
     if (image == null) throw StateError('decode failed: $srcPath');
     final bytes = _encode(image, format, quality: quality);
     final newExt = '.${format.toLowerCase()}';
+    if (overwriteMeme != null) {
+      // 源是动图而输出是静态格式时，类型随之调整为图片
+      final newType = overwriteMeme.isAnimated ? Meme.typeImage : null;
+      await _storage.replaceMemeFile(overwriteMeme.id, bytes, ext: newExt, type: newType);
+      return _storage.getMeme(overwriteMeme.id) ?? overwriteMeme;
+    }
     return _saveAndCreateMeme(bytes, newExt,
       name: name ?? p.basenameWithoutExtension(srcPath),
       format: format.toLowerCase(),
@@ -68,6 +75,7 @@ class ImageToolService {
   /// 修改尺寸并保存为新的 meme
   /// [width]/[height] 为目标尺寸，设为 null 表示按另一边等比缩放
   /// [percent] 不为 null 时按百分比缩放（0.0~1.0）
+  /// [overwriteMeme] 不为 null 时覆盖该 meme 的原文件而非新增（保留名称/标签/文件夹等元数据）
   Future<Meme> resize(
     String srcPath, {
     int? width,
@@ -75,6 +83,7 @@ class ImageToolService {
     double? percent,
     String? name,
     String? folderId,
+    Meme? overwriteMeme,
   }) async {
     final image = await _decode(srcPath);
     if (image == null) throw StateError('decode failed: $srcPath');
@@ -105,6 +114,11 @@ class ImageToolService {
     final ext = p.extension(srcPath).toLowerCase();
     final formatStr = ext.isEmpty ? 'png' : ext.substring(1);
     final bytes = _encode(resized, formatStr);
+    // resize 保持源格式，类型语义不变，直接沿用原类型
+    if (overwriteMeme != null) {
+      await _storage.replaceMemeFile(overwriteMeme.id, bytes, ext: ext.isEmpty ? '.png' : ext);
+      return _storage.getMeme(overwriteMeme.id) ?? overwriteMeme;
+    }
     return _saveAndCreateMeme(bytes, ext.isEmpty ? '.png' : ext,
       name: name ?? p.basenameWithoutExtension(srcPath),
       format: formatStr,
@@ -258,6 +272,8 @@ class ImageToolService {
     bool isAnimated = false,
   }) async {
     final relPath = await _saveBytes(bytes, ext);
+    // 从输出字节头解析宽高，详情面板才能展示分辨率
+    final dims = StorageService.parseImageDimensionsFromHeader(bytes);
     final meme = Meme(
       id: _uuid(),
       name: name,
@@ -268,6 +284,8 @@ class ImageToolService {
       mimeType: _mimeOf(format),
       fileSize: bytes.length,
       type: isAnimated ? Meme.typeGif : Meme.typeImage,
+      width: dims?.width ?? 0,
+      height: dims?.height ?? 0,
     );
     await _storage.saveMeme(meme);
     return meme;

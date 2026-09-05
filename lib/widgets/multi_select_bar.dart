@@ -36,7 +36,8 @@ class MultiSelectBar extends StatelessWidget {
           TextButton.icon(
             icon: const Icon(Icons.deselect, size: 18),
             label: Text(l10n.tr('cancel')),
-            onPressed: () => prov.deselectAll(),
+            // 取消 = 退出多选模式（同时清空已选），而非仅清空选择停留在多选态
+            onPressed: () => prov.exitMulti(),
           ),
           // 右侧操作按钮：窄屏可横向滚动，删除固定在最后
           Expanded(
@@ -48,32 +49,32 @@ class MultiSelectBar extends StatelessWidget {
                     IconButton(
                       icon: const Icon(Icons.visibility, size: 20),
                       tooltip: l10n.tr('view_tags'),
-                      onPressed: () => _showTagViewerDialog(context, prov, l10n),
+                      onPressed: () => showTagViewerDialog(context, prov, l10n),
                     ),
                     IconButton(
                       icon: const Icon(Icons.folder_open, size: 20),
                       tooltip: l10n.tr('move_to_folder'),
-                      onPressed: () => _showMoveDialog(context, prov, l10n),
+                      onPressed: () => showMoveDialog(context, prov, l10n),
                     ),
                     IconButton(
                       icon: const Icon(Icons.label_outline, size: 20),
                       tooltip: l10n.tr('change_category'),
-                      onPressed: () => _showTypeDialog(context, prov, l10n),
+                      onPressed: () => showTypeDialog(context, prov, l10n),
                     ),
                     IconButton(
                       icon: const Icon(Icons.local_offer_outlined, size: 20),
                       tooltip: l10n.tr('add_tag'),
-                      onPressed: () => _showBatchTagDialog(context, prov, l10n),
+                      onPressed: () => showBatchTagDialog(context, prov, l10n),
                     ),
                     IconButton(
                       icon: const Icon(Icons.ios_share, size: 20),
                       tooltip: l10n.tr('export_selected'),
-                      onPressed: () => _exportSelected(context, prov, l10n),
+                      onPressed: () => exportSelected(context, prov, l10n),
                     ),
                     IconButton(
                       icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
                       tooltip: l10n.tr('delete_selected'),
-                      onPressed: () => _confirmDelete(context, prov, l10n),
+                      onPressed: () => confirmDelete(context, prov, l10n),
                     ),
                   ],
                 ],
@@ -171,6 +172,7 @@ class MultiSelectBar extends StatelessWidget {
   static void _showConvertDialog(BuildContext ctx, MemeProvider prov, L10n l10n, List<Meme> memes) {
     String format = 'png';
     int quality = 90;
+    bool overwrite = false;
     showDialog(
       context: ctx,
       builder: (dCtx) => StatefulBuilder(
@@ -203,6 +205,8 @@ class MultiSelectBar extends StatelessWidget {
                   onChanged: (v) => setState(() => quality = v.round()),
                 ),
               ],
+              const SizedBox(height: 12),
+              _buildSaveModeSelector(l10n, overwrite, (v) => setState(() => overwrite = v)),
             ],
           ),
           actions: [
@@ -210,7 +214,7 @@ class MultiSelectBar extends StatelessWidget {
             FilledButton(
               onPressed: () {
                 Navigator.pop(dCtx);
-                _batchConvert(ctx, prov, l10n, memes, format, quality);
+                _batchConvert(ctx, prov, l10n, memes, format, quality, overwrite);
               },
               child: Text(l10n.tr('convert')),
             ),
@@ -220,7 +224,34 @@ class MultiSelectBar extends StatelessWidget {
     );
   }
 
-  static Future<void> _batchConvert(BuildContext ctx, MemeProvider prov, L10n l10n, List<Meme> memes, String format, int quality) async {
+  /// 保存方式选择：另存为新表情包 / 覆盖原图（覆盖保留名称、标签、文件夹等元数据）
+  static Widget _buildSaveModeSelector(L10n l10n, bool overwrite, ValueChanged<bool> onChanged) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(l10n.tr('save_mode')),
+        const SizedBox(height: 8),
+        SegmentedButton<bool>(
+          segments: [
+            ButtonSegment(
+              value: false,
+              icon: const Icon(Icons.add_circle_outline, size: 16),
+              label: Text(l10n.tr('save_as_new')),
+            ),
+            ButtonSegment(
+              value: true,
+              icon: const Icon(Icons.save_as_outlined, size: 16),
+              label: Text(l10n.tr('overwrite_original')),
+            ),
+          ],
+          selected: {overwrite},
+          onSelectionChanged: (s) => onChanged(s.first),
+        ),
+      ],
+    );
+  }
+
+  static Future<void> _batchConvert(BuildContext ctx, MemeProvider prov, L10n l10n, List<Meme> memes, String format, int quality, bool overwrite) async {
     final tool = ctx.read<ImageToolService>();
     final messenger = ScaffoldMessenger.of(ctx);
     showDialog(
@@ -237,7 +268,8 @@ class MultiSelectBar extends StatelessWidget {
     int ok = 0;
     for (final m in memes) {
       try {
-        await tool.convertFormat(m.filePath, format, quality: quality, name: m.name);
+        await tool.convertFormat(m.filePath, format,
+          quality: quality, name: m.name, overwriteMeme: overwrite ? m : null);
         ok++;
       } catch (_) {}
     }
@@ -251,6 +283,7 @@ class MultiSelectBar extends StatelessWidget {
   /// 批量尺寸修改
   static void _showResizeDialog(BuildContext ctx, MemeProvider prov, L10n l10n, List<Meme> memes) {
     int percent = 50;
+    bool overwrite = false;
     showDialog(
       context: ctx,
       builder: (dCtx) => StatefulBuilder(
@@ -269,6 +302,8 @@ class MultiSelectBar extends StatelessWidget {
                 label: '$percent%',
                 onChanged: (v) => setState(() => percent = v.round()),
               ),
+              const SizedBox(height: 12),
+              _buildSaveModeSelector(l10n, overwrite, (v) => setState(() => overwrite = v)),
             ],
           ),
           actions: [
@@ -276,7 +311,7 @@ class MultiSelectBar extends StatelessWidget {
             FilledButton(
               onPressed: () {
                 Navigator.pop(dCtx);
-                _batchResize(ctx, prov, l10n, memes, percent / 100.0);
+                _batchResize(ctx, prov, l10n, memes, percent / 100.0, overwrite);
               },
               child: Text(l10n.tr('resize')),
             ),
@@ -286,7 +321,7 @@ class MultiSelectBar extends StatelessWidget {
     );
   }
 
-  static Future<void> _batchResize(BuildContext ctx, MemeProvider prov, L10n l10n, List<Meme> memes, double ratio) async {
+  static Future<void> _batchResize(BuildContext ctx, MemeProvider prov, L10n l10n, List<Meme> memes, double ratio, bool overwrite) async {
     final tool = ctx.read<ImageToolService>();
     final messenger = ScaffoldMessenger.of(ctx);
     showDialog(
@@ -303,7 +338,7 @@ class MultiSelectBar extends StatelessWidget {
     int ok = 0;
     for (final m in memes) {
       try {
-        await tool.resize(m.filePath, percent: ratio, name: m.name);
+        await tool.resize(m.filePath, percent: ratio, name: m.name, overwriteMeme: overwrite ? m : null);
         ok++;
       } catch (_) {}
     }
@@ -549,7 +584,7 @@ class MultiSelectBar extends StatelessWidget {
     }
   }
 
-  void _showMoveDialog(BuildContext ctx, MemeProvider prov, L10n l10n) {
+  static void showMoveDialog(BuildContext ctx, MemeProvider prov, L10n l10n) {
     showDialog(
       context: ctx,
       builder: (dCtx) => SimpleDialog(
@@ -568,7 +603,7 @@ class MultiSelectBar extends StatelessWidget {
     );
   }
 
-  void _showTypeDialog(BuildContext ctx, MemeProvider prov, L10n l10n) {
+  static void showTypeDialog(BuildContext ctx, MemeProvider prov, L10n l10n) {
     final settings = ctx.read<SettingsProvider>();
     final allTypes = [
       {'type': Meme.typeEmoji, 'label': l10n.tr('type_emoji'), 'icon': Icons.emoji_emotions_outlined},
@@ -612,7 +647,7 @@ class MultiSelectBar extends StatelessWidget {
     );
   }
 
-  void _showTagViewerDialog(BuildContext ctx, MemeProvider prov, L10n l10n) {
+  static void showTagViewerDialog(BuildContext ctx, MemeProvider prov, L10n l10n) {
     final selectedMemes = prov.selectedMemes;
     final tagMap = <String, Set<String>>{};
     for (final m in selectedMemes) {
@@ -661,7 +696,7 @@ class MultiSelectBar extends StatelessWidget {
     );
   }
 
-  void _showBatchTagDialog(BuildContext ctx, MemeProvider prov, L10n l10n) {
+  static void showBatchTagDialog(BuildContext ctx, MemeProvider prov, L10n l10n) {
     final tagCtrl = TextEditingController();
     showDialog(
       context: ctx,
@@ -712,7 +747,7 @@ class MultiSelectBar extends StatelessWidget {
     );
   }
 
-  Future<void> _exportSelected(BuildContext ctx, MemeProvider prov, L10n l10n) async {
+  static Future<void> exportSelected(BuildContext ctx, MemeProvider prov, L10n l10n) async {
     try {
       ScaffoldMessenger.of(ctx).showSnackBar(
         SnackBar(content: Text(l10n.tr('selected_memes', args: {'count': prov.selected.length.toString()}))),
@@ -726,7 +761,7 @@ class MultiSelectBar extends StatelessWidget {
     }
   }
 
-  void _confirmDelete(BuildContext ctx, MemeProvider prov, L10n l10n) async {
+  static Future<void> confirmDelete(BuildContext ctx, MemeProvider prov, L10n l10n) async {
     final confirm = await showDialog<bool>(
       context: ctx,
       builder: (dCtx) => AlertDialog(
@@ -741,3 +776,4 @@ class MultiSelectBar extends StatelessWidget {
     if (confirm == true) await prov.deleteSelected();
   }
 }
+// Last updated: 2026-09-05 - Fixed static method declarations for home_screen integration

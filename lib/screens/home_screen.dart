@@ -42,6 +42,132 @@ class _HomeScreenState extends State<HomeScreen> {
   String _moodQuery = '';
   bool _isEffectShowing = false;
 
+  // Scaffold 全屏 drawerEdgeDragWidth 会抢走顶部筛选按钮（横向 ListView）的滚动，
+  // 改用手动 Listener 实现"分区"右滑开抽屉：指针落在筛选区则放行给 ListView 滚动，
+  // 落在别处右滑才开抽屉。Listener 不参与手势竞技场，不会拦截子组件
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final GlobalKey _topChipsKey = GlobalKey();
+  final GlobalKey _multiSelectBarKey = GlobalKey();
+  
+  // 多选模式下筛选区中的工具按钮 - 类似 MultiSelectBar 但更紧凑
+  Widget _buildMultiSelectTools(MemeProvider prov) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final l10n = context.read<LocaleProvider>().l10n;
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 可见工具按钮的紧凑版本
+          if (prov.selected.isNotEmpty) ...[
+            // 标签查看按钮
+            IconButton(
+              icon: const Icon(Icons.visibility, size: 18),
+              tooltip: l10n.tr('view_tags'),
+              onPressed: () => MultiSelectBar.showTagViewerDialog(context, prov, l10n),
+            ),
+            // 移动到文件夹按钮
+            IconButton(
+              icon: const Icon(Icons.folder_open, size: 18),
+              tooltip: l10n.tr('move_to_folder'),
+              onPressed: () => MultiSelectBar.showMoveDialog(context, prov, l10n),
+            ),
+            // 分类变更按钮
+            IconButton(
+              icon: const Icon(Icons.label_outline, size: 18),
+              tooltip: l10n.tr('change_category'),
+              onPressed: () => MultiSelectBar.showTypeDialog(context, prov, l10n),
+            ),
+            // 添加标签按钮
+            IconButton(
+              icon: const Icon(Icons.local_offer_outlined, size: 18),
+              tooltip: l10n.tr('add_tag'),
+              onPressed: () => MultiSelectBar.showBatchTagDialog(context, prov, l10n),
+            ),
+            // 导出按钮
+            IconButton(
+              icon: const Icon(Icons.ios_share, size: 18),
+              tooltip: l10n.tr('export_selected'),
+              onPressed: () => MultiSelectBar.exportSelected(context, prov, l10n),
+            ),
+            // 删除按钮 - 用红色表示
+            IconButton(
+              icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+              tooltip: l10n.tr('delete_selected'),
+              onPressed: () => MultiSelectBar.confirmDelete(context, prov, l10n),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+  Offset? _swipeStart;
+  bool _swipeInChips = false;
+  bool _swipeDrawerOpened = false;
+
+  bool _pointerInChipsZone(Offset globalPos) {
+    // 检查是否在顶部筛选区域
+    final topChipsCtx = _topChipsKey.currentContext;
+    if (topChipsCtx != null) {
+      final topChipsBox = topChipsCtx.findRenderObject();
+      if (topChipsBox is RenderBox && topChipsBox.attached) {
+        final tl = topChipsBox.localToGlobal(Offset.zero);
+        final br = tl + Offset(topChipsBox.size.width, topChipsBox.size.height);
+        if (globalPos.dx >= tl.dx && globalPos.dx <= br.dx &&
+            globalPos.dy >= tl.dy && globalPos.dy <= br.dy) {
+          return true;
+        }
+      }
+    }
+    
+    // 在多选模式下，也检查多选按钮区域
+    if (context.mounted && context.read<MemeProvider>().isMulti) {
+      final multiSelectCtx = _multiSelectBarKey.currentContext;
+      if (multiSelectCtx != null) {
+        final multiSelectBox = multiSelectCtx.findRenderObject();
+        if (multiSelectBox is RenderBox && multiSelectBox.attached) {
+          final tl = multiSelectBox.localToGlobal(Offset.zero);
+          final br = tl + Offset(multiSelectBox.size.width, multiSelectBox.size.height);
+          if (globalPos.dx >= tl.dx && globalPos.dx <= br.dx &&
+              globalPos.dy >= tl.dy && globalPos.dy <= br.dy) {
+            return true;
+          }
+        }
+      }
+    }
+    
+    return false;
+  }
+
+  void _onBodyPointerDown(PointerDownEvent e) {
+    _swipeStart = e.position;
+    _swipeInChips = _pointerInChipsZone(e.position);
+    _swipeDrawerOpened = false;
+  }
+
+  void _onBodyPointerMove(PointerMoveEvent e) {
+    if (_swipeStart == null || _swipeDrawerOpened || _swipeInChips) return;
+    final dx = e.position.dx - _swipeStart!.dx;
+    final ady = (e.position.dy - _swipeStart!.dy).abs();
+    // 仅明显右滑且横向占主导时开抽屉，避免与纵向网格滚动打架
+    if (dx > 24 && dx > ady * 2) {
+      _swipeDrawerOpened = true;
+      _scaffoldKey.currentState?.openDrawer();
+    }
+  }
+
+  void _resetSwipe() {
+    _swipeStart = null;
+    _swipeInChips = false;
+    _swipeDrawerOpened = false;
+  }
+
   // 底部导航顺序与内部 tab 语义一致：0=表情 1=文件夹 2=收藏 3=情绪
   int _navToLogic(int nav) => nav;
   int _logicToNav(int logic) => logic;
@@ -133,6 +259,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       },
       child: Scaffold(
+      key: _scaffoldKey,
       // FAB 不随输入法上升（导入按钮/新建文件夹按钮）
       resizeToAvoidBottomInset: false,
       backgroundColor: theme.colorScheme.surface,
@@ -141,15 +268,31 @@ class _HomeScreenState extends State<HomeScreen> {
         leading: _buildLeading(prov, l10n),
         title: _buildTitle(prov, l10n),
         actions: _buildActions(prov, l10n, settings),
-        bottom: prov.isMulti ? const PreferredSize(
-          preferredSize: Size.fromHeight(48),
-          child: MultiSelectBar(),
-        ) : null,
       ),
-      // 全屏右滑即可打开侧边栏
-      drawerEdgeDragWidth: MediaQuery.of(context).size.width,
+      // 关掉 Scaffold 自带的右滑开抽屉（全屏宽度会抢走顶部筛选按钮的横向滚动），
+      // 改由下方包裹 body 的 Listener 分区判定后手动 openDrawer
+      drawerEdgeDragWidth: 0,
       drawer: _buildDrawer(context, prov),
-      body: _buildBody(prov, l10n),
+      body: Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: _onBodyPointerDown,
+        onPointerMove: _onBodyPointerMove,
+        onPointerUp: (_) => _resetSwipe(),
+        onPointerCancel: (_) => _resetSwipe(),
+        child: Column(
+          children: [
+            Expanded(
+              child: _buildBody(prov, l10n),
+            ),
+            if (prov.isMulti)
+              PreferredSize(
+                key: _multiSelectBarKey,
+                preferredSize: Size.fromHeight(48),
+                child: MultiSelectBar(),
+              ),
+          ],
+        ),
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: navIndex,
         onDestinationSelected: (i) => _onTabChanged(_navToLogic(i)),
@@ -577,8 +720,24 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Column(
                     children: [
                       custom.MakoSearchBar(onSearch: (q) => prov.setQuery(q)),
-                      _buildCategoryChips(prov),
-                      if (prov.tagFilter.isNotEmpty || prov.folderFilter.isNotEmpty) _buildFilterChips(prov),
+                      // 顶部筛选按钮区域：带 key 供右滑开抽屉的分区判定，
+                      // 落在此区域内的右滑放行给横向 ListView 滚动，不打开抽屉
+                      // 也允许点击/触摸 - 多选模式下的工具按钮在此区域
+                      Column(
+                        key: _topChipsKey,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildCategoryChips(prov),
+                          if (prov.tagFilter.isNotEmpty || prov.folderFilter.isNotEmpty) _buildFilterChips(prov),
+                          // 多选模式下的工具按钮也属于筛选区的一部分，允许水平滚动
+                          if (prov.isMulti) ...[
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              child: _buildMultiSelectTools(prov),
+                            ),
+                          ],
+                        ],
+                      ),
                       Expanded(
                         child: MemeGrid(
                           memes: prov.memes,

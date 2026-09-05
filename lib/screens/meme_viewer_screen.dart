@@ -48,6 +48,11 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
   // 拖动面板时实时更新，图片区域随之收缩，保证图片始终可见
   double _panelExtent = 0.45;
 
+  // 全局唯一的详情面板控制器：面板单实例建在 PageView 之上（而非每页各建一份，
+  // 每页的 sheet 各持独立的真实拖动高度，会与共享的 _panelExtent 错位），
+  // 翻页时用它把面板真实高度重置回初始值
+  final DraggableScrollableController _panelController = DraggableScrollableController();
+
   // 全屏查看模式：隐藏 AppBar 和详情面板，图片占满整屏
   // 单击图片切换，支持 PhotoView/InteractiveViewer 捏合缩放
   bool _isFullscreen = false;
@@ -143,6 +148,7 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     }
     _controller.dispose();
+    _panelController.dispose();
     super.dispose();
   }
 
@@ -252,29 +258,15 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
               ),
           ],
         ),
-        body: PageView.builder(
-          // 全屏模式下禁用左右滑动，避免与 PhotoView 捏合缩放冲突
-          // 非全屏保持 BouncingScrollPhysics，允许左右切换上一张/下一张
-          physics: _isFullscreen
-              ? const NeverScrollableScrollPhysics()
-              : const BouncingScrollPhysics(),
-          controller: _controller,
-          // 使用 provider 的实时列表，标签/名称变更后立即刷新
-          itemCount: prov.memes.length,
-          onPageChanged: (i) => setState(() {
-            _currentIndex = i;
-            _mangaPageIndex = 0;
-            // 翻页时重置面板到初始高度，防止返回旧页时面板与图片区域高度不匹配导致图片从面板下露出
-            _panelExtent = 0.45;
-          }),
-          itemBuilder: (ctx, i) {
-            final m = prov.memes[i];
-            // 用 LayoutBuilder 量取 Scaffold body 的真实高度（面板可用高度）。
-            // 不能用 MediaQuery 全屏高度：body 位于 AppBar 之下，两者存在像素差，
-            // 会导致面板高度与图片区域留白不一致、面板下方露出 Scaffold 背景色
-            return LayoutBuilder(
-                builder: (ctx, constraints) {
-                  final bodyHeight = constraints.maxHeight;
+        // 用 LayoutBuilder 量取 Scaffold body 的真实高度（面板可用高度）。
+        // 不能用 MediaQuery 全屏高度：body 位于 AppBar 之下，两者存在像素差，
+        // 会导致面板高度与图片区域留白不一致、面板下方露出 Scaffold 背景色。
+        // 面板单实例建在 PageView 之上：若每页各建一份 sheet，翻页后存活邻页
+        // 的 sheet 仍保持自己的拖动高度，与共享的 _panelExtent 错位——
+        // 返回旧页时图片从面板下漏出、面板下方留出无法滑动的死区
+        body: LayoutBuilder(
+          builder: (ctx, constraints) {
+            final bodyHeight = constraints.maxHeight;
             // 全屏模式下面板高度为 0，图片占满；否则留出面板高度
             final panelHeight = _isFullscreen ? 0.0 : _panelExtent * bodyHeight;
             // 使用 Stack 让面板覆盖在图片上方，避免 Column 无界高度导致 DraggableScrollableSheet 失效
@@ -289,16 +281,38 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
               },
               child: Stack(
                 children: [
-                  // ClipRect 强制裁剪，防止超大画幅图片在 PhotoView 缩放时
-                  // 溢出到 PageView 相邻页面（左右两侧看到本页内容）
                   Positioned.fill(
                     bottom: panelHeight,
-                    child: ClipRect(
-                      child: GestureDetector(
-                        onTap: _toggleFullscreen,
-                        behavior: HitTestBehavior.translucent,
-                        child: _buildImageArea(m, i),
-                      ),
+                    child: PageView.builder(
+                      // 全屏模式下禁用左右滑动，避免与 PhotoView 捏合缩放冲突
+                      // 非全屏保持 BouncingScrollPhysics，允许左右切换上一张/下一张
+                      physics: _isFullscreen
+                          ? const NeverScrollableScrollPhysics()
+                          : const BouncingScrollPhysics(),
+                      controller: _controller,
+                      // 使用 provider 的实时列表，标签/名称变更后立即刷新
+                      itemCount: prov.memes.length,
+                      onPageChanged: (i) => setState(() {
+                        _currentIndex = i;
+                        _mangaPageIndex = 0;
+                        // 翻页时面板吸附回初始高度：驱动单实例面板的真实高度，
+                        // 通知回调会把 _panelExtent 一并同步，图片区域同帧贴合
+                        if (_panelController.isAttached) {
+                          _panelController.jumpTo(0.45);
+                        }
+                      }),
+                      itemBuilder: (ctx, i) {
+                        final m = prov.memes[i];
+                        // ClipRect 强制裁剪，防止超大画幅图片在 PhotoView 缩放时
+                        // 溢出到 PageView 相邻页面（左右两侧看到本页内容）
+                        return ClipRect(
+                          child: GestureDetector(
+                            onTap: _toggleFullscreen,
+                            behavior: HitTestBehavior.translucent,
+                            child: _buildImageArea(m, i),
+                          ),
+                        );
+                      },
                     ),
                   ),
                   if (!_isFullscreen) ...[
@@ -326,13 +340,11 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                     ),
                     Align(
                       alignment: Alignment.bottomCenter,
-                      child: _buildDraggableDetailPanel(theme, prov, m, l10n, bodyHeight),
+                      child: _buildDraggableDetailPanel(theme, prov, _meme, l10n, bodyHeight),
                     ),
                   ],
                 ],
               ),
-            );
-              },
             );
           },
         ),
@@ -1204,6 +1216,7 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
     final isMobile = _isMobilePlatform();
     final settings = context.watch<SettingsProvider>();
     return DraggableScrollableSheet(
+      controller: _panelController,
       initialChildSize: 0.45,
       minChildSize: 0.2,
       maxChildSize: 1.0,

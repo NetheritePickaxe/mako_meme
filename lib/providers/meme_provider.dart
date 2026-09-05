@@ -137,6 +137,44 @@ class MemeProvider with ChangeNotifier {
     _apply();
     notifyListeners();
     _exporter.exportAll(_all);
+    _backfillMissingDimensions();
+  }
+
+  // 宽高回填去重：每个 meme 每次会话只尝试一次，
+  // 避免头部无法解析的格式（ICO/TIF/HEIC 等）每次 loadAll 都重读文件
+  final Set<String> _dimBackfillTried = {};
+  bool _dimBackfillRunning = false;
+
+  /// 存量数据宽高回填：老版本导入的图片、图片工具（转格式/缩放/转 GIF）产出的
+  /// meme 可能没有记录宽高，详情面板便不显示分辨率。
+  /// 对缺失宽高的图片类条目逐一读文件头解析（仅 64KB，不解码整图）并持久化。
+  /// 仅原生端执行：Web 端逐个读 bytes 代价高，且刷新后元数据本就不保留。
+  Future<void> _backfillMissingDimensions() async {
+    if (kIsWeb || _dimBackfillRunning) return;
+    _dimBackfillRunning = true;
+    try {
+      var healed = 0;
+      for (final m in List<Meme>.from(_all)) {
+        if (m.width > 0 && m.height > 0) continue;
+        if (_dimBackfillTried.contains(m.id)) continue;
+        _dimBackfillTried.add(m.id);
+        if (!m.isImageType || m.isPdf || m.filePath.isEmpty) continue;
+        final dims = await _storage.getImageDimensions(m.filePath);
+        if (dims != null && dims.width > 0 && dims.height > 0) {
+          await _storage.saveMeme(m.copyWith(width: dims.width, height: dims.height));
+          final idx = _all.indexWhere((x) => x.id == m.id);
+          if (idx >= 0) _all[idx] = m.copyWith(width: dims.width, height: dims.height);
+          healed++;
+        }
+      }
+      if (healed > 0) {
+        _memesByMoodCache = null;
+        _apply();
+        notifyListeners();
+      }
+    } finally {
+      _dimBackfillRunning = false;
+    }
   }
 
   void selectFolder(String? id) {
@@ -440,6 +478,14 @@ class MemeProvider with ChangeNotifier {
       _sel.clear();
       _selectedFolders.clear();
     }
+    notifyListeners();
+  }
+
+  /// 退出多选模式并清空已选（多选栏"取消"按钮）
+  void exitMulti() {
+    _multi = false;
+    _sel.clear();
+    _selectedFolders.clear();
     notifyListeners();
   }
 
@@ -847,9 +893,10 @@ class MemeProvider with ChangeNotifier {
 
   void _apply() {
     var list = List<Meme>.from(_all);
-    // 文件夹筛选仅在表情包 tab（非收藏视图）生效；
-    // 切到收藏/文件夹 tab 时保留 _folderId 但不应用，以便切回时恢复
-    if (_folderId != null && !_showFavorites && !_showFoldersView) {
+    // 文件夹筛选在表情包 tab 和文件夹 tab（文件夹内容视图）都生效，仅收藏视图不应用。
+    // 文件夹 tab 在 folderId 非空时渲染文件夹内容视图（标题/返回键一致），
+    // 过滤必须与 UI 对齐，否则会显示全部图片；folderId 仍跨 tab 保留
+    if (_folderId != null && !_showFavorites) {
       list = list.where((m) => m.folderId == _folderId).toList();
     }
     if (_showFavorites) {
