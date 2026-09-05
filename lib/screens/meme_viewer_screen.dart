@@ -316,20 +316,6 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                     ),
                   ),
                   if (!_isFullscreen) ...[
-                    // 暗色遮罩只覆盖图片区域（面板上方），随面板展开程度加深
-                    Positioned(
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: panelHeight,
-                      child: IgnorePointer(
-                        child: AnimatedOpacity(
-                          opacity: ((_panelExtent - 0.2) / 0.8).clamp(0.0, 1.0),
-                          duration: const Duration(milliseconds: 150),
-                          child: Container(color: Colors.black54),
-                        ),
-                      ),
-                    ),
                     // 面板底层不透明色块：无论面板如何移动/动画，下方不会透出 Scaffold 背景
                     Positioned(
                       left: 0,
@@ -1242,7 +1228,12 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
               child: SingleChildScrollView(
                 controller: controller,
                 padding: const EdgeInsets.fromLTRB(16, 6, 16, 16),
-                child: Column(
+                // 内容必须至少撑满面面板高度：SingleChildScrollView 会按内容收缩
+                // （Column min），内容较短时滚动区只盖住上半部分，
+                // 下半部分没有挂 controller 的滚动体 → 无法拖动面板（死区）
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: bodyHeight),
+                  child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1385,6 +1376,7 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
                 ],
               ],
             ),
+          ),
           ),
           ),
           if (_showScrollToTop)
@@ -2153,69 +2145,65 @@ class _MemeViewerScreenState extends State<MemeViewerScreen> {
     ];
   }
 
-  /// 角色卡预览标题栏：点击切换展开/收起，右侧始终显示编辑按钮
+  /// 角色卡预览标题栏：点击整条标题栏切换展开/收起，右侧始终显示编辑按钮
   /// 默认收起，避免长内容撑爆详情面板；展开后显示全部字段
   Widget _buildCharacterCardHeader(ThemeData theme, L10n l10n, Meme m) {
     final name = (m.characterData?['name'] ?? '').toString();
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.primary.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.contact_page_outlined,
-            size: 18,
-            color: theme.colorScheme.primary,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              name.isNotEmpty ? name : l10n.tr('type_character_card'),
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: theme.colorScheme.primary,
-                fontWeight: FontWeight.w600,
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      // 点击标题栏任意位置（含名称、左侧图标）即切换展开/收起，
+      // 编辑按钮是独立 IconButton，点击会命中自身而不会触发此回调
+      onTap: () => setState(() {
+        _cardExpanded = !_cardExpanded;
+        _onDetailScroll();
+      }),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.primary.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.contact_page_outlined,
+              size: 18,
+              color: theme.colorScheme.primary,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                name.isNotEmpty ? name : l10n.tr('type_character_card'),
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
-          ),
-          // 编辑按钮：始终可见，无需展开即可点
-          IconButton(
-            icon: const Icon(Icons.edit_outlined, size: 18),
-            tooltip: l10n.tr('edit_character_card'),
-            visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-            style: IconButton.styleFrom(
-              foregroundColor: theme.colorScheme.primary,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            // 编辑按钮：始终可见，无需展开即可点
+            IconButton(
+              icon: const Icon(Icons.edit_outlined, size: 18),
+              tooltip: l10n.tr('edit_character_card'),
+              visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+              style: IconButton.styleFrom(
+                foregroundColor: theme.colorScheme.primary,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              onPressed: _editCharacterCard,
             ),
-            onPressed: _editCharacterCard,
-          ),
-          // 展开/收起切换按钮
-          IconButton(
-            icon: Icon(
+            // 展开/收起指示箭头（随标题栏点击切换）
+            Icon(
               _cardExpanded ? Icons.expand_less : Icons.expand_more,
               size: 22,
+              color: theme.colorScheme.primary,
             ),
-            tooltip: _cardExpanded ? l10n.tr('collapse') : l10n.tr('expand'),
-            visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-            style: IconButton.styleFrom(
-              foregroundColor: theme.colorScheme.primary,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            onPressed: () => setState(() {
-              _cardExpanded = !_cardExpanded;
-              _onDetailScroll();
-            }),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

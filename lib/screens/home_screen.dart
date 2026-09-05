@@ -736,6 +736,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               child: _buildMultiSelectTools(prov),
                             ),
                           ],
+                          // 筛选按钮下边界留白
+                          const SizedBox(height: 8),
                         ],
                       ),
                       Expanded(
